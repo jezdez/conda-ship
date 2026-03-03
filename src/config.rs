@@ -101,8 +101,11 @@ pub fn write_frozen(prefix: &Path) -> miette::Result<()> {
         )
     });
     std::fs::create_dir_all(prefix.join("conda-meta")).into_diagnostic()?;
-    std::fs::write(&frozen_path, serde_json::to_string_pretty(&contents).into_diagnostic()?)
-        .into_diagnostic()?;
+    std::fs::write(
+        &frozen_path,
+        serde_json::to_string_pretty(&contents).into_diagnostic()?,
+    )
+    .into_diagnostic()?;
     eprintln!("   Wrote {}", frozen_path.display());
     Ok(())
 }

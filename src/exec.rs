@@ -38,6 +38,7 @@ fn hand_off(mut cmd: std::process::Command) -> miette::Result<()> {
 
 #[cfg(not(unix))]
 fn hand_off(mut cmd: std::process::Command) -> miette::Result<()> {
+    use miette::IntoDiagnostic;
     let status = cmd.status().into_diagnostic()?;
     std::process::exit(status.code().unwrap_or(1));
 }

@@ -107,7 +107,11 @@ fn main() {
     let repo_hash = manifest_dir.join("cx.lock.hash");
     std::fs::write(&repo_lock, &lock_content).expect("failed to write repo cx.lock");
     std::fs::write(&repo_hash, &input_hash).expect("failed to write repo hash");
-    eprintln!("cx: lockfile written to {} and {}", lock_path.display(), repo_lock.display());
+    eprintln!(
+        "cx: lockfile written to {} and {}",
+        lock_path.display(),
+        repo_lock.display()
+    );
 }
 
 /// Fetch repodata, solve, filter exclusions, and produce a lockfile string.
