@@ -1,6 +1,6 @@
 [package]
 name = "conda-express"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 description = "A lightweight, single-binary conda bootstrapper — powered by rattler"
 license = "BSD-3-Clause"
