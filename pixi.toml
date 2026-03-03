@@ -1,0 +1,46 @@
+[workspace]
+name = "conda-express"
+description = "A lightweight, single-binary conda bootstrapper"
+channels = ["conda-forge"]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+license = "BSD-3-Clause"
+
+[dependencies]
+rust = ">=1.85"
+
+[tasks]
+build = "cargo build --release"
+build-debug = "cargo build"
+test = "cargo test --release"
+fmt-check = "cargo fmt --check"
+clippy = "cargo clippy --all-targets -- -D warnings"
+lint = { depends-on = ["fmt-check", "clippy"] }
+
+[feature.docs.dependencies]
+sphinx = ">=7.0"
+conda-sphinx-theme = ">=0.2"
+myst-parser = ">=3.0"
+sphinx-design = ">=0.6"
+sphinx-copybutton = ">=0.5"
+sphinx-reredirects = ">=0.1"
+sphinx-sitemap = ">=2.5"
+
+[feature.docs.tasks]
+docs = { cmd = "sphinx-build -b dirhtml . _build/dirhtml", cwd = "docs" }
+docs-serve = { cmd = "python -m http.server", cwd = "docs/_build/dirhtml" }
+docs-clean = { cmd = "rm -rf _build", cwd = "docs" }
+
+[environments]
+docs = ["docs"]
+
+[tool.cx]
+channels = ["conda-forge"]
+packages = [
+    "python >=3.12",
+    "conda >=25.1",
+    "conda-rattler-solver",
+    "conda-spawn",
+    "conda-pypi",
+    "conda-self",
+]
+exclude = ["conda-libmamba-solver"]
