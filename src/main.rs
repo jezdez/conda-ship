@@ -44,33 +44,9 @@ async fn async_main() -> miette::Result<()> {
         Some("init") => {
             print_disabled_init();
         }
-        Some("help") => {
-            print_help();
-        }
-        Some("shell") => {
-            let prefix = default_prefix()?;
-            if !is_bootstrapped(&prefix) {
-                eprintln!(
-                    "{} No conda installation found. Bootstrapping now...",
-                    console::style(">>").cyan().bold()
-                );
-                let cfg = embedded_config();
-                cmd_bootstrap(
-                    &prefix,
-                    false,
-                    None,
-                    None,
-                    &cfg.exclude,
-                    LockSource::Embedded,
-                )
-                .await?;
-            }
-            let mut conda_args = vec!["spawn"];
-            conda_args.extend(raw_args[2..].iter().map(|s| s.as_str()));
-            return exec::replace_process_with_conda(&prefix, &conda_args);
-        }
-        Some("bootstrap") | Some("status") | Some("--help") | Some("-h") | Some("--version")
-        | Some("-V") | None => {
+        // Commands handled by clap (cx's own subcommands, flags, bare invocation)
+        Some("bootstrap") | Some("status") | Some("shell") | Some("help") | Some("--help")
+        | Some("-h") | Some("--version") | Some("-V") | None => {
             let cli = Cli::parse();
             match cli.command {
                 Some(Command::Bootstrap {
@@ -103,6 +79,24 @@ async fn async_main() -> miette::Result<()> {
                     let prefix = prefix.map(Ok).unwrap_or_else(default_prefix)?;
                     return cmd_status(&prefix);
                 }
+                Some(Command::Shell { env }) => {
+                    let prefix = default_prefix()?;
+                    ensure_bootstrapped(&prefix).await?;
+                    let mut conda_args = vec!["spawn"];
+                    if let Some(ref name) = env {
+                        conda_args.push(name);
+                    }
+                    let extra: Vec<&str> = raw_args[2..]
+                        .iter()
+                        .skip(env.is_some() as usize)
+                        .map(|s| s.as_str())
+                        .collect();
+                    conda_args.extend(extra);
+                    return exec::replace_process_with_conda(&prefix, &conda_args);
+                }
+                Some(Command::Help) => {
+                    Cli::parse_from(["cx", "--help"]);
+                }
                 None => {
                     let prefix = default_prefix()?;
                     if !is_bootstrapped(&prefix) {
@@ -116,24 +110,10 @@ async fn async_main() -> miette::Result<()> {
                 }
             }
         }
+        // Everything else passes through to conda
         Some(_) => {
             let prefix = default_prefix()?;
-            if !is_bootstrapped(&prefix) {
-                eprintln!(
-                    "{} No conda installation found. Bootstrapping now...",
-                    console::style(">>").cyan().bold()
-                );
-                let cfg = embedded_config();
-                cmd_bootstrap(
-                    &prefix,
-                    false,
-                    None,
-                    None,
-                    &cfg.exclude,
-                    LockSource::Embedded,
-                )
-                .await?;
-            }
+            ensure_bootstrapped(&prefix).await?;
             let conda_args: Vec<&str> = raw_args[1..].iter().map(|s| s.as_str()).collect();
             if exec::needs_output_filtering(&conda_args) {
                 return exec::run_conda_filtered(&prefix, &conda_args);
@@ -154,6 +134,26 @@ fn default_prefix() -> miette::Result<std::path::PathBuf> {
 
 fn is_bootstrapped(prefix: &Path) -> bool {
     prefix.join("conda-meta").is_dir()
+}
+
+async fn ensure_bootstrapped(prefix: &Path) -> miette::Result<()> {
+    if !is_bootstrapped(prefix) {
+        eprintln!(
+            "{} No conda installation found. Bootstrapping now...",
+            console::style(">>").cyan().bold()
+        );
+        let cfg = embedded_config();
+        cmd_bootstrap(
+            prefix,
+            false,
+            None,
+            None,
+            &cfg.exclude,
+            LockSource::Embedded,
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 fn conda_executable(prefix: &Path) -> std::path::PathBuf {
@@ -327,80 +327,6 @@ fn print_disabled_init() {
     eprintln!();
     eprintln!("  Learn more: https://github.com/conda-incubator/conda-spawn");
     std::process::exit(1);
-}
-
-// ─── Help ─────────────────────────────────────────────────────────────────────
-
-fn print_help() {
-    let g = console::style;
-    eprintln!(
-        "{} {} — lightweight single-binary conda bootstrapper",
-        g("cx").bold().cyan(),
-        env!("CARGO_PKG_VERSION"),
-    );
-    eprintln!();
-    eprintln!("{}", g("Getting started:").bold().underlined());
-    eprintln!();
-    eprintln!(
-        "  {}    Install conda into ~/.cx",
-        g("cx bootstrap").green()
-    );
-    eprintln!(
-        "  {}  Re-install from scratch",
-        g("cx bootstrap --force").green()
-    );
-    eprintln!();
-    eprintln!("{}", g("Working with environments:").bold().underlined());
-    eprintln!();
-    eprintln!(
-        "  {}  Create an environment",
-        g("cx create -n myenv python=3.12 numpy").green()
-    );
-    eprintln!(
-        "  {}              Activate (spawns a subshell)",
-        g("cx shell myenv").green()
-    );
-    eprintln!(
-        "  {}                        Leave the environment",
-        g("exit").green()
-    );
-    eprintln!();
-    eprintln!("{}", g("cx commands:").bold().underlined());
-    eprintln!();
-    eprintln!(
-        "  {}          Install conda into ~/.cx",
-        g("bootstrap").cyan()
-    );
-    eprintln!(
-        "  {}             Show cx prefix metadata",
-        g("status").cyan()
-    );
-    eprintln!(
-        "  {}              Activate via subshell (conda spawn)",
-        g("shell").cyan()
-    );
-    eprintln!("  {}               This help message", g("help").cyan());
-    eprintln!();
-    eprintln!(
-        "{}",
-        g("All other commands pass through to conda:")
-            .bold()
-            .underlined()
-    );
-    eprintln!();
-    eprintln!(
-        "  {}",
-        g("cx install, cx remove, cx list, cx env, cx info, cx config, ...").dim()
-    );
-    eprintln!();
-    eprintln!(
-        "  Docs: {}",
-        g("https://jezdez.github.io/conda-express/").underlined()
-    );
-    eprintln!(
-        "  Repo: {}",
-        g("https://github.com/jezdez/conda-express").underlined()
-    );
 }
 
 // ─── Tracing ─────────────────────────────────────────────────────────────────
