@@ -1,0 +1,89 @@
+name: "Build cx (conda-express)"
+description: >
+  Build a custom cx bootstrapper binary with your choice of conda packages
+  baked in. Runs on the current runner — use a matrix strategy for
+  multi-platform builds.
+branding:
+  icon: package
+  color: green
+
+inputs:
+  packages:
+    description: >
+      Comma-separated conda package specs to include in the bootstrapper.
+      Example: "python >=3.12, conda >=25.1, numpy, pandas".
+      When empty, uses the default packages from conda-express.
+    required: false
+    default: ""
+  channels:
+    description: >
+      Comma-separated conda channels.
+      When empty, uses the default (conda-forge).
+    required: false
+    default: ""
+  exclude:
+    description: >
+      Comma-separated packages to exclude (along with their exclusive
+      dependencies). When empty, uses the default exclusions.
+    required: false
+    default: ""
+  ref:
+    description: "Git ref of conda-express to build from (tag, branch, or SHA)."
+    required: false
+    default: "main"
+
+outputs:
+  binary-path:
+    description: "Absolute path to the built cx binary."
+    value: ${{ steps.stage.outputs.binary_path }}
+  asset-name:
+    description: "Platform-qualified asset name (e.g. cx-aarch64-apple-darwin)."
+    value: ${{ steps.stage.outputs.asset_name }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout conda-express
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        repository: jezdez/conda-express
+        ref: ${{ inputs.ref }}
+        path: .cx-build
+
+    - name: Setup pixi
+      uses: prefix-dev/setup-pixi@82d477f15f3a381dbcc8adc1206ce643fe110fb7 # v0.9.3
+      with:
+        manifest-path: .cx-build/pixi.toml
+        cache: true
+
+    - name: Setup Rust cache
+      uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+      with:
+        workspaces: .cx-build
+
+    - name: Build cx
+      shell: bash
+      env:
+        CX_PACKAGES: ${{ inputs.packages }}
+        CX_CHANNELS: ${{ inputs.channels }}
+        CX_EXCLUDE: ${{ inputs.exclude }}
+      working-directory: .cx-build
+      run: pixi run build
+
+    - name: Stage binary
+      id: stage
+      shell: bash
+      run: |
+        TARGET="$(rustc -vV | grep '^host:' | cut -d' ' -f2)"
+        if [[ "$TARGET" == *"windows"* ]]; then
+          BIN_NAME="cx.exe"
+          ASSET_NAME="cx-${TARGET}.exe"
+        else
+          BIN_NAME="cx"
+          ASSET_NAME="cx-${TARGET}"
+        fi
+        BINARY_PATH="${GITHUB_WORKSPACE}/${ASSET_NAME}"
+        cp ".cx-build/target/release/${BIN_NAME}" "${BINARY_PATH}"
+        sha256sum "${BINARY_PATH}" > "${BINARY_PATH}.sha256"
+        echo "binary_path=${BINARY_PATH}" >> "$GITHUB_OUTPUT"
+        echo "asset_name=${ASSET_NAME}" >> "$GITHUB_OUTPUT"
