@@ -1,0 +1,76 @@
+name: Build custom cx
+
+on:
+  workflow_call:
+    inputs:
+      packages:
+        description: >
+          Comma-separated conda package specs to include in the bootstrapper.
+          Example: "python >=3.12, conda >=25.1, numpy, pandas"
+          Defaults to the packages defined in pixi.toml [tool.cx].
+        required: false
+        type: string
+        default: ""
+      channels:
+        description: >
+          Comma-separated conda channels.
+          Defaults to the channels defined in pixi.toml [tool.cx].
+        required: false
+        type: string
+        default: ""
+      exclude:
+        description: >
+          Comma-separated packages to exclude from the bootstrapper
+          (along with their exclusive dependencies).
+          Defaults to the excludes defined in pixi.toml [tool.cx].
+        required: false
+        type: string
+        default: ""
+      ref:
+        description: "Git ref of conda-express to build from (tag, branch, or SHA)."
+        required: false
+        type: string
+        default: "main"
+      retention-days:
+        description: "Number of days to retain build artifacts."
+        required: false
+        type: number
+        default: 7
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: x86_64-apple-darwin
+            os: macos-15-large
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+
+    steps:
+      - name: Build cx
+        id: build
+        uses: jezdez/conda-express@${{ inputs.ref }}
+        with:
+          packages: ${{ inputs.packages }}
+          channels: ${{ inputs.channels }}
+          exclude: ${{ inputs.exclude }}
+          ref: ${{ inputs.ref }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ steps.build.outputs.asset-name }}
+          path: |
+            ${{ steps.build.outputs.binary-path }}
+            ${{ steps.build.outputs.binary-path }}.sha256
+          retention-days: ${{ inputs.retention-days }}
