@@ -14,28 +14,26 @@ uses: jezdez/conda-express@<ref>
 
 ### Inputs
 
-`packages`
+`packages` {bdg-secondary}`optional`
 : Comma-separated conda package specs to include in the bootstrapper.
-  When empty, uses the default packages from conda-express. Optional.
+  When empty, uses the default packages from conda-express.
 
   Example: `"python >=3.12, conda >=25.1, numpy, pandas"`
 
-`channels`
+`channels` {bdg-secondary}`optional`
 : Comma-separated conda channels. When empty, uses the default
-  (`conda-forge`). Optional.
+  (`conda-forge`).
 
   Example: `"conda-forge, bioconda"`
 
-`exclude`
+`exclude` {bdg-secondary}`optional`
 : Comma-separated packages to exclude from the bootstrapper, along with
   their exclusive dependencies. When empty, uses the default exclusions.
-  Optional.
 
   Example: `"conda-libmamba-solver"`
 
-`ref`
+`ref` {bdg-secondary}`optional` {bdg-info}`default: main`
 : Git ref of conda-express to build from (tag, branch, or SHA).
-  Default: `main`. Optional.
 
 ### Outputs
 
@@ -69,8 +67,8 @@ uses: jezdez/conda-express/.github/workflows/build.yml@<ref>
 
 All inputs from the composite action are supported, plus:
 
-`retention-days`
-: Number of days to retain build artifacts. Default: `7`. Optional.
+`retention-days` {bdg-secondary}`optional` {bdg-info}`default: 7`
+: Number of days to retain build artifacts.
 
 ### Artifacts
 
