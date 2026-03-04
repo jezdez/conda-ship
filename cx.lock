@@ -24,7 +24,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/conda-index-0.7.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/conda-package-handling-2.4.0-pyh7900ff3_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/conda-package-streaming-0.12.0-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/conda-pypi-0.4.0-py314h4dc9dd8_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/conda-pypi-0.5.0-py314h4dc9dd8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/conda-rattler-solver-0.0.5-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/conda-self-0.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/conda-spawn-0.0.5-pyhd8ed1ab_0.conda
@@ -319,9 +319,9 @@ packages:
   license_family: BSD
   size: 21933
   timestamp: 1751548225624
-- conda: https://conda.anaconda.org/conda-forge/osx-arm64/conda-pypi-0.4.0-py314h4dc9dd8_1.conda
-  sha256: fa95626bfb04ee00b9a7f4b5d0c0b0bf86e2fc905f8d47a61dfff0b1bb00b387
-  md5: 517dce7fa2bfe74d24b73259c11ea0b6
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/conda-pypi-0.5.0-py314h4dc9dd8_0.conda
+  sha256: d464fb951197d8396d5ecd571a14ce319b238474874145beec53aca37f3d064b
+  md5: 98bc5b026007ed69ca8ab005b83b58b4
   depends:
   - conda >=26.1.0
   - conda-index >=0.7.0
@@ -337,8 +337,8 @@ packages:
   - unearth
   license: MIT
   license_family: MIT
-  size: 247245
-  timestamp: 1770385076338
+  size: 251921
+  timestamp: 1772544183859
 - conda: https://conda.anaconda.org/conda-forge/noarch/conda-rattler-solver-0.0.5-pyhcf101f3_0.conda
   sha256: e0a860c9de2a4a4b98adb9da06c11179ed0f1b1e9dbc009e59e6aa046cc4af97
   md5: ee2bf345c9ab7ba5f159567061ebde32
