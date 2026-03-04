@@ -56,17 +56,43 @@ fn main() {
     println!("cargo:rerun-if-changed=cx.lock");
 
     let config_contents = std::fs::read_to_string(&config_path).expect("failed to read pixi.toml");
-    let config: PixiToml = toml::from_str(&config_contents).expect("failed to parse pixi.toml");
+    let mut config: PixiToml = toml::from_str(&config_contents).expect("failed to parse pixi.toml");
+
+    println!("cargo:rerun-if-env-changed=CX_PACKAGES");
+    println!("cargo:rerun-if-env-changed=CX_CHANNELS");
+    println!("cargo:rerun-if-env-changed=CX_EXCLUDE");
+
+    let env_packages = env::var("CX_PACKAGES").ok().filter(|v| !v.is_empty());
+    let env_channels = env::var("CX_CHANNELS").ok().filter(|v| !v.is_empty());
+    let env_exclude = env::var("CX_EXCLUDE").ok().filter(|v| !v.is_empty());
+    let has_env_overrides = env_packages.is_some() || env_channels.is_some() || env_exclude.is_some();
+
+    if let Some(ref val) = env_packages {
+        config.tool.cx.packages = val.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        eprintln!("cx: CX_PACKAGES override: {:?}", config.tool.cx.packages);
+    }
+    if let Some(ref val) = env_channels {
+        config.tool.cx.channels = val.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        eprintln!("cx: CX_CHANNELS override: {:?}", config.tool.cx.channels);
+    }
+    if let Some(ref val) = env_exclude {
+        config.tool.cx.exclude = val.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        eprintln!("cx: CX_EXCLUDE override: {:?}", config.tool.cx.exclude);
+    }
 
     let input_hash = {
         let mut hasher = Sha256::new();
         hasher.update(config_contents.as_bytes());
+        if let Some(ref v) = env_packages { hasher.update(v.as_bytes()); }
+        if let Some(ref v) = env_channels { hasher.update(v.as_bytes()); }
+        if let Some(ref v) = env_exclude { hasher.update(v.as_bytes()); }
         format!("{:x}", hasher.finalize())
     };
 
     // Fast path: use a checked-in cx.lock from the repo root if it exists
     // and the config hash matches. This avoids the network solve entirely.
-    if checked_in_lock.exists() {
+    // Skipped when env var overrides are active (different package set).
+    if !has_env_overrides && checked_in_lock.exists() {
         let checked_in_hash_path = manifest_dir.join("cx.lock.hash");
         if checked_in_hash_path.exists() {
             let stored_hash = std::fs::read_to_string(&checked_in_hash_path).unwrap_or_default();
@@ -79,8 +105,9 @@ fn main() {
         }
     }
 
-    // Second fast path: OUT_DIR cached lockfile from a previous build
-    if lock_path.exists() && hash_path.exists() {
+    // Second fast path: OUT_DIR cached lockfile from a previous build.
+    // Also skipped when env var overrides are active.
+    if !has_env_overrides && lock_path.exists() && hash_path.exists() {
         let stored_hash = std::fs::read_to_string(&hash_path).unwrap_or_default();
         if stored_hash.trim() == input_hash {
             eprintln!("cx: lockfile is fresh, skipping solve");
@@ -102,16 +129,21 @@ fn main() {
     std::fs::write(&lock_path, &lock_content).expect("failed to write cx.lock");
     std::fs::write(&hash_path, &input_hash).expect("failed to write hash file");
 
-    // Also write to the repo root so the lockfile can be checked in
-    let repo_lock = manifest_dir.join("cx.lock");
-    let repo_hash = manifest_dir.join("cx.lock.hash");
-    std::fs::write(&repo_lock, &lock_content).expect("failed to write repo cx.lock");
-    std::fs::write(&repo_hash, &input_hash).expect("failed to write repo hash");
-    eprintln!(
-        "cx: lockfile written to {} and {}",
-        lock_path.display(),
-        repo_lock.display()
-    );
+    // Write to the repo root so the lockfile can be checked in — but only
+    // when no env var overrides are active (those produce a one-off lockfile).
+    if !has_env_overrides {
+        let repo_lock = manifest_dir.join("cx.lock");
+        let repo_hash = manifest_dir.join("cx.lock.hash");
+        std::fs::write(&repo_lock, &lock_content).expect("failed to write repo cx.lock");
+        std::fs::write(&repo_hash, &input_hash).expect("failed to write repo hash");
+        eprintln!(
+            "cx: lockfile written to {} and {}",
+            lock_path.display(),
+            repo_lock.display()
+        );
+    } else {
+        eprintln!("cx: lockfile written to {}", lock_path.display());
+    }
 }
 
 /// Fetch repodata, solve, filter exclusions, and produce a lockfile string.
