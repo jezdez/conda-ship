@@ -2,7 +2,7 @@
 
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     env,
     future::IntoFuture,
     path::Path,
@@ -19,8 +19,8 @@ use rattler::{
     package_cache::PackageCache,
 };
 use rattler_conda_types::{
-    Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, PackageName, ParseMatchSpecOptions,
-    Platform, PrefixRecord, RepoDataRecord,
+    Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, ParseMatchSpecOptions, Platform,
+    PrefixRecord, RepoDataRecord,
 };
 use rattler_lock::LockFile;
 use rattler_networking::AuthenticationMiddleware;
@@ -28,6 +28,7 @@ use rattler_repodata_gateway::{Gateway, RepoData, SourceConfig};
 use rattler_solve::{SolverImpl, SolverTask, resolvo};
 
 use crate::config;
+use crate::exclude::filter_excluded_packages;
 
 // ─── Shared progress bar ─────────────────────────────────────────────────────
 
@@ -275,83 +276,6 @@ fn apply_excludes(packages: Vec<RepoDataRecord>, excludes: &[String]) -> Vec<Rep
         );
     }
     filtered
-}
-
-// ─── Post-solve exclusion filter ─────────────────────────────────────────────
-
-/// Remove explicitly excluded packages and any of their dependencies that are
-/// not required by any remaining package.
-///
-/// Walks the reverse-dependency graph: starting from the excluded set, it
-/// transitively removes dependencies whose *every* dependent has already been
-/// removed.
-fn filter_excluded_packages(
-    packages: Vec<RepoDataRecord>,
-    excludes: &[String],
-) -> (Vec<RepoDataRecord>, Vec<String>) {
-    let exclude_set: HashSet<&str> = excludes.iter().map(|s| s.as_str()).collect();
-
-    let name_of = |r: &RepoDataRecord| r.package_record.name.as_normalized().to_string();
-    let pkg_names: Vec<String> = packages.iter().map(name_of).collect();
-    let name_to_idx: HashMap<&str, usize> = pkg_names
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.as_str(), i))
-        .collect();
-
-    let n = packages.len();
-    let mut reverse_deps: Vec<HashSet<usize>> = vec![HashSet::new(); n];
-    for (i, rec) in packages.iter().enumerate() {
-        for dep_str in &rec.package_record.depends {
-            let dep_name = PackageName::from_matchspec_str_unchecked(dep_str);
-            if let Some(&dep_idx) = name_to_idx.get(dep_name.as_normalized()) {
-                reverse_deps[dep_idx].insert(i);
-            }
-        }
-    }
-
-    let mut removed: HashSet<usize> = HashSet::new();
-    let mut queue: Vec<usize> = Vec::new();
-    for (i, name) in pkg_names.iter().enumerate() {
-        if exclude_set.contains(name.as_str()) {
-            removed.insert(i);
-            queue.push(i);
-        }
-    }
-
-    while let Some(pkg_idx) = queue.pop() {
-        for dep_str in &packages[pkg_idx].package_record.depends {
-            let dep_name = PackageName::from_matchspec_str_unchecked(dep_str);
-            if let Some(&dep_idx) = name_to_idx.get(dep_name.as_normalized()) {
-                if removed.contains(&dep_idx) {
-                    continue;
-                }
-                let all_dependents_removed = reverse_deps[dep_idx]
-                    .iter()
-                    .all(|rdep| removed.contains(rdep));
-                if all_dependents_removed {
-                    removed.insert(dep_idx);
-                    queue.push(dep_idx);
-                }
-            }
-        }
-    }
-
-    let removed_names: Vec<String> = removed
-        .iter()
-        .map(|&i| pkg_names[i].clone())
-        .collect::<Vec<_>>();
-
-    let filtered: Vec<RepoDataRecord> = packages
-        .into_iter()
-        .enumerate()
-        .filter(|(i, _)| !removed.contains(i))
-        .map(|(_, r)| r)
-        .collect();
-
-    let mut sorted_names = removed_names;
-    sorted_names.sort();
-    (filtered, sorted_names)
 }
 
 // ─── Progress spinners ───────────────────────────────────────────────────────

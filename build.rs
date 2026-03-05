@@ -5,18 +5,14 @@
 //! content-hash to cache the lockfile: if the config hasn't changed since
 //! the last build, the solve is skipped entirely.
 
-use std::{
-    collections::{HashMap, HashSet},
-    env,
-    path::PathBuf,
-    sync::Arc,
-    time::Instant,
-};
+use std::{collections::HashMap, env, path::PathBuf, sync::Arc, time::Instant};
+
+#[path = "src/exclude.rs"]
+mod exclude;
 
 use rattler::{default_cache_dir, package_cache::PackageCache};
 use rattler_conda_types::{
-    Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, PackageName, ParseMatchSpecOptions,
-    Platform, RepoDataRecord,
+    Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, ParseMatchSpecOptions, Platform,
 };
 use rattler_lock::{CondaPackageData, LockFileBuilder};
 use rattler_networking::AuthenticationMiddleware;
@@ -243,7 +239,8 @@ async fn solve_and_lock(config: &CxConfig) -> Result<String, Box<dyn std::error:
     let required_packages = if config.exclude.is_empty() {
         solved.records
     } else {
-        let (filtered, removed) = filter_excluded_packages(solved.records, &config.exclude);
+        let (filtered, removed) =
+            exclude::filter_excluded_packages(solved.records, &config.exclude);
         eprintln!(
             "cx: excluded {} packages ({})",
             removed.len(),
@@ -275,71 +272,4 @@ async fn solve_and_lock(config: &CxConfig) -> Result<String, Box<dyn std::error:
 
     let lock_file = builder.finish();
     Ok(lock_file.render_to_string()?)
-}
-
-/// Remove explicitly excluded packages and any of their dependencies that are
-/// not required by any remaining package.
-fn filter_excluded_packages(
-    packages: Vec<RepoDataRecord>,
-    excludes: &[String],
-) -> (Vec<RepoDataRecord>, Vec<String>) {
-    let exclude_set: HashSet<&str> = excludes.iter().map(|s| s.as_str()).collect();
-
-    let name_of = |r: &RepoDataRecord| r.package_record.name.as_normalized().to_string();
-    let pkg_names: Vec<String> = packages.iter().map(name_of).collect();
-    let name_to_idx: HashMap<&str, usize> = pkg_names
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.as_str(), i))
-        .collect();
-
-    let n = packages.len();
-    let mut reverse_deps: Vec<HashSet<usize>> = vec![HashSet::new(); n];
-    for (i, rec) in packages.iter().enumerate() {
-        for dep_str in &rec.package_record.depends {
-            let dep_name = PackageName::from_matchspec_str_unchecked(dep_str);
-            if let Some(&dep_idx) = name_to_idx.get(dep_name.as_normalized()) {
-                reverse_deps[dep_idx].insert(i);
-            }
-        }
-    }
-
-    let mut removed: HashSet<usize> = HashSet::new();
-    let mut queue: Vec<usize> = Vec::new();
-    for (i, name) in pkg_names.iter().enumerate() {
-        if exclude_set.contains(name.as_str()) {
-            removed.insert(i);
-            queue.push(i);
-        }
-    }
-
-    while let Some(pkg_idx) = queue.pop() {
-        for dep_str in &packages[pkg_idx].package_record.depends {
-            let dep_name = PackageName::from_matchspec_str_unchecked(dep_str);
-            if let Some(&dep_idx) = name_to_idx.get(dep_name.as_normalized()) {
-                if removed.contains(&dep_idx) {
-                    continue;
-                }
-                let all_dependents_removed = reverse_deps[dep_idx]
-                    .iter()
-                    .all(|rdep| removed.contains(rdep));
-                if all_dependents_removed {
-                    removed.insert(dep_idx);
-                    queue.push(dep_idx);
-                }
-            }
-        }
-    }
-
-    let removed_names: Vec<String> = removed.iter().map(|&i| pkg_names[i].clone()).collect();
-    let filtered: Vec<RepoDataRecord> = packages
-        .into_iter()
-        .enumerate()
-        .filter(|(i, _)| !removed.contains(i))
-        .map(|(_, r)| r)
-        .collect();
-
-    let mut sorted_names = removed_names;
-    sorted_names.sort();
-    (filtered, sorted_names)
 }
