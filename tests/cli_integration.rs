@@ -12,7 +12,7 @@ fn cx() -> assert_cmd::Command {
 fn test_cx_help() {
     let output = cx().arg("--help").output().unwrap();
     assert!(output.status.success(), "cx --help should succeed");
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stdout = String::from_utf8_lossy(&output.stdout).replace("cx.exe", "cx");
     insta::assert_snapshot!("cx_help", stdout);
 }
 
