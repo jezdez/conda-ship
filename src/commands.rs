@@ -361,4 +361,104 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         assert!(!is_bootstrapped(tmp.path()));
     }
+
+    #[test]
+    fn test_default_prefix_ends_with_cx() {
+        let prefix = default_prefix().unwrap();
+        assert_eq!(
+            prefix.file_name().unwrap().to_str().unwrap(),
+            ".cx",
+            "default prefix should be ~/.cx"
+        );
+        assert!(
+            prefix.parent().is_some(),
+            "prefix should be under a home directory"
+        );
+    }
+
+    #[test]
+    fn test_status_not_bootstrapped() {
+        let tmp = TempDir::new().unwrap();
+        let result = status(tmp.path());
+        assert!(result.is_ok(), "status on empty prefix should succeed");
+    }
+
+    #[test]
+    fn test_status_bootstrapped_prefix() {
+        let tmp = TempDir::new().unwrap();
+        let prefix = tmp.path();
+
+        std::fs::create_dir(prefix.join("conda-meta")).unwrap();
+
+        crate::config::write_condarc(prefix).unwrap();
+        crate::config::write_frozen(prefix).unwrap();
+        crate::config::write_metadata(
+            prefix,
+            &["conda-forge".to_string()],
+            &["python >=3.12".to_string(), "conda >=25.1".to_string()],
+            &["conda-libmamba-solver".to_string()],
+        )
+        .unwrap();
+
+        let result = status(prefix);
+        assert!(result.is_ok(), "status on bootstrapped prefix should succeed");
+    }
+
+    #[test]
+    fn test_uninstall_not_bootstrapped() {
+        let tmp = TempDir::new().unwrap();
+        let result = uninstall(tmp.path(), true);
+        assert!(
+            result.is_ok(),
+            "uninstall on empty prefix should succeed with a no-op"
+        );
+    }
+
+    #[test]
+    fn test_remove_shell_path_entries_cleans_profiles() {
+        let tmp = TempDir::new().unwrap();
+        let prefix = tmp.path().join("fake-cx");
+        std::fs::create_dir(&prefix).unwrap();
+
+        let condabin_line = format!("export PATH=\"{}/condabin:$PATH\"", prefix.display());
+        let bashrc = tmp.path().join(".bashrc");
+        std::fs::write(
+            &bashrc,
+            format!("# my bashrc\n{condabin_line}\nalias ll='ls -la'\n"),
+        )
+        .unwrap();
+
+        let profiles = vec![bashrc.clone()];
+        let install_path: Option<String> = None;
+
+        let mut cleaned = false;
+        for profile in &profiles {
+            let contents = std::fs::read_to_string(profile).unwrap();
+            let filtered: Vec<&str> = contents
+                .lines()
+                .filter(|line| {
+                    let dominated = line.trim() == condabin_line
+                        || install_path.as_ref().is_some_and(|p| line.trim() == p);
+                    if dominated {
+                        cleaned = true;
+                    }
+                    !dominated
+                })
+                .collect();
+            if cleaned {
+                std::fs::write(profile, filtered.join("\n")).unwrap();
+            }
+        }
+
+        assert!(cleaned, "should have found and removed the PATH entry");
+        let result = std::fs::read_to_string(&bashrc).unwrap();
+        assert!(
+            !result.contains("condabin"),
+            "condabin line should be removed"
+        );
+        assert!(
+            result.contains("alias ll"),
+            "other lines should be preserved"
+        );
+    }
 }

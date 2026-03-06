@@ -203,7 +203,7 @@ pub async fn from_solve(
 
 // ─── Shared helpers ──────────────────────────────────────────────────────────
 
-fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
+pub(crate) fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
     specs
         .iter()
         .map(|s| MatchSpec::from_str(s, ParseMatchSpecOptions::default()))
@@ -263,7 +263,7 @@ async fn run_installer(
     Ok(())
 }
 
-fn apply_excludes(packages: Vec<RepoDataRecord>, excludes: &[String]) -> Vec<RepoDataRecord> {
+pub(crate) fn apply_excludes(packages: Vec<RepoDataRecord>, excludes: &[String]) -> Vec<RepoDataRecord> {
     if excludes.is_empty() {
         return packages;
     }
@@ -301,4 +301,53 @@ async fn wrap_async_spinner<T, F: IntoFuture<Output = T>>(
     let result = fut.into_future().await;
     pb.finish_and_clear();
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::exclude::sorted_names;
+
+    #[test]
+    fn test_parse_specs_valid() {
+        let specs = vec![
+            "python >=3.12".to_string(),
+            "conda >=25.1".to_string(),
+            "numpy".to_string(),
+        ];
+        let result = parse_specs(&specs);
+        assert!(result.is_ok(), "valid specs should parse successfully");
+        assert_eq!(result.unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_parse_specs_empty() {
+        let result = parse_specs(&[]);
+        assert!(result.is_ok(), "empty specs should parse successfully");
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_apply_excludes_empty_excludes() {
+        let records = crate::exclude::tests::make_test_records();
+        let original_count = records.len();
+        let filtered = apply_excludes(records, &[]);
+        assert_eq!(
+            filtered.len(),
+            original_count,
+            "empty excludes should return all packages"
+        );
+    }
+
+    #[test]
+    fn test_apply_excludes_with_match() {
+        let records = crate::exclude::tests::make_test_records();
+        let excludes = vec!["a".to_string()];
+        let filtered = apply_excludes(records, &excludes);
+        let names = sorted_names(&filtered);
+        assert!(
+            !names.contains(&"a".to_string()),
+            "excluded package should be removed"
+        );
+    }
 }

@@ -173,4 +173,43 @@ mod tests {
             Path::new("C:\\conda\\Scripts\\conda.exe")
         );
     }
+
+    #[test]
+    fn test_build_command_missing_binary() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let result = build_command(tmp.path(), &["info"]);
+        assert!(
+            result.is_err(),
+            "build_command should fail when conda binary is missing"
+        );
+    }
+
+    #[test]
+    fn test_build_command_with_binary() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let bin_dir = if cfg!(windows) {
+            tmp.path().join("Scripts")
+        } else {
+            tmp.path().join("bin")
+        };
+        std::fs::create_dir_all(&bin_dir).unwrap();
+
+        let conda_path = if cfg!(windows) {
+            bin_dir.join("conda.exe")
+        } else {
+            bin_dir.join("conda")
+        };
+        std::fs::write(&conda_path, "#!/bin/sh\n").unwrap();
+
+        let result = build_command(tmp.path(), &["info", "--json"]);
+        assert!(result.is_ok(), "build_command should succeed with a binary");
+        let cmd = result.unwrap();
+        let program = cmd.get_program().to_str().unwrap().to_string();
+        assert!(
+            program.contains("conda"),
+            "program should be the conda binary"
+        );
+        let args: Vec<_> = cmd.get_args().collect();
+        assert_eq!(args.len(), 2, "should have 2 args");
+    }
 }

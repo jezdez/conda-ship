@@ -94,7 +94,7 @@ pub fn sorted_names(records: &[RepoDataRecord]) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::str::FromStr;
 
     use super::*;
@@ -104,7 +104,7 @@ mod tests {
     };
     use reqwest::Url;
 
-    fn make_record(name: &str, depends: &[&str]) -> RepoDataRecord {
+    pub(crate) fn make_record(name: &str, depends: &[&str]) -> RepoDataRecord {
         let mut record = PackageRecord::new(
             PackageName::new_unchecked(name),
             VersionWithSource::from_str("1.0").unwrap(),
@@ -121,6 +121,15 @@ mod tests {
             url: Url::parse(&format!("https://example.com/{name}-1.0-0.conda")).unwrap(),
             channel: Some("test".to_string()),
         }
+    }
+
+    #[allow(dead_code)] // used by install::tests
+    pub(crate) fn make_test_records() -> Vec<RepoDataRecord> {
+        vec![
+            make_record("a", &["c"]),
+            make_record("b", &["c"]),
+            make_record("c", &[]),
+        ]
     }
 
     #[test]
