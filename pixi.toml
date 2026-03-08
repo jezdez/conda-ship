@@ -30,6 +30,8 @@ web-copy = { cmd = "cp pkg/cx_web.js www/cx_web.js && cp pkg/cx_web_bg.wasm www/
 web-copy-dev = { cmd = "cp pkg/cx_web.js www/cx_web.js && cp pkg/cx_web_bg.wasm www/cx_web_bg.wasm", cwd = "crates/cx-web", depends-on = ["web-build-dev"] }
 web-serve = { cmd = "python -m http.server 8080 --directory www", cwd = "crates/cx-web", depends-on = ["web-copy"] }
 web-serve-dev = { cmd = "python -m http.server 8080 --directory www", cwd = "crates/cx-web", depends-on = ["web-copy-dev"] }
+web-conda-test-prep = { cmd = "cp ../../recipes/conda-browser/lockfile-env/pixi.lock www/conda-browser.lock && mkdir -p www/packages && cp ../../output/noarch/conda-browser-*.conda ../../output/noarch/frozendict-*.conda www/packages/", cwd = "crates/cx-web", depends-on = ["web-copy-dev"] }
+web-conda-test = { cmd = "echo 'Open http://localhost:8080/conda-test.html' && python -m http.server 8080 --directory www", cwd = "crates/cx-web", depends-on = ["web-conda-test-prep"] }
 web-clean = { cmd = "cargo clean && rm -rf pkg www/cx_web.js www/cx_web_bg.wasm", cwd = "crates/cx-web" }
 
 [feature.docs.dependencies]
@@ -46,9 +48,18 @@ docs = { cmd = "sphinx-build -b dirhtml . _build/dirhtml", cwd = "docs" }
 docs-serve = { cmd = "python -m http.server", cwd = "docs/_build/dirhtml" }
 docs-clean = { cmd = "rm -rf _build", cwd = "docs" }
 
+[feature.recipes.dependencies]
+rattler-build = ">=0.35"
+
+[feature.recipes.tasks]
+build-conda-browser = { cmd = "rattler-build build --recipe recipes/conda-browser/recipe.yaml -c conda-forge" }
+build-frozendict-noarch = { cmd = "rattler-build build --recipe recipes/frozendict-noarch/recipe.yaml -c conda-forge" }
+build-conda-browser-lockfile = { cmd = "pixi install", cwd = "recipes/conda-browser/lockfile-env", depends-on = ["build-conda-browser", "build-frozendict-noarch"] }
+
 [environments]
 docs = ["docs"]
 web = ["web"]
+recipes = ["recipes"]
 
 [tool.cx]
 channels = ["conda-forge"]
