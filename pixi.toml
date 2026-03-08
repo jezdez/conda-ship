@@ -20,6 +20,18 @@ fmt-check = "cargo fmt --check"
 clippy = "cargo clippy --all-targets -- -D warnings"
 lint = { depends-on = ["fmt-check", "clippy"] }
 
+[feature.web.dependencies]
+python = ">=3.12"
+
+[feature.web.tasks]
+web-build = { cmd = "wasm-pack build --target web --release", cwd = "crates/cx-web" }
+web-build-dev = { cmd = "wasm-pack build --target web --dev", cwd = "crates/cx-web" }
+web-copy = { cmd = "cp pkg/cx_web.js www/cx_web.js && cp pkg/cx_web_bg.wasm www/cx_web_bg.wasm", cwd = "crates/cx-web", depends-on = ["web-build"] }
+web-copy-dev = { cmd = "cp pkg/cx_web.js www/cx_web.js && cp pkg/cx_web_bg.wasm www/cx_web_bg.wasm", cwd = "crates/cx-web", depends-on = ["web-build-dev"] }
+web-serve = { cmd = "python -m http.server 8080 --directory www", cwd = "crates/cx-web", depends-on = ["web-copy"] }
+web-serve-dev = { cmd = "python -m http.server 8080 --directory www", cwd = "crates/cx-web", depends-on = ["web-copy-dev"] }
+web-clean = { cmd = "cargo clean && rm -rf pkg www/cx_web.js www/cx_web_bg.wasm", cwd = "crates/cx-web" }
+
 [feature.docs.dependencies]
 sphinx = ">=7.0"
 conda-sphinx-theme = ">=0.2"
@@ -36,6 +48,7 @@ docs-clean = { cmd = "rm -rf _build", cwd = "docs" }
 
 [environments]
 docs = ["docs"]
+web = ["web"]
 
 [tool.cx]
 channels = ["conda-forge"]
