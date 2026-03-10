@@ -650,7 +650,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cx-web"
+name = "cx-wasm"
 version = "0.1.0"
 dependencies = [
  "bzip2-rs",
@@ -658,11 +658,13 @@ dependencies = [
  "js-sys",
  "rattler_conda_types",
  "rattler_lock",
+ "rattler_solve",
  "ruzstd",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
  "tar",
+ "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

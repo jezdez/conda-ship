@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/cx-web"]
+members = [".", "crates/cx-wasm"]
 
 [package]
 name = "conda-express"
