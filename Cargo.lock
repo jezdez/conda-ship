@@ -659,6 +659,7 @@ dependencies = [
  "rattler_conda_types",
  "rattler_lock",
  "rattler_solve",
+ "rmp-serde",
  "ruzstd",
  "serde",
  "serde-wasm-bindgen",
