@@ -106,13 +106,9 @@ pub enum Command {
     Help,
 }
 
-/// Where to source the lockfile for bootstrap.
 pub enum LockSource {
-    /// Use the lockfile embedded at compile time.
     Embedded,
-    /// Use an external lockfile from disk.
     File(PathBuf),
-    /// Skip the lockfile entirely and do a live solve.
     None,
 }
 

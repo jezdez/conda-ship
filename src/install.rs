@@ -30,8 +30,6 @@ use rattler_solve::{SolverImpl, SolverTask, resolvo};
 use crate::config;
 use crate::exclude::filter_excluded_packages;
 
-// ─── Shared progress bar ─────────────────────────────────────────────────────
-
 static GLOBAL_MP: std::sync::LazyLock<MultiProgress> = std::sync::LazyLock::new(|| {
     let mp = MultiProgress::new();
     mp.set_draw_target(ProgressDrawTarget::stderr_with_hz(20));
@@ -42,13 +40,7 @@ fn multi_progress() -> MultiProgress {
     GLOBAL_MP.clone()
 }
 
-// ─── Install from lockfile (fast path) ───────────────────────────────────────
-
-/// Install packages from a pre-solved lockfile.
-///
-/// Skips repodata fetching and solving entirely — parses the lockfile, extracts
-/// records for the current platform, applies exclusions, and passes straight to
-/// the installer.
+/// Install packages from a pre-solved lockfile (fast path, no solve needed).
 pub async fn from_lockfile(
     prefix: &Path,
     lock_content: &str,
@@ -92,8 +84,6 @@ pub async fn from_lockfile(
     )
     .await
 }
-
-// ─── Install via live solve ──────────────────────────────────────────────────
 
 /// Fetch repodata, solve, and install packages into the prefix.
 pub async fn from_solve(
@@ -171,7 +161,7 @@ pub async fn from_solve(
 
     let locked_packages = installed
         .iter()
-        .map(|record| record.repodata_record.clone())
+        .map(|r| r.repodata_record.clone())
         .collect();
 
     let solver_task = SolverTask {
@@ -200,8 +190,6 @@ pub async fn from_solve(
     )
     .await
 }
-
-// ─── Shared helpers ──────────────────────────────────────────────────────────
 
 pub(crate) fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
     specs
@@ -280,8 +268,6 @@ pub(crate) fn apply_excludes(
     }
     filtered
 }
-
-// ─── Progress spinners ───────────────────────────────────────────────────────
 
 fn wrap_spinner<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>>, func: F) -> T {
     let pb = multi_progress().add(ProgressBar::new_spinner());
