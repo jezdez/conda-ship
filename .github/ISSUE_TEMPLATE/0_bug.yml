@@ -1,0 +1,50 @@
+name: Bug Report
+description: Create a bug report.
+labels:
+  - type::bug
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      description: Please confirm and check all of the following options.
+      options:
+        - label: I added a descriptive title
+          required: true
+        - label: I searched open reports and couldn't find a duplicate
+          required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What should have happened instead? Please provide as many details as possible.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: |
+        Provide minimal steps to reproduce the behavior.
+
+        ```bash
+        cx bootstrap
+        # ...
+        ```
+      render: shell
+  - type: textarea
+    id: info
+    attributes:
+      label: Environment info
+      description: |
+        Please run the following and paste the output below.
+
+        ```bash
+        cx --version && cx status
+        ```
+      render: shell
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Include any additional information (or screenshots) that you think would be valuable.

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: conda Issues/Features
+    url: https://github.com/conda/conda/issues
+    about: Issues related to conda itself (not the cx bootstrapper)
+  - name: conda-forge Package Issues/Requests
+    url: https://github.com/conda-forge
+    about: Anything related to a package from conda-forge channel

@@ -1,0 +1,70 @@
+name: Epic
+description: A collection of related tickets.
+labels:
+  - epic
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      description: Please confirm and check all of the following options.
+      options:
+        - label: I added a descriptive title
+          required: true
+        - label: I searched open issues and couldn't find a duplicate
+          required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What?
+      description: What feature or problem will be addressed in this epic?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: >-
+        Why is the reported issue(s) a problem, or why is the proposed feature needed?
+    validations:
+      required: true
+  - type: textarea
+    id: user_impact
+    attributes:
+      label: User impact
+      description: >-
+        In what specific way(s) will users benefit from this change?
+    validations:
+      required: true
+  - type: textarea
+    id: goals
+    attributes:
+      label: Goals
+      value: |
+        - [ ] <goal>
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Tasks
+      value: |
+        - [ ] <task or PR>
+    validations:
+      required: false
+  - type: textarea
+    id: blocked_by
+    attributes:
+      label: "This epic is blocked by:"
+      value: |
+        - [ ] <dependency epic or issue>
+    validations:
+      required: false
+  - type: textarea
+    id: blocks
+    attributes:
+      label: "This epic blocks:"
+      value: |
+        - [ ] <dependency epic or issue>
+    validations:
+      required: false
