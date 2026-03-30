@@ -2,6 +2,7 @@
 
 use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::prelude::*;
+use rstest::rstest;
 use tempfile::TempDir;
 
 fn cx() -> assert_cmd::Command {
@@ -24,12 +25,30 @@ fn test_cx_version() {
         .stdout(predicate::str::contains(env!("CARGO_PKG_VERSION")));
 }
 
-#[test]
-fn test_cx_status_nonexistent_prefix() {
+#[derive(Clone, Copy)]
+enum MissingPrefixCmd {
+    Status,
+    Uninstall,
+}
+
+#[rstest]
+#[case::status(MissingPrefixCmd::Status)]
+#[case::uninstall(MissingPrefixCmd::Uninstall)]
+fn test_cx_nonexistent_prefix_reports_missing(#[case] cmd: MissingPrefixCmd) {
     let tmp = TempDir::new().unwrap();
     let nonexistent = tmp.path().join("does-not-exist");
-    cx().args(["status", "--prefix", nonexistent.to_str().unwrap()])
-        .assert()
+    let path = nonexistent.to_str().unwrap();
+
+    let mut c = cx();
+    match cmd {
+        MissingPrefixCmd::Status => {
+            c.args(["status", "--prefix", path]);
+        }
+        MissingPrefixCmd::Uninstall => {
+            c.args(["uninstall", "--prefix", path, "--yes"]);
+        }
+    }
+    c.assert()
         .success()
         .stderr(predicate::str::contains("No conda installation found"));
 }
@@ -109,4 +128,44 @@ fn test_cx_uninstall_removes_prefix() {
         .stderr(predicate::str::contains("uninstalled"));
 
     assert!(!prefix.exists(), "prefix should be removed after uninstall");
+}
+
+/// Uses `--prefix` so Windows CI does not depend on `dirs::home_dir()` (known-folder profile),
+/// which ignores `HOME` / `USERPROFILE` for a synthetic layout.
+#[test]
+fn test_cx_uninstall_interactive_prompt_declined() {
+    let tmp = TempDir::new().unwrap();
+    let prefix = tmp.path().join("cx-uninstall-interactive");
+    std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
+
+    cx().args(["uninstall", "--prefix", prefix.to_str().unwrap()])
+        .write_stdin("n\n")
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Continue? [y/N]").and(predicate::str::contains("Aborted.")),
+        );
+
+    assert!(
+        prefix.exists(),
+        "prefix should remain after declining uninstall"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_cx_uninstall_default_prefix_respects_home() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::create_dir_all(tmp.path().join(".cx/conda-meta")).unwrap();
+
+    cx().env("HOME", tmp.path().as_os_str())
+        .arg("uninstall")
+        .write_stdin("n\n")
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("Continue? [y/N]").and(predicate::str::contains("Aborted.")),
+        );
+
+    assert!(tmp.path().join(".cx").exists());
 }
