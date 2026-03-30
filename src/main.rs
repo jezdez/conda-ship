@@ -120,7 +120,7 @@ async fn async_main() -> miette::Result<()> {
             let prefix = default_prefix()?;
             ensure_bootstrapped(&prefix).await?;
             let conda_args: Vec<&str> = raw_args[1..].iter().map(|s| s.as_str()).collect();
-            if exec::needs_output_filtering(&conda_args) {
+            if exec::should_filter_conda_output(&conda_args) {
                 return exec::run_conda_filtered(&prefix, &conda_args);
             }
             return exec::replace_process_with_conda(&prefix, &conda_args);

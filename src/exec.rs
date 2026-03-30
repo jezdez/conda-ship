@@ -1,7 +1,7 @@
 //! Replace the current process with the installed conda binary,
 //! or run it as a subprocess with output filtering.
 
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, IsTerminal};
 use std::path::Path;
 use std::process::Stdio;
 
@@ -40,6 +40,7 @@ pub fn replace_process_with_conda(prefix: &Path, args: &[&str]) -> miette::Resul
 /// `create` and `env create` that print "conda activate" instructions.
 pub fn run_conda_filtered(prefix: &Path, args: &[&str]) -> miette::Result<()> {
     let mut child = build_command(prefix, args)?
+        .stdin(Stdio::inherit())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
@@ -101,6 +102,21 @@ pub fn needs_output_filtering(args: &[&str]) -> bool {
     }
 }
 
+/// True when `create` / `env create` should use piped stdout for activation-hint filtering.
+///
+/// Conda prompts for confirmation by writing to stdout without a trailing newline, then
+/// reading stdin. If we pipe stdout and read it line-by-line, the parent blocks waiting for a
+/// newline while conda blocks on stdin, so the prompt never reaches the terminal and input
+/// looks swallowed.
+pub fn should_filter_conda_output(args: &[&str]) -> bool {
+    needs_output_filtering(args)
+        && (!std::io::stdin().is_terminal() || conda_always_yes_in_args(args))
+}
+
+fn conda_always_yes_in_args(args: &[&str]) -> bool {
+    args.iter().any(|&a| a == "-y" || a == "--yes")
+}
+
 pub(crate) fn extract_env_name(args: &[&str]) -> Option<String> {
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
@@ -155,6 +171,14 @@ mod tests {
     #[case::empty(&[], None)]
     fn test_extract_env_name(#[case] args: &[&str], #[case] expected: Option<&str>) {
         assert_eq!(extract_env_name(args), expected.map(String::from));
+    }
+
+    #[rstest]
+    #[case::no_yes_flag(&["create", "-n", "x"], false)]
+    #[case::short_y(&["create", "-y", "-n", "x"], true)]
+    #[case::long_yes(&["env", "create", "--yes", "-n", "x"], true)]
+    fn test_conda_always_yes_in_args(#[case] args: &[&str], #[case] expected: bool) {
+        assert_eq!(super::conda_always_yes_in_args(args), expected);
     }
 
     #[test]
