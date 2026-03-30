@@ -3,7 +3,7 @@ members = [".", "crates/cx-wasm"]
 
 [package]
 name = "conda-express"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2024"
 description = "A lightweight, single-binary conda bootstrapper — powered by rattler"
 license = "BSD-3-Clause"
