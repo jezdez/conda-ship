@@ -36,7 +36,7 @@ static GLOBAL_MP: std::sync::LazyLock<MultiProgress> = std::sync::LazyLock::new(
     mp
 });
 
-fn multi_progress() -> MultiProgress {
+pub(crate) fn multi_progress() -> MultiProgress {
     GLOBAL_MP.clone()
 }
 
@@ -505,7 +505,7 @@ pub(crate) fn apply_excludes(
     filtered
 }
 
-fn wrap_spinner<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>>, func: F) -> T {
+pub(crate) fn wrap_spinner<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>>, func: F) -> T {
     let pb = multi_progress().add(ProgressBar::new_spinner());
     pb.enable_steady_tick(Duration::from_millis(100));
     pb.set_style(ProgressStyle::with_template("   {spinner:.green} {msg}").unwrap());
