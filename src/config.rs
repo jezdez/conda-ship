@@ -123,6 +123,8 @@ solver: rattler
 auto_activate_base: false
 notify_outdated_conda: false
 show_channel_urls: true
+channels:
+  - conda-forge
 default_channels:
   - conda-forge
 ";
