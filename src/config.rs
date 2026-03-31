@@ -125,8 +125,6 @@ notify_outdated_conda: false
 show_channel_urls: true
 channels:
   - conda-forge
-default_channels:
-  - conda-forge
 ";
     std::fs::create_dir_all(prefix).into_diagnostic()?;
     std::fs::write(&condarc_path, contents).into_diagnostic()?;
