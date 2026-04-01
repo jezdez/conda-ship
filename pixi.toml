@@ -19,6 +19,7 @@ coverage-html = "cargo llvm-cov --html"
 fmt-check = "cargo fmt --check"
 clippy = "cargo clippy --all-targets -- -D warnings"
 lint = { depends-on = ["fmt-check", "clippy"] }
+demos = { cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}""", args = [{ arg = "name", default = "" }], description = "Record demo GIFs" }
 
 [feature.web.dependencies]
 python = ">=3.12"
