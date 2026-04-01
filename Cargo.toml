@@ -38,38 +38,38 @@ online_tests = []
 slow_tests = []
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 console = "0.16"
 dirs = "6"
 indicatif = "0.18"
 miette = { version = "7.6", features = ["fancy"] }
-rattler = { version = "0.39", default-features = false, features = ["indicatif"] }
+rattler = { version = "0.40", default-features = false, features = ["indicatif"] }
 rattler_cache = { version = "0.6", default-features = false }
-rattler_conda_types = { version = "0.43", default-features = false }
-rattler_lock = { version = "0.26", default-features = false }
+rattler_conda_types = { version = "0.44", default-features = false }
+rattler_lock = { version = "0.27", default-features = false }
 rattler_networking = { version = "0.26", default-features = false }
-rattler_repodata_gateway = { version = "0.26", default-features = false, features = ["gateway"] }
-rattler_solve = { version = "4.2", default-features = false, features = ["resolvo"] }
+rattler_repodata_gateway = { version = "0.27", default-features = false, features = ["gateway"] }
+rattler_solve = { version = "5.0", default-features = false, features = ["resolvo"] }
 rattler_virtual_packages = { version = "2.3", default-features = false }
 reqwest = { version = "0.12", default-features = false, features = ["stream"] }
 reqwest-middleware = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1.45", features = ["rt-multi-thread", "macros"] }
-toml = "0.8"
+toml = "1.0"
 tar = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 zstd = "0.13"
 
 [build-dependencies]
-rattler = { version = "0.39", default-features = false, features = ["rustls-tls"] }
+rattler = { version = "0.40", default-features = false, features = ["rustls-tls"] }
 rattler_cache = { version = "0.6", default-features = false, features = ["rustls-tls"] }
-rattler_conda_types = { version = "0.43", default-features = false }
-rattler_lock = { version = "0.26", default-features = false }
+rattler_conda_types = { version = "0.44", default-features = false }
+rattler_lock = { version = "0.27", default-features = false }
 rattler_networking = { version = "0.26", default-features = false, features = ["rustls-tls"] }
-rattler_repodata_gateway = { version = "0.26", default-features = false, features = ["gateway", "rustls-tls"] }
-rattler_solve = { version = "4.2", default-features = false, features = ["resolvo"] }
+rattler_repodata_gateway = { version = "0.27", default-features = false, features = ["gateway", "rustls-tls"] }
+rattler_solve = { version = "5.0", default-features = false, features = ["resolvo"] }
 rattler_virtual_packages = { version = "2.3", default-features = false }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots"] }
 reqwest-middleware = "0.4"
@@ -77,7 +77,7 @@ serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 tar = "0.4"
 tokio = { version = "1.45", features = ["rt-multi-thread"] }
-toml = "0.8"
+toml = "1.0"
 zstd = "0.13"
 
 [profile.dev.package."*"]
@@ -94,6 +94,6 @@ assert_cmd = "2"
 assert_matches = "1"
 insta = { version = "1", features = ["yaml"] }
 predicates = "3"
-rstest = "0.24"
+rstest = "0.26"
 temp-env = "0.3"
 tempfile = "3"
