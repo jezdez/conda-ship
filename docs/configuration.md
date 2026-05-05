@@ -101,6 +101,7 @@ For custom builds without editing `pixi.toml` (e.g. via the
 | `CX_PACKAGES` | `packages` | Comma-separated [MatchSpec](https://conda.io/projects/conda/en/latest/user-guide/concepts/pkg-specs.html) strings |
 | `CX_CHANNELS` | `channels` | Comma-separated channel names |
 | `CX_EXCLUDE` | `exclude` | Comma-separated package names |
+| `CX_INSTALL_METHOD` | *(none)* | Installation method name (e.g. `homebrew`, `cargo`). Baked into the binary; used by `cx uninstall` to show a context-aware removal hint |
 
 Empty values are ignored (the `pixi.toml` defaults are used).
 

@@ -67,6 +67,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=CX_EXCLUDE");
     println!("cargo:rerun-if-env-changed=CX_PLATFORM");
     println!("cargo:rerun-if-env-changed=CX_EMBED_PAYLOAD");
+    println!("cargo:rerun-if-env-changed=CX_INSTALL_METHOD");
 
     let embed_payload = env::var("CX_EMBED_PAYLOAD").ok().is_some_and(|v| v == "1");
 

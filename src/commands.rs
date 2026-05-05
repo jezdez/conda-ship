@@ -308,10 +308,6 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
             named_envs.join(", ")
         );
     }
-    if let Some(ref bin) = cx_binary {
-        eprintln!("   cx binary: {}", bin.display());
-    }
-
     if !yes {
         eprint!("\n   Continue? [y/N] ");
         let mut input = String::new();
@@ -390,19 +386,18 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
         .into_diagnostic()
         .context("failed to remove conda prefix")?;
 
-    if let Some(ref bin) = cx_binary
-        && bin.exists()
-    {
-        if verbosity != Verbosity::Quiet {
-            eprintln!(
-                "{} Removing cx binary at {}",
-                console::style(">>").cyan().bold(),
-                bin.display()
-            );
-        }
-        std::fs::remove_file(bin)
-            .into_diagnostic()
-            .context("failed to remove cx binary")?;
+    if let Some(ref bin) = cx_binary {
+        let hint = match crate::config::INSTALL_METHOD {
+            Some("homebrew") => "   brew uninstall conda-express".to_string(),
+            Some("cargo") => "   cargo uninstall conda-express".to_string(),
+            Some(method) => format!("   Installed via: {method}"),
+            None => format!("   {}", bin.display()),
+        };
+        eprintln!(
+            "\n{} To complete removal, delete the cx binary:",
+            console::style("i").blue().bold(),
+        );
+        eprintln!("{hint}");
     }
 
     remove_shell_path_entries(prefix);

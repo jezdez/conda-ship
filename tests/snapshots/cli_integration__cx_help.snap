@@ -1,5 +1,6 @@
 ---
 source: tests/cli_integration.rs
+assertion_line: 19
 expression: stdout
 ---
 cx (conda-express) is a lightweight, single-binary bootstrapper for conda.
@@ -13,7 +14,7 @@ Commands:
   bootstrap  Bootstrap a fresh conda installation into the prefix
   status     Print cx status (prefix, channels, packages, excludes)
   shell      Activate an environment via subshell (alias for conda spawn)
-  uninstall  Uninstall cx: remove the conda prefix, environments, and optionally the cx binary
+  uninstall  Uninstall cx: remove the conda prefix and environments
   help       Show this help message
 
 Options:
@@ -39,7 +40,7 @@ Quick start:
 Management:
 
   cx status                              Show installation details
-  cx uninstall                           Remove cx, conda, and all environments
+  cx uninstall                           Remove conda prefix and all environments
 
 Pass-through:
 

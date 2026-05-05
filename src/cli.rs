@@ -14,7 +14,7 @@ const AFTER_HELP: &str = "\x1b[1;4mQuick start:\x1b[0m
 \x1b[1;4mManagement:\x1b[0m
 
   cx status                              Show installation details
-  cx uninstall                           Remove cx, conda, and all environments
+  cx uninstall                           Remove conda prefix and all environments
 
 \x1b[1;4mPass-through:\x1b[0m
 
@@ -127,7 +127,7 @@ pub enum Command {
         env: Option<String>,
     },
 
-    /// Uninstall cx: remove the conda prefix, environments, and optionally the cx binary
+    /// Uninstall cx: remove the conda prefix and environments
     Uninstall {
         /// Target prefix directory (default: ~/.cx)
         #[clap(long)]
