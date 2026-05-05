@@ -1,0 +1,19 @@
+[package]
+name = "cx-build"
+version = "0.1.0"
+edition = "2024"
+description = "Internal build tools for conda-express"
+publish = false
+
+[dependencies]
+clap = { version = "4.6", features = ["derive"] }
+rattler_conda_types = { version = "0.44", default-features = false }
+rattler_lock = { version = "0.27", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "rustls-tls-native-roots"] }
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+tar = "0.4"
+tokio = { version = "1.52", features = ["rt-multi-thread", "macros"] }
+toml = "1.1"
+toml_edit = "0.25"
+zstd = "0.13"

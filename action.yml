@@ -62,17 +62,36 @@ runs:
         manifest-path: .cx-build/pixi.toml
         cache: true
 
-    - name: Setup Rust cache
-      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-      with:
-        workspaces: .cx-build
+    - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+
+    - name: Configure custom packages
+      if: inputs.packages != '' || inputs.channels != '' || inputs.exclude != ''
+      shell: bash
+      working-directory: .cx-build
+      run: |
+        ARGS=""
+        if [ -n "${{ inputs.packages }}" ]; then
+          ARGS="$ARGS --packages '${{ inputs.packages }}'"
+        fi
+        if [ -n "${{ inputs.channels }}" ]; then
+          ARGS="$ARGS --channels '${{ inputs.channels }}'"
+        fi
+        if [ -n "${{ inputs.exclude }}" ]; then
+          ARGS="$ARGS --exclude '${{ inputs.exclude }}'"
+        fi
+        eval pixi run -- cargo run -p cx-build -- configure $ARGS
+        pixi lock
+        pixi run prepare
+
+    - name: Generate payload
+      if: inputs.embed-payload == 'true'
+      shell: bash
+      working-directory: .cx-build
+      run: pixi run payload
 
     - name: Build cx
       shell: bash
       env:
-        CX_PACKAGES: ${{ inputs.packages }}
-        CX_CHANNELS: ${{ inputs.channels }}
-        CX_EXCLUDE: ${{ inputs.exclude }}
         CX_EMBED_PAYLOAD: ${{ inputs.embed-payload == 'true' && '1' || '' }}
       working-directory: .cx-build
       run: pixi run build

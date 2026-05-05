@@ -568,7 +568,6 @@ dependencies = [
  "rstest",
  "serde",
  "serde_json",
- "sha2",
  "tar",
  "temp-env",
  "tempfile",
@@ -673,6 +672,23 @@ checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
 dependencies = [
  "generic-array",
  "typenum",
+]
+
+[[package]]
+name = "cx-build"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "rattler_conda_types",
+ "rattler_lock",
+ "reqwest",
+ "serde",
+ "sha2",
+ "tar",
+ "tokio",
+ "toml",
+ "toml_edit",
+ "zstd",
 ]
 
 [[package]]
@@ -4130,6 +4146,7 @@ dependencies = [
  "indexmap 2.14.0",
  "toml_datetime",
  "toml_parser",
+ "toml_writer",
  "winnow",
 ]
 
@@ -5251,17 +5268,6 @@ checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
  "rustix 1.1.4",
-]
-
-[[package]]
-name = "xtask"
-version = "0.1.0"
-dependencies = [
- "clap",
- "rattler_conda_types",
- "rattler_lock",
- "sha2",
- "toml",
 ]
 
 [[package]]

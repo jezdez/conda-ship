@@ -87,15 +87,6 @@ pub enum Command {
         #[clap(short, long)]
         package: Option<Vec<String>>,
 
-        /// Packages to exclude from installation (along with their exclusive
-        /// dependencies). Defaults to conda-libmamba-solver.
-        #[clap(short, long)]
-        exclude: Option<Vec<String>>,
-
-        /// Disable default exclusions (install everything including conda-libmamba-solver)
-        #[clap(long)]
-        no_exclude: bool,
-
         /// Ignore the embedded lockfile and perform a live solve instead
         #[clap(long)]
         no_lock: bool,
@@ -114,7 +105,7 @@ pub enum Command {
         offline: bool,
     },
 
-    /// Print cx status (prefix, channels, packages, excludes)
+    /// Print cx status (prefix, channels, packages)
     Status {
         /// Target prefix directory (default: ~/.cx)
         #[clap(long)]
@@ -164,8 +155,6 @@ mod tests {
                 prefix: None,
                 channel: None,
                 package: None,
-                exclude: None,
-                no_exclude: false,
                 no_lock: false,
                 lockfile: None,
                 payload: None,
@@ -213,29 +202,6 @@ mod tests {
             Some(Command::Bootstrap { channel: Some(ref c), package: Some(ref p), .. })
                 if c == &vec!["conda-forge".to_string(), "defaults".to_string()]
                     && p == &vec!["numpy".to_string(), "scipy".to_string()]
-        );
-    }
-
-    #[test]
-    fn test_parse_bootstrap_exclude() {
-        let cli = Cli::parse_from(["cx", "bootstrap", "-e", "conda-libmamba-solver"]);
-        assert_matches!(
-            cli.command,
-            Some(Command::Bootstrap { exclude: Some(ref e), no_exclude: false, .. })
-                if e == &vec!["conda-libmamba-solver".to_string()]
-        );
-    }
-
-    #[test]
-    fn test_parse_bootstrap_no_exclude() {
-        let cli = Cli::parse_from(["cx", "bootstrap", "--no-exclude"]);
-        assert_matches!(
-            cli.command,
-            Some(Command::Bootstrap {
-                exclude: None,
-                no_exclude: true,
-                ..
-            })
         );
     }
 

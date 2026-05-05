@@ -12,7 +12,7 @@ Usage: cx [OPTIONS] [COMMAND]
 
 Commands:
   bootstrap  Bootstrap a fresh conda installation into the prefix
-  status     Print cx status (prefix, channels, packages, excludes)
+  status     Print cx status (prefix, channels, packages)
   shell      Activate an environment via subshell (alias for conda spawn)
   uninstall  Uninstall cx: remove the conda prefix and environments
   help       Show this help message

@@ -1,6 +1,7 @@
 ---
 source: src/config.rs
-expression: "serde_json::json!({\n    \"channels\": config.channels, \"packages\": config.packages, \"exclude\":\n    config.exclude,\n})"
+assertion_line: 148
+expression: "serde_json::json!({\n    \"channels\": config.channels, \"packages\": config.packages,\n})"
 ---
 channels:
   - conda-forge
@@ -13,5 +14,3 @@ packages:
   - conda-self
   - conda-global
   - conda-workspaces >=0.4.0
-exclude:
-  - conda-libmamba-solver

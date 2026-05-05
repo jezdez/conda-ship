@@ -1,8 +1,8 @@
-//! Integration tests for the exclude filter using the real embedded lockfile.
+//! Integration tests verifying the embedded lockfile has been pre-filtered
+//! by `cx-build prepare` (exclude filter applied at build time).
 
 use std::str::FromStr;
 
-use conda_express::exclude::{filter_excluded_packages, sorted_names};
 use rattler_conda_types::{Platform, RepoDataRecord};
 use rattler_lock::LockFile;
 
@@ -19,6 +19,15 @@ fn records_from_embedded_lock() -> Vec<RepoDataRecord> {
         .expect("no records for current platform")
 }
 
+fn sorted_names(records: &[RepoDataRecord]) -> Vec<String> {
+    let mut names: Vec<String> = records
+        .iter()
+        .map(|r| r.package_record.name.as_normalized().to_string())
+        .collect();
+    names.sort();
+    names
+}
+
 #[test]
 fn test_embedded_lockfile_package_composition() {
     let records = records_from_embedded_lock();
@@ -28,7 +37,7 @@ fn test_embedded_lockfile_package_composition() {
     for pkg in &excluded {
         assert!(
             !names.contains(&pkg.to_string()),
-            "embedded lockfile should not contain {pkg} (pre-filtered by build.rs)"
+            "embedded lockfile should not contain {pkg} (pre-filtered by cx-build prepare)"
         );
     }
 
@@ -49,19 +58,4 @@ fn test_embedded_lockfile_package_composition() {
         names.iter().any(|n| n.starts_with("python")),
         "embedded lockfile should contain python"
     );
-}
-
-#[test]
-fn test_filter_noop_on_already_filtered() {
-    let records = records_from_embedded_lock();
-    let original_count = records.len();
-    let excludes = vec!["conda-libmamba-solver".to_string()];
-
-    let (filtered, removed) = filter_excluded_packages(records, &excludes);
-
-    assert!(
-        removed.is_empty(),
-        "nothing to remove from already-filtered lockfile"
-    );
-    assert_eq!(filtered.len(), original_count);
 }

@@ -28,7 +28,6 @@ use rattler_repodata_gateway::{Gateway, RepoData, SourceConfig};
 use rattler_solve::{SolverImpl, SolverTask, resolvo};
 
 use crate::config;
-use crate::exclude::filter_excluded_packages;
 
 static GLOBAL_MP: std::sync::LazyLock<MultiProgress> = std::sync::LazyLock::new(|| {
     let mp = MultiProgress::new();
@@ -40,11 +39,8 @@ pub(crate) fn multi_progress() -> MultiProgress {
     GLOBAL_MP.clone()
 }
 
-/// Parse a lockfile and return the platform and filtered records.
-fn lockfile_records(
-    lock_content: &str,
-    excludes: &[String],
-) -> miette::Result<(Platform, Vec<RepoDataRecord>)> {
+/// Parse a lockfile and return the platform and records.
+fn lockfile_records(lock_content: &str) -> miette::Result<(Platform, Vec<RepoDataRecord>)> {
     let lock_file = LockFile::from_str(lock_content)
         .into_diagnostic()
         .context("failed to parse lockfile")?;
@@ -66,16 +62,12 @@ fn lockfile_records(
         platform
     );
 
-    Ok((platform, apply_excludes(records, excludes)))
+    Ok((platform, records))
 }
 
 /// Install packages from a pre-solved lockfile (fast path, no solve needed).
-pub async fn from_lockfile(
-    prefix: &Path,
-    lock_content: &str,
-    excludes: &[String],
-) -> miette::Result<()> {
-    let (platform, required_packages) = lockfile_records(lock_content, excludes)?;
+pub async fn from_lockfile(prefix: &Path, lock_content: &str) -> miette::Result<()> {
+    let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let cfg = config::embedded_config();
     let match_specs = parse_specs(&cfg.packages)?;
@@ -101,11 +93,10 @@ pub async fn from_lockfile(
 pub async fn from_lockfile_with_payload(
     prefix: &Path,
     lock_content: &str,
-    excludes: &[String],
     payload_dir: &Path,
     offline: bool,
 ) -> miette::Result<()> {
-    let (platform, required_packages) = lockfile_records(lock_content, excludes)?;
+    let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let payload_index = index_payload_dir(payload_dir)?;
     let (matched, missing) = match_records_to_payload(&required_packages, &payload_index);
@@ -188,12 +179,8 @@ pub async fn from_lockfile_with_payload(
 }
 
 /// Install packages from a lockfile in offline mode (cache only, no payload).
-pub async fn from_lockfile_offline(
-    prefix: &Path,
-    lock_content: &str,
-    excludes: &[String],
-) -> miette::Result<()> {
-    let (platform, required_packages) = lockfile_records(lock_content, excludes)?;
+pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette::Result<()> {
+    let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let cache_dir = default_cache_dir()
         .map_err(|e| miette::miette!("could not determine cache directory: {}", e))?;
@@ -326,7 +313,6 @@ pub async fn from_solve(
     prefix: &Path,
     channels: &[String],
     specs: &[String],
-    excludes: &[String],
 ) -> miette::Result<()> {
     let channel_config =
         ChannelConfig::default_with_root_dir(env::current_dir().into_diagnostic()?);
@@ -414,17 +400,7 @@ pub async fn from_solve(
     .context("failed to solve environment")?
     .records;
 
-    let required_packages = apply_excludes(solved, excludes);
-
-    run_installer(
-        prefix,
-        platform,
-        &installed,
-        &match_specs,
-        client,
-        required_packages,
-    )
-    .await
+    run_installer(prefix, platform, &installed, &match_specs, client, solved).await
 }
 
 pub(crate) fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
@@ -487,24 +463,6 @@ async fn run_installer(
     Ok(())
 }
 
-pub(crate) fn apply_excludes(
-    packages: Vec<RepoDataRecord>,
-    excludes: &[String],
-) -> Vec<RepoDataRecord> {
-    if excludes.is_empty() {
-        return packages;
-    }
-    let (filtered, removed) = filter_excluded_packages(packages, excludes);
-    if !removed.is_empty() {
-        eprintln!(
-            "   Excluded {} packages ({})",
-            removed.len(),
-            removed.join(", ")
-        );
-    }
-    filtered
-}
-
 pub(crate) fn wrap_spinner<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>>, func: F) -> T {
     let pb = multi_progress().add(ProgressBar::new_spinner());
     pb.enable_steady_tick(Duration::from_millis(100));
@@ -531,7 +489,6 @@ async fn wrap_async_spinner<T, F: IntoFuture<Output = T>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::exclude::sorted_names;
     use rstest::rstest;
 
     #[test]
@@ -558,30 +515,6 @@ mod tests {
         let specs = vec![">=>=not_a_package!!!".to_string()];
         let result = parse_specs(&specs);
         assert!(result.is_err(), "malformed spec should fail to parse");
-    }
-
-    #[test]
-    fn test_apply_excludes_empty_excludes() {
-        let records = crate::exclude::tests::make_test_records();
-        let original_count = records.len();
-        let filtered = apply_excludes(records, &[]);
-        assert_eq!(
-            filtered.len(),
-            original_count,
-            "empty excludes should return all packages"
-        );
-    }
-
-    #[test]
-    fn test_apply_excludes_with_match() {
-        let records = crate::exclude::tests::make_test_records();
-        let excludes = vec!["a".to_string()];
-        let filtered = apply_excludes(records, &excludes);
-        let names = sorted_names(&filtered);
-        assert!(
-            !names.contains(&"a".to_string()),
-            "excluded package should be removed"
-        );
     }
 
     #[rstest]

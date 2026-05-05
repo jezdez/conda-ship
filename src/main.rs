@@ -8,7 +8,6 @@ use miette::IntoDiagnostic;
 mod cli;
 mod commands;
 mod config;
-mod exclude;
 mod exec;
 mod install;
 
@@ -17,7 +16,6 @@ use commands::{
     bootstrap, default_prefix, ensure_bootstrapped, is_bootstrapped, print_disabled_init,
     print_disabled_shell_command, status, uninstall, validate_bootstrap_flags,
 };
-use config::embedded_config;
 
 fn main() -> miette::Result<()> {
     let num_cores = std::thread::available_parallelism()
@@ -57,19 +55,12 @@ async fn async_main() -> miette::Result<()> {
                     prefix,
                     channel,
                     package,
-                    exclude,
-                    no_exclude,
                     no_lock,
                     lockfile,
                     payload,
                     offline,
                 }) => {
                     let prefix = prefix.map(Ok).unwrap_or_else(default_prefix)?;
-                    let excludes = if no_exclude {
-                        vec![]
-                    } else {
-                        exclude.unwrap_or_else(|| embedded_config().exclude)
-                    };
                     let lock_source = if no_lock {
                         LockSource::None
                     } else if let Some(path) = lockfile {
@@ -97,7 +88,6 @@ async fn async_main() -> miette::Result<()> {
                         force,
                         channel,
                         package,
-                        &excludes,
                         lock_source,
                         payload,
                         offline,

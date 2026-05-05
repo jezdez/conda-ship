@@ -33,6 +33,7 @@ pub struct CxConfig {
     pub channels: Vec<String>,
     pub packages: Vec<String>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub exclude: Vec<String>,
 }
 
@@ -50,8 +51,6 @@ pub struct PrefixMetadata {
     pub version: String,
     pub channels: Vec<String>,
     pub packages: Vec<String>,
-    #[serde(default)]
-    pub excludes: Vec<String>,
 }
 
 fn metadata_path(prefix: &Path) -> PathBuf {
@@ -62,13 +61,11 @@ pub fn write_metadata(
     prefix: &Path,
     channels: &[String],
     packages: &[String],
-    excludes: &[String],
 ) -> miette::Result<()> {
     let meta = PrefixMetadata {
         version: env!("CARGO_PKG_VERSION").to_string(),
         channels: channels.to_vec(),
         packages: packages.to_vec(),
-        excludes: excludes.to_vec(),
     };
     let json = serde_json::to_string_pretty(&meta).into_diagnostic()?;
     std::fs::write(metadata_path(prefix), json).into_diagnostic()?;
@@ -83,7 +80,6 @@ pub fn read_metadata(prefix: &Path) -> miette::Result<PrefixMetadata> {
             version: "unknown".to_string(),
             channels: config.channels,
             packages: config.packages,
-            excludes: config.exclude,
         });
     }
     let data = std::fs::read_to_string(&path).into_diagnostic()?;
@@ -154,7 +150,6 @@ mod tests {
             serde_json::json!({
                 "channels": config.channels,
                 "packages": config.packages,
-                "exclude": config.exclude,
             })
         );
     }
@@ -165,21 +160,19 @@ mod tests {
 
         let channels = vec!["conda-forge".to_string()];
         let packages = vec!["python".to_string(), "conda".to_string()];
-        let excludes = vec!["conda-libmamba-solver".to_string()];
 
-        write_metadata(tmp.path(), &channels, &packages, &excludes).unwrap();
+        write_metadata(tmp.path(), &channels, &packages).unwrap();
 
         let meta = read_metadata(tmp.path()).unwrap();
         assert_eq!(meta.channels, channels);
         assert_eq!(meta.packages, packages);
-        assert_eq!(meta.excludes, excludes);
     }
 
     #[test]
     fn test_write_metadata_includes_version() {
         let tmp = TempDir::new().unwrap();
 
-        write_metadata(tmp.path(), &[], &[], &[]).unwrap();
+        write_metadata(tmp.path(), &[], &[]).unwrap();
 
         let meta = read_metadata(tmp.path()).unwrap();
         assert_eq!(
@@ -197,7 +190,6 @@ mod tests {
         let embedded = embedded_config();
         assert_eq!(meta.channels, embedded.channels);
         assert_eq!(meta.packages, embedded.packages);
-        assert_eq!(meta.excludes, embedded.exclude);
         assert_eq!(
             meta.version, "unknown",
             "fallback version should be 'unknown'"

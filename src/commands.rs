@@ -28,13 +28,11 @@ pub(crate) async fn ensure_bootstrapped(prefix: &Path) -> miette::Result<()> {
             "{} No conda installation found. Bootstrapping now...",
             console::style(">>").cyan().bold()
         );
-        let cfg = embedded_config();
         bootstrap(
             prefix,
             false,
             None,
             None,
-            &cfg.exclude,
             LockSource::Embedded,
             None,
             false,
@@ -72,7 +70,6 @@ pub(crate) async fn bootstrap(
     force: bool,
     channels: Option<Vec<String>>,
     extra_packages: Option<Vec<String>>,
-    excludes: &[String],
     lock_source: LockSource,
     payload: Option<std::path::PathBuf>,
     offline: bool,
@@ -112,9 +109,6 @@ pub(crate) async fn bootstrap(
         );
         eprintln!("   Channels: {}", channels.join(", "));
         eprintln!("   Packages: {}", specs.join(", "));
-        if !excludes.is_empty() {
-            eprintln!("   Exclude:  {}", excludes.join(", "));
-        }
         if offline {
             eprintln!("   Mode:     offline");
         }
@@ -155,8 +149,7 @@ pub(crate) async fn bootstrap(
         if verbosity != Verbosity::Quiet {
             eprintln!("   Payload:  {}", payload_dir.display());
         }
-        install::from_lockfile_with_payload(prefix, &content, excludes, payload_dir, offline)
-            .await?;
+        install::from_lockfile_with_payload(prefix, &content, payload_dir, offline).await?;
     } else if let Some(embedded_dir) = install::extract_embedded_payload()? {
         let content =
             lock_content.ok_or_else(|| miette::miette!("embedded payload requires a lockfile"))?;
@@ -164,25 +157,24 @@ pub(crate) async fn bootstrap(
             eprintln!("   Payload:  embedded");
         }
         let result =
-            install::from_lockfile_with_payload(prefix, &content, excludes, &embedded_dir, true)
-                .await;
+            install::from_lockfile_with_payload(prefix, &content, &embedded_dir, true).await;
         let _ = std::fs::remove_dir_all(&embedded_dir);
         result?;
     } else if offline {
         let content = lock_content.ok_or_else(|| {
             miette::miette!("--offline requires a lockfile (embedded or --lockfile)")
         })?;
-        install::from_lockfile_offline(prefix, &content, excludes).await?;
+        install::from_lockfile_offline(prefix, &content).await?;
     } else {
         match &lock_content {
-            Some(content) => install::from_lockfile(prefix, content, excludes).await?,
-            None => install::from_solve(prefix, &channels, &specs, excludes).await?,
+            Some(content) => install::from_lockfile(prefix, content).await?,
+            None => install::from_solve(prefix, &channels, &specs).await?,
         };
     }
 
     write_condarc(prefix)?;
     write_frozen(prefix)?;
-    write_metadata(prefix, &channels, &specs, excludes)?;
+    write_metadata(prefix, &channels, &specs)?;
 
     compile_python_bytecode(prefix);
 
@@ -240,9 +232,6 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
     println!("  prefix:   {}", prefix.display());
     println!("  channels: {}", meta.channels.join(", "));
     println!("  packages: {}", meta.packages.join(", "));
-    if !meta.excludes.is_empty() {
-        println!("  excludes: {}", meta.excludes.join(", "));
-    }
     if !payload.is_empty() {
         println!(
             "  payload:  embedded ({:.1} MB)",
@@ -566,7 +555,6 @@ mod tests {
             prefix,
             &["conda-forge".to_string()],
             &["python >=3.12".to_string(), "conda >=25.1".to_string()],
-            &["conda-libmamba-solver".to_string()],
         )
         .unwrap();
 
