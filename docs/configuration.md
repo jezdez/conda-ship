@@ -13,10 +13,11 @@ packages = [
     "python >=3.12",
     "conda >=25.1",
     "conda-rattler-solver",
-    "conda-spawn",
+    "conda-spawn >=0.1.0",
     "conda-pypi",
     "conda-self",
-    "conda-workspaces",
+    "conda-global",
+    "conda-workspaces >=0.4.0",
 ]
 exclude = ["conda-libmamba-solver"]
 ```
