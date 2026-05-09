@@ -1,6 +1,7 @@
 //! Configuration, metadata, and `.condarc` management.
 
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
 
 use miette::IntoDiagnostic;
 
@@ -37,11 +38,15 @@ pub struct CxConfig {
     pub exclude: Vec<String>,
 }
 
-/// Parse the `[tool.cx]` section from the embedded `pixi.toml`.
-pub fn embedded_config() -> CxConfig {
+static EMBEDDED_CX_CONFIG: LazyLock<CxConfig> = LazyLock::new(|| {
     let pixi: PixiToml =
         toml::from_str(EMBEDDED_PIXI_TOML).expect("invalid [tool.cx] in pixi.toml");
     pixi.tool.cx
+});
+
+/// Return a reference to the `[tool.cx]` section from the embedded `pixi.toml`.
+pub fn embedded_config() -> &'static CxConfig {
+    &EMBEDDED_CX_CONFIG
 }
 
 // ─── .cx.json (prefix metadata) ─────────────────────────────────────────────
@@ -78,8 +83,8 @@ pub fn read_metadata(prefix: &Path) -> miette::Result<PrefixMetadata> {
         let config = embedded_config();
         return Ok(PrefixMetadata {
             version: "unknown".to_string(),
-            channels: config.channels,
-            packages: config.packages,
+            channels: config.channels.clone(),
+            packages: config.packages.clone(),
         });
     }
     let data = std::fs::read_to_string(&path).into_diagnostic()?;

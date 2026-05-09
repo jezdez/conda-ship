@@ -94,10 +94,13 @@ fn prepare(check: bool, root_override: Option<PathBuf>) {
 
     let pixi_toml = std::fs::read_to_string(&pixi_toml_path)
         .unwrap_or_else(|e| panic!("failed to read {}: {e}", pixi_toml_path.display()));
+    let pixi_lock_content = std::fs::read_to_string(&pixi_lock_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {e}", pixi_lock_path.display()));
 
     let input_hash = {
         let mut hasher = Sha256::new();
         hasher.update(pixi_toml.as_bytes());
+        hasher.update(pixi_lock_content.as_bytes());
         format!("{:x}", hasher.finalize())
     };
 
@@ -306,7 +309,9 @@ fn gen_payload(platform_str: Option<String>, root_override: Option<PathBuf>) {
 async fn download_and_bundle(
     packages: &[&rattler_lock::CondaPackageData],
     payload_path: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    use futures::stream::{self, StreamExt};
+
     let client = reqwest::Client::builder().no_gzip().build()?;
 
     let payload_dir = payload_path
@@ -317,53 +322,67 @@ async fn download_and_bundle(
 
     let start = std::time::Instant::now();
 
-    for pkg in packages {
-        let url = pkg.location().as_url().expect("package has URL");
-        let archive_name = url
-            .path_segments()
-            .and_then(|mut s| s.next_back())
-            .unwrap_or("unknown");
+    let download_tasks = packages.iter().map(|pkg| {
+        let client = client.clone();
+        let payload_dir = payload_dir.clone();
+        async move {
+            let url = pkg.location().as_url().expect("package has URL");
+            let archive_name = url
+                .path_segments()
+                .and_then(|mut s| s.next_back())
+                .unwrap_or("unknown");
 
-        let dest = payload_dir.join(archive_name);
+            let dest = payload_dir.join(archive_name);
 
-        if dest.exists() {
-            if let Some(ref expected) = pkg.record().sha256 {
-                let data = std::fs::read(&dest)?;
-                let actual = Sha256::digest(&data);
-                if actual == *expected {
-                    continue;
+            if dest.exists() {
+                if let Some(ref expected) = pkg.record().sha256 {
+                    let data = std::fs::read(&dest)?;
+                    let actual = Sha256::digest(&data);
+                    if actual == *expected {
+                        return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
+                    }
+                    eprintln!("SHA256 mismatch for {archive_name}, re-downloading");
+                    std::fs::remove_file(&dest)?;
+                } else {
+                    return Ok(());
                 }
-                eprintln!("SHA256 mismatch for {archive_name}, re-downloading");
-                std::fs::remove_file(&dest)?;
-            } else {
-                continue;
             }
-        }
 
-        let response = client
-            .get(url.clone())
-            .send()
-            .await
-            .map_err(|e| format!("failed to fetch {archive_name}: {e}"))?;
+            let response = client
+                .get(url.clone())
+                .send()
+                .await
+                .map_err(|e| format!("failed to fetch {archive_name}: {e}"))?;
 
-        let status = response.status();
-        if !status.is_success() {
-            return Err(format!("HTTP {status} fetching {archive_name}").into());
-        }
-
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| format!("failed to read {archive_name}: {e}"))?;
-
-        if let Some(ref expected) = pkg.record().sha256 {
-            let actual = Sha256::digest(&bytes);
-            if actual != *expected {
-                return Err(format!("SHA256 mismatch for {archive_name}").into());
+            let status = response.status();
+            if !status.is_success() {
+                return Err(format!("HTTP {status} fetching {archive_name}").into());
             }
-        }
 
-        std::fs::write(&dest, &bytes)?;
+            let bytes = response
+                .bytes()
+                .await
+                .map_err(|e| format!("failed to read {archive_name}: {e}"))?;
+
+            if let Some(ref expected) = pkg.record().sha256 {
+                let actual = Sha256::digest(&bytes);
+                if actual != *expected {
+                    return Err(format!("SHA256 mismatch for {archive_name}").into());
+                }
+            }
+
+            std::fs::write(&dest, &bytes)?;
+            Ok(())
+        }
+    });
+
+    let results: Vec<_> = stream::iter(download_tasks)
+        .buffer_unordered(8)
+        .collect()
+        .await;
+
+    for result in results {
+        result?;
     }
 
     eprintln!(

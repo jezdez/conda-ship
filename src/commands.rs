@@ -43,6 +43,26 @@ pub(crate) async fn ensure_bootstrapped(prefix: &Path) -> miette::Result<()> {
     Ok(())
 }
 
+fn reject_dangerous_prefix(prefix: &Path) -> miette::Result<()> {
+    let home = dirs::home_dir();
+    let canon = prefix
+        .canonicalize()
+        .unwrap_or_else(|_| prefix.to_path_buf());
+
+    let dangerous = canon == Path::new("/")
+        || canon == Path::new("")
+        || home.as_deref() == Some(&canon)
+        || canon == std::env::current_dir().unwrap_or_default();
+
+    if dangerous {
+        return Err(miette::miette!(
+            "refusing to remove dangerous path: {}",
+            prefix.display()
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_bootstrap_flags(
     offline: bool,
     no_lock: bool,
@@ -86,6 +106,7 @@ pub(crate) async fn bootstrap(
     }
 
     if force && prefix.exists() {
+        reject_dangerous_prefix(prefix)?;
         eprintln!(
             "{} Removing existing prefix at {}",
             console::style(">>").cyan().bold(),
@@ -95,8 +116,8 @@ pub(crate) async fn bootstrap(
     }
 
     let cfg = embedded_config();
-    let channels = channels.unwrap_or(cfg.channels);
-    let mut specs = cfg.packages;
+    let channels = channels.unwrap_or_else(|| cfg.channels.clone());
+    let mut specs = cfg.packages.clone();
     if let Some(extra) = extra_packages {
         specs.extend(extra);
     }
@@ -363,6 +384,8 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
             }
         }
     }
+
+    reject_dangerous_prefix(prefix)?;
 
     if verbosity != Verbosity::Quiet {
         eprintln!(

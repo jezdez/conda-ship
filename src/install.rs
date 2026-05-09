@@ -123,16 +123,20 @@ pub async fn from_lockfile_with_payload(
     let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
 
     let start = Instant::now();
-    for path in &matched {
-        package_cache
-            .get_or_fetch_from_path(path, None)
-            .await
-            .into_diagnostic()
-            .context(format!(
-                "failed to cache package from payload: {}",
-                path.display()
-            ))?;
-    }
+    let cache_futures = matched.iter().map(|path| {
+        let cache = &package_cache;
+        async move {
+            cache
+                .get_or_fetch_from_path(path, None)
+                .await
+                .into_diagnostic()
+                .context(format!(
+                    "failed to cache package from payload: {}",
+                    path.display()
+                ))
+        }
+    });
+    futures::future::try_join_all(cache_futures).await?;
     eprintln!(
         "   Cached {} packages from payload in {:.1}s",
         matched.len(),
@@ -230,8 +234,9 @@ pub fn extract_embedded_payload() -> miette::Result<Option<PathBuf>> {
         return Ok(None);
     }
 
-    let tmp_dir = std::env::temp_dir().join(format!("cxz-payload-{}", std::process::id()));
-    std::fs::create_dir_all(&tmp_dir)
+    let tmp_dir = tempfile::Builder::new()
+        .prefix("cxz-payload-")
+        .tempdir()
         .into_diagnostic()
         .context("failed to create temp dir for embedded payload")?;
 
@@ -240,17 +245,18 @@ pub fn extract_embedded_payload() -> miette::Result<Option<PathBuf>> {
         .context("failed to decompress embedded payload")?;
     let mut archive = tar::Archive::new(decoder);
     archive
-        .unpack(&tmp_dir)
+        .unpack(tmp_dir.path())
         .into_diagnostic()
         .context("failed to unpack embedded payload")?;
 
     eprintln!(
         "   Extracted embedded payload ({:.1} MB) to {}",
         payload.len() as f64 / 1_048_576.0,
-        tmp_dir.display()
+        tmp_dir.path().display()
     );
 
-    Ok(Some(tmp_dir))
+    let path = tmp_dir.keep();
+    Ok(Some(path))
 }
 
 /// Scan a directory for `.conda` and `.tar.bz2` package archives.
@@ -386,16 +392,21 @@ pub async fn from_solve(
         .map(|r| r.repodata_record.clone())
         .collect();
 
-    let solver_task = SolverTask {
-        locked_packages,
-        virtual_packages,
-        specs: match_specs.clone(),
-        ..SolverTask::from_iter(&repo_data)
-    };
-
-    let solved = wrap_spinner("solving environment", move || {
-        resolvo::Solver.solve(solver_task)
+    let specs_clone = match_specs.clone();
+    let solved = tokio::task::spawn_blocking(move || {
+        let solver_task = SolverTask {
+            locked_packages,
+            virtual_packages,
+            specs: specs_clone,
+            ..SolverTask::from_iter(&repo_data)
+        };
+        wrap_spinner("solving environment", move || {
+            resolvo::Solver.solve(solver_task)
+        })
     })
+    .await
+    .into_diagnostic()
+    .context("solver task panicked")?
     .into_diagnostic()
     .context("failed to solve environment")?
     .records;
@@ -416,7 +427,8 @@ fn make_download_client() -> miette::Result<reqwest_middleware::ClientWithMiddle
     let raw = reqwest::Client::builder()
         .no_gzip()
         .build()
-        .expect("failed to create HTTP client");
+        .into_diagnostic()
+        .context("failed to create HTTP client")?;
 
     Ok(reqwest_middleware::ClientBuilder::new(raw.clone())
         .with_arc(Arc::new(
