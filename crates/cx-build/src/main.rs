@@ -101,7 +101,11 @@ fn prepare(check: bool, root_override: Option<PathBuf>) {
         let mut hasher = Sha256::new();
         hasher.update(pixi_toml.as_bytes());
         hasher.update(pixi_lock_content.as_bytes());
-        format!("{:x}", hasher.finalize())
+        let digest = hasher.finalize();
+        digest
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
     };
 
     if check {
@@ -338,7 +342,7 @@ async fn download_and_bundle(
                 if let Some(ref expected) = pkg.record().sha256 {
                     let data = std::fs::read(&dest)?;
                     let actual = Sha256::digest(&data);
-                    if actual == *expected {
+                    if actual.as_slice() == expected.as_slice() {
                         return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
                     }
                     eprintln!("SHA256 mismatch for {archive_name}, re-downloading");
@@ -366,7 +370,7 @@ async fn download_and_bundle(
 
             if let Some(ref expected) = pkg.record().sha256 {
                 let actual = Sha256::digest(&bytes);
-                if actual != *expected {
+                if actual.as_slice() != expected.as_slice() {
                     return Err(format!("SHA256 mismatch for {archive_name}").into());
                 }
             }
