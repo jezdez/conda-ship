@@ -1,6 +1,6 @@
 [workspace]
-name = "conda-express"
-description = "A lightweight, single-binary conda bootstrapper"
+name = "pronto"
+description = "Build ready-to-run conda bootstrap binaries"
 channels = ["conda-forge"]
 platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 license = "BSD-3-Clause"
@@ -28,20 +28,6 @@ clippy = "cargo clippy --all-targets -- -D warnings"
 lint = { depends-on = ["fmt-check", "clippy"] }
 demos = { cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}""", args = [{ arg = "name", default = "" }], description = "Record demo GIFs" }
 
-[feature.web.dependencies]
-python = ">=3.12"
-
-[feature.web.tasks]
-wasm-build = { cmd = "PATH=\"$HOME/.cargo/bin:$PATH\" wasm-pack build --target web --release", cwd = "crates/cx-wasm" }
-wasm-build-dev = { cmd = "PATH=\"$HOME/.cargo/bin:$PATH\" wasm-pack build --target web --dev", cwd = "crates/cx-wasm" }
-wasm-copy = { cmd = "cp pkg/cx_wasm.js www/cx_wasm.js && cp pkg/cx_wasm_bg.wasm www/cx_wasm_bg.wasm", cwd = "crates/cx-wasm", depends-on = ["wasm-build"] }
-wasm-copy-dev = { cmd = "cp pkg/cx_wasm.js www/cx_wasm.js && cp pkg/cx_wasm_bg.wasm www/cx_wasm_bg.wasm", cwd = "crates/cx-wasm", depends-on = ["wasm-build-dev"] }
-wasm-serve = { cmd = "python www/serve.py 8080 --directory www", cwd = "crates/cx-wasm", depends-on = ["wasm-copy"] }
-wasm-serve-dev = { cmd = "python www/serve.py 8080 --directory www", cwd = "crates/cx-wasm", depends-on = ["wasm-copy-dev"] }
-wasm-conda-test-prep = { cmd = "cp ../../recipes/conda-emscripten/lockfile-env/pixi.lock www/conda-emscripten.lock && mkdir -p www/packages && cp ../../output/noarch/conda-*.conda ../../output/noarch/frozendict-*.conda ../../output/noarch/conda-emscripten-*.conda www/packages/ 2>/dev/null; true", cwd = "crates/cx-wasm", depends-on = ["wasm-copy-dev"] }
-wasm-conda-test = { cmd = "echo 'Open http://localhost:8080/conda-test.html' && python www/serve.py 8080 --directory www", cwd = "crates/cx-wasm", depends-on = ["wasm-conda-test-prep"] }
-wasm-clean = { cmd = "cargo clean && rm -rf pkg www/cx_wasm.js www/cx_wasm_bg.wasm", cwd = "crates/cx-wasm" }
-
 [feature.docs.dependencies]
 sphinx = ">=7.0"
 conda-sphinx-theme = ">=0.2"
@@ -56,38 +42,6 @@ docs = { cmd = "sphinx-build -b dirhtml . _build/dirhtml", cwd = "docs" }
 docs-serve = { cmd = "python -m http.server", cwd = "docs/_build/dirhtml" }
 docs-clean = { cmd = "rm -rf _build", cwd = "docs" }
 
-[feature.recipes.dependencies]
-rattler-build = ">=0.35"
-
-[feature.recipes.tasks]
-build-conda-emscripten = { cmd = "rattler-build build --recipe recipes/conda-emscripten/recipe.yaml -c conda-forge" }
-build-frozendict-noarch = { cmd = "rattler-build build --recipe recipes/frozendict-noarch/recipe.yaml -c conda-forge" }
-build-conda-emscripten-plugin = { cmd = "rattler-build build --recipe recipes/conda-emscripten-plugin/recipe.yaml -c conda-forge" }
-build-conda-emscripten-lockfile = { cmd = "pixi install", cwd = "recipes/conda-emscripten/lockfile-env", depends-on = ["build-conda-emscripten", "build-frozendict-noarch", "build-conda-emscripten-plugin"] }
-# Build the cx-wasm kernel bridge conda package.
-# Requires wasm-pack output in crates/cx-wasm/pkg/ (run wasm-build[-dev] first).
-build-cx-wasm-kernel = { cmd = "rattler-build build --recipe recipes/cx-wasm-kernel/recipe.yaml -c conda-forge" }
-
-[feature.lite.dependencies]
-python = ">=3.12"
-jupyterlite-core = ">=0.5"
-jupyterlite-xeus = ">=4.0"
-jupyterlab = ">=4.0,<5"
-nodejs = ">=20"
-
-[feature.lite.tasks]
-# Build the JupyterLite static site (emscripten-forge packages only).
-lite-build = { cmd = "python build.py", cwd = "lite" }
-# Build with locally-compiled cx-wasm-kernel (enables runtime conda install).
-# Prerequisite: pixi run -e web wasm-build && pixi run -e recipes build-cx-wasm-kernel
-lite-build-local = { cmd = "python build.py --with-local", cwd = "lite" }
-# Serve the built site on http://localhost:8888/lab/index.html
-lite-serve = { cmd = "echo 'Open http://localhost:8888/lab/index.html' && python -m http.server 8888 --directory _output", cwd = "lite" }
-# Build (with local packages) then serve — the full demo workflow
-lite-demo = { depends-on = ["lite-build-local", "lite-serve"] }
-# Remove the build output
-lite-clean = { cmd = "rm -rf _output _env .jupyterlite.doit.db", cwd = "lite" }
-
 [feature.cx-env.dependencies]
 python = ">=3.12"
 conda = ">=25.1"
@@ -99,9 +53,6 @@ conda-workspaces = ">=0.4.0"
 
 [environments]
 docs = ["docs"]
-web = ["web"]
-recipes = ["recipes"]
-lite = ["lite"]
 cx-env = { features = ["cx-env"], no-default-feature = true }
 
 [tool.cx]
