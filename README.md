@@ -18,8 +18,6 @@ terminology, then split generic runtime behavior from the opinionated
 `conda-express` distribution.
 
 The GitHub Action uses `embed-bundle: true` for embedded `cxz` builds.
-`embed-payload` remains accepted as a deprecated compatibility alias while the
-extraction settles.
 
 `pronto` is not an OS installer generator and does not target `.sh`, `.pkg`, or
 `.msi` output. It produces bootstrap binaries that can be distributed directly

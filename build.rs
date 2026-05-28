@@ -16,7 +16,6 @@ fn main() {
     println!("cargo:rerun-if-changed=cx.lock.hash");
     println!("cargo:rerun-if-changed=payload.tar.zst");
     println!("cargo:rerun-if-env-changed=PRONTO_EMBED_BUNDLE");
-    println!("cargo:rerun-if-env-changed=CX_EMBED_PAYLOAD");
     println!("cargo:rerun-if-env-changed=CX_INSTALL_METHOD");
 
     let cx_lock_src = manifest_dir.join("cx.lock");
@@ -28,7 +27,7 @@ fn main() {
     std::fs::copy(&cx_lock_src, &cx_lock_dst).expect("failed to copy cx.lock to OUT_DIR");
 
     let payload_dst = out_dir.join("payload.tar.zst");
-    let embed_bundle = env_flag("PRONTO_EMBED_BUNDLE") || env_flag("CX_EMBED_PAYLOAD");
+    let embed_bundle = env_flag("PRONTO_EMBED_BUNDLE");
 
     if embed_bundle {
         let payload_src = manifest_dir.join("payload.tar.zst");

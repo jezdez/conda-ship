@@ -225,7 +225,7 @@ pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette:
 
 /// Extract the embedded payload (if any) to a temporary directory.
 ///
-/// Returns `Some(path)` when the binary was built with `CX_EMBED_PAYLOAD=1`
+/// Returns `Some(path)` when the binary was built with `PRONTO_EMBED_BUNDLE=1`
 /// and contains a non-empty `payload.tar.zst`. Returns `None` for standard
 /// `cx` builds where the payload is empty.
 pub fn extract_embedded_payload() -> miette::Result<Option<PathBuf>> {

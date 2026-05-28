@@ -37,11 +37,6 @@ inputs:
       (increases size by 40-85 MB depending on platform). The output binary is named cxz instead of cx.
     required: false
     default: "false"
-  embed-payload:
-    description: >
-      Deprecated alias for embed-bundle. Use embed-bundle for new workflows.
-    required: false
-    default: "false"
 
 outputs:
   binary-path:
@@ -89,7 +84,7 @@ runs:
         pixi run prepare
 
     - name: Generate bundle
-      if: inputs.embed-bundle == 'true' || inputs.embed-payload == 'true'
+      if: inputs.embed-bundle == 'true'
       shell: bash
       working-directory: .pronto-build
       run: pixi run bundle
@@ -97,7 +92,7 @@ runs:
     - name: Build cx
       shell: bash
       env:
-        PRONTO_EMBED_BUNDLE: ${{ (inputs.embed-bundle == 'true' || inputs.embed-payload == 'true') && '1' || '' }}
+        PRONTO_EMBED_BUNDLE: ${{ inputs.embed-bundle == 'true' && '1' || '' }}
       working-directory: .pronto-build
       run: pixi run build
 
@@ -105,7 +100,7 @@ runs:
       id: stage
       shell: bash
       env:
-        EMBED_BUNDLE: ${{ (inputs.embed-bundle == 'true' || inputs.embed-payload == 'true') && 'true' || 'false' }}
+        EMBED_BUNDLE: ${{ inputs.embed-bundle }}
       run: |
         TARGET="$(rustc -vV | grep '^host:' | cut -d' ' -f2)"
         if [[ "$EMBED_BUNDLE" == "true" ]]; then
