@@ -45,6 +45,18 @@ outputs:
   asset-name:
     description: "Platform-qualified asset name (e.g. cx-aarch64-apple-darwin)."
     value: ${{ steps.stage.outputs.asset_name }}
+  info-path:
+    description: "Absolute path to the artifact info JSON."
+    value: ${{ steps.stage.outputs.info_path }}
+  lock-path:
+    description: "Absolute path to the staged artifact lock."
+    value: ${{ steps.stage.outputs.lock_path }}
+  package-list-path:
+    description: "Absolute path to the package list."
+    value: ${{ steps.stage.outputs.package_list_path }}
+  checksums-path:
+    description: "Absolute path to the SHA256 checksum file."
+    value: ${{ steps.stage.outputs.checksums_path }}
 
 runs:
   using: composite
@@ -83,18 +95,23 @@ runs:
         pixi lock
         pixi run prepare
 
-    - name: Generate bundle
-      if: inputs.embed-bundle == 'true'
-      shell: bash
-      working-directory: .pronto
-      run: pixi run bundle
-
     - name: Build cx
       shell: bash
-      env:
-        PRONTO_EMBED_BUNDLE: ${{ inputs.embed-bundle == 'true' && '1' || '' }}
       working-directory: .pronto
-      run: pixi run build
+      env:
+        EMBED_BUNDLE: ${{ inputs.embed-bundle }}
+      run: |
+        TARGET="$(rustc -vV | grep '^host:' | cut -d' ' -f2)"
+        if [[ "$EMBED_BUNDLE" == "true" ]]; then
+          LAYOUT="embedded"
+        else
+          LAYOUT="none"
+        fi
+        pixi run -- cargo run -p pronto -- build \
+          --layout "$LAYOUT" \
+          --name cx \
+          --target-label "$TARGET" \
+          --out-dir "${GITHUB_WORKSPACE}/.pronto-artifacts"
 
     - name: Stage binary
       id: stage
@@ -108,15 +125,17 @@ runs:
         else
           PREFIX="cx"
         fi
+        STEM="${PREFIX}-${TARGET}"
         if [[ "$TARGET" == *"windows"* ]]; then
-          BIN_NAME="cx.exe"
-          ASSET_NAME="${PREFIX}-${TARGET}.exe"
+          ASSET_NAME="${STEM}.exe"
         else
-          BIN_NAME="cx"
-          ASSET_NAME="${PREFIX}-${TARGET}"
+          ASSET_NAME="${STEM}"
         fi
-        BINARY_PATH="${GITHUB_WORKSPACE}/${ASSET_NAME}"
-        cp ".pronto/target/release/${BIN_NAME}" "${BINARY_PATH}"
-        sha256sum "${BINARY_PATH}" > "${BINARY_PATH}.sha256"
+        ARTIFACT_DIR="${GITHUB_WORKSPACE}/.pronto-artifacts"
+        BINARY_PATH="${ARTIFACT_DIR}/${ASSET_NAME}"
         echo "binary_path=${BINARY_PATH}" >> "$GITHUB_OUTPUT"
         echo "asset_name=${ASSET_NAME}" >> "$GITHUB_OUTPUT"
+        echo "info_path=${ARTIFACT_DIR}/${STEM}.info.json" >> "$GITHUB_OUTPUT"
+        echo "lock_path=${ARTIFACT_DIR}/${STEM}.artifact.lock" >> "$GITHUB_OUTPUT"
+        echo "package_list_path=${ARTIFACT_DIR}/${STEM}.packages.txt" >> "$GITHUB_OUTPUT"
+        echo "checksums_path=${ARTIFACT_DIR}/${STEM}.sha256" >> "$GITHUB_OUTPUT"

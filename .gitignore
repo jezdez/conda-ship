@@ -2,3 +2,4 @@
 /docs/_build/
 /bundle/
 /bundle.tar.zst
+/dist/

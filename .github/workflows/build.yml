@@ -80,5 +80,8 @@ jobs:
           name: ${{ steps.build.outputs.asset-name }}
           path: |
             ${{ steps.build.outputs.binary-path }}
-            ${{ steps.build.outputs.binary-path }}.sha256
+            ${{ steps.build.outputs.info-path }}
+            ${{ steps.build.outputs.lock-path }}
+            ${{ steps.build.outputs.package-list-path }}
+            ${{ steps.build.outputs.checksums-path }}
           retention-days: ${{ inputs.retention-days }}

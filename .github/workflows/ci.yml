@@ -90,11 +90,7 @@ jobs:
 
       - name: Build cxz (embedded bundle)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        env:
-          PRONTO_EMBED_BUNDLE: "1"
-        run: |
-          pixi run bundle
-          pixi run build
+        run: pixi run -- cargo run -p pronto -- build --layout embedded --target-label "$TARGET"
 
       - name: Smoke test cxz
         if: matrix.target == 'x86_64-unknown-linux-gnu'

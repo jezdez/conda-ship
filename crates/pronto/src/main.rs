@@ -1,8 +1,9 @@
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use rattler_conda_types::{PackageName, Platform};
 use rattler_lock::{CondaPackageData, LockFile, LockFileBuilder};
 use sha2::{Digest, Sha256};
@@ -54,6 +55,79 @@ enum Command {
         root: Option<PathBuf>,
     },
 
+    /// Build and stage a ready-to-run artifact
+    Build {
+        /// Artifact layout to produce
+        #[arg(long, value_enum, default_value_t = BundleLayout::None)]
+        layout: BundleLayout,
+
+        /// Base artifact name
+        #[arg(long, default_value = "cx")]
+        name: String,
+
+        /// Optional target label appended to staged artifact names
+        #[arg(long)]
+        target_label: Option<String>,
+
+        /// Conda platform to bundle/describe (default: current)
+        #[arg(long)]
+        platform: Option<String>,
+
+        /// Rust target triple to pass to cargo build
+        #[arg(long)]
+        target: Option<String>,
+
+        /// Output directory for staged artifacts
+        #[arg(long, default_value = "dist")]
+        out_dir: PathBuf,
+
+        /// Project root (default: auto-detect from Cargo workspace)
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+
+    /// Build and run a staged artifact for local smoke testing
+    Run {
+        /// Artifact layout to produce before running
+        #[arg(long, value_enum, default_value_t = BundleLayout::None)]
+        layout: BundleLayout,
+
+        /// Base artifact name
+        #[arg(long, default_value = "cx")]
+        name: String,
+
+        /// Conda platform to bundle/describe (default: current)
+        #[arg(long)]
+        platform: Option<String>,
+
+        /// Output directory for staged artifacts
+        #[arg(long, default_value = "dist")]
+        out_dir: PathBuf,
+
+        /// Project root (default: auto-detect from Cargo workspace)
+        #[arg(long)]
+        root: Option<PathBuf>,
+
+        /// Arguments passed to the staged runtime binary
+        #[arg(last = true)]
+        args: Vec<OsString>,
+    },
+
+    /// Inspect artifact.lock
+    Inspect {
+        /// Conda platform to inspect (default: current)
+        #[arg(long)]
+        platform: Option<String>,
+
+        /// Emit JSON
+        #[arg(long)]
+        json: bool,
+
+        /// Project root (default: auto-detect from Cargo workspace)
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+
     /// Override cx-env packages/channels/exclude in pixi.toml for custom builds
     Configure {
         /// Comma-separated conda package specs (replaces [feature.cx-env.dependencies])
@@ -72,6 +146,30 @@ enum Command {
         #[arg(long)]
         root: Option<PathBuf>,
     },
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum BundleLayout {
+    /// Binary contains lock/metadata; packages download during bootstrap.
+    None,
+    /// Binary is paired with a compressed package bundle.
+    External,
+    /// Binary contains the compressed package bundle.
+    Embedded,
+}
+
+impl BundleLayout {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::External => "external",
+            Self::Embedded => "embedded",
+        }
+    }
+
+    fn needs_bundle(self) -> bool {
+        matches!(self, Self::External | Self::Embedded)
+    }
 }
 
 fn project_root(override_root: Option<&Path>) -> PathBuf {
@@ -432,6 +530,502 @@ async fn download_and_bundle(
     Ok(())
 }
 
+#[derive(Debug)]
+struct BuildOutput {
+    binary: PathBuf,
+    bundle: Option<PathBuf>,
+    info: PathBuf,
+    checksums: PathBuf,
+    lock: PathBuf,
+    package_list: PathBuf,
+}
+
+#[derive(serde::Serialize)]
+struct ArtifactChecksum {
+    path: String,
+    sha256: String,
+    bytes: u64,
+}
+
+#[derive(serde::Serialize)]
+struct ArtifactInfo {
+    schema_version: u8,
+    name: String,
+    layout: String,
+    platform: String,
+    binary: String,
+    bundle: Option<String>,
+    lock: String,
+    package_list: String,
+    package_count: usize,
+    checksums: Vec<ArtifactChecksum>,
+}
+
+#[derive(serde::Serialize)]
+struct LockInspect {
+    lock: String,
+    selected_platform: String,
+    platforms: Vec<PlatformSummary>,
+    packages: Vec<PackageInfo>,
+}
+
+#[derive(serde::Serialize)]
+struct PlatformSummary {
+    platform: String,
+    packages: usize,
+}
+
+#[derive(serde::Serialize)]
+struct PackageInfo {
+    name: String,
+    version: String,
+    build: String,
+    url: String,
+    sha256: Option<String>,
+}
+
+fn build_artifact(
+    layout: BundleLayout,
+    name: String,
+    target_label: Option<String>,
+    platform_str: Option<String>,
+    target: Option<String>,
+    out_dir: PathBuf,
+    root_override: Option<PathBuf>,
+) -> BuildOutput {
+    validate_artifact_name(&name);
+    let root = project_root(root_override.as_deref());
+    let platform = parse_platform(platform_str);
+
+    write_artifact_lock(false, Some(root.clone()));
+
+    if layout.needs_bundle() {
+        gen_bundle(Some(platform.to_string()), Some(root.clone()));
+    }
+
+    run_cargo_build(&root, layout == BundleLayout::Embedded, target.as_deref());
+    stage_artifacts(
+        &root,
+        layout,
+        &name,
+        target_label.as_deref(),
+        platform,
+        target.as_deref(),
+        &out_dir,
+    )
+}
+
+fn run_artifact(
+    layout: BundleLayout,
+    name: String,
+    platform: Option<String>,
+    out_dir: PathBuf,
+    root_override: Option<PathBuf>,
+    args: Vec<OsString>,
+) {
+    let root = project_root(root_override.as_deref());
+    let output = build_artifact(
+        layout,
+        name,
+        None,
+        platform,
+        None,
+        out_dir,
+        Some(root.clone()),
+    );
+
+    let mut command = std::process::Command::new(&output.binary);
+    command.args(args);
+    if layout == BundleLayout::External {
+        command.env("CX_BUNDLE", root.join("bundle"));
+    }
+
+    let status = command
+        .status()
+        .unwrap_or_else(|e| panic!("failed to run {}: {e}", output.binary.display()));
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+}
+
+fn inspect_artifact(platform_str: Option<String>, json: bool, root_override: Option<PathBuf>) {
+    let root = project_root(root_override.as_deref());
+    let artifact_lock_path = root.join("artifact.lock");
+    let platform = parse_platform(platform_str);
+    let lock_file = LockFile::from_path(&artifact_lock_path)
+        .unwrap_or_else(|e| panic!("failed to parse {}: {e}", artifact_lock_path.display()));
+
+    let summaries = platform_summaries(&lock_file, &artifact_lock_path);
+    let packages = packages_for_platform(&lock_file, &artifact_lock_path, platform);
+    let package_infos = package_infos(&packages);
+
+    if json {
+        let inspect = LockInspect {
+            lock: artifact_lock_path.display().to_string(),
+            selected_platform: platform.to_string(),
+            platforms: summaries,
+            packages: package_infos,
+        };
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&inspect).expect("failed to render inspect JSON")
+        );
+        return;
+    }
+
+    println!("{}", artifact_lock_path.display());
+    for summary in summaries {
+        println!("  {}: {} packages", summary.platform, summary.packages);
+    }
+    println!();
+    println!("{platform}: {} packages", package_infos.len());
+    for package in package_infos {
+        println!("  {} {} {}", package.name, package.version, package.build);
+    }
+}
+
+fn run_cargo_build(root: &Path, embed_bundle: bool, target: Option<&str>) {
+    let mut command = std::process::Command::new("cargo");
+    command.arg("build").arg("--release").current_dir(root);
+    if let Some(target) = target {
+        command.arg("--target").arg(target);
+    }
+    if embed_bundle {
+        command.env("PRONTO_EMBED_BUNDLE", "1");
+    } else {
+        command.env_remove("PRONTO_EMBED_BUNDLE");
+    }
+
+    let status = command.status().expect("failed to run cargo build");
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+}
+
+fn stage_artifacts(
+    root: &Path,
+    layout: BundleLayout,
+    name: &str,
+    target_label: Option<&str>,
+    platform: Platform,
+    target: Option<&str>,
+    out_dir: &Path,
+) -> BuildOutput {
+    let out_dir = resolve_out_dir(root, out_dir);
+    std::fs::create_dir_all(&out_dir)
+        .unwrap_or_else(|e| panic!("failed to create {}: {e}", out_dir.display()));
+
+    let stem = artifact_stem(name, layout, target_label);
+    let binary_name = binary_filename(&stem, target);
+    let source_binary = source_binary_path(root, target);
+    let binary = out_dir.join(binary_name);
+    std::fs::copy(&source_binary, &binary).unwrap_or_else(|e| {
+        panic!(
+            "failed to copy {} to {}: {e}",
+            source_binary.display(),
+            binary.display()
+        )
+    });
+
+    let bundle = if layout == BundleLayout::External {
+        let source_bundle = root.join("bundle.tar.zst");
+        let staged_bundle = out_dir.join(format!("{stem}.bundle.tar.zst"));
+        std::fs::copy(&source_bundle, &staged_bundle).unwrap_or_else(|e| {
+            panic!(
+                "failed to copy {} to {}: {e}",
+                source_bundle.display(),
+                staged_bundle.display()
+            )
+        });
+        Some(staged_bundle)
+    } else {
+        None
+    };
+
+    let metadata = write_artifact_metadata(
+        root,
+        &out_dir,
+        &stem,
+        layout,
+        platform,
+        &binary,
+        bundle.as_deref(),
+    );
+
+    eprintln!("staged {}", binary.display());
+    if let Some(bundle) = &bundle {
+        eprintln!("staged {}", bundle.display());
+    }
+    eprintln!("wrote {}", metadata.info.display());
+    eprintln!("wrote {}", metadata.checksums.display());
+
+    BuildOutput {
+        binary,
+        bundle,
+        info: metadata.info,
+        checksums: metadata.checksums,
+        lock: metadata.lock,
+        package_list: metadata.package_list,
+    }
+}
+
+#[derive(Debug)]
+struct ArtifactMetadataPaths {
+    info: PathBuf,
+    checksums: PathBuf,
+    lock: PathBuf,
+    package_list: PathBuf,
+}
+
+fn write_artifact_metadata(
+    root: &Path,
+    out_dir: &Path,
+    stem: &str,
+    layout: BundleLayout,
+    platform: Platform,
+    binary: &Path,
+    bundle: Option<&Path>,
+) -> ArtifactMetadataPaths {
+    let artifact_lock_path = root.join("artifact.lock");
+    let lock_file = LockFile::from_path(&artifact_lock_path)
+        .unwrap_or_else(|e| panic!("failed to parse {}: {e}", artifact_lock_path.display()));
+    let packages = packages_for_platform(&lock_file, &artifact_lock_path, platform);
+    let package_infos = package_infos(&packages);
+
+    let lock = out_dir.join(format!("{stem}.artifact.lock"));
+    std::fs::copy(&artifact_lock_path, &lock).unwrap_or_else(|e| {
+        panic!(
+            "failed to copy {} to {}: {e}",
+            artifact_lock_path.display(),
+            lock.display()
+        )
+    });
+
+    let package_list = out_dir.join(format!("{stem}.packages.txt"));
+    let package_list_content = render_package_list(&package_infos);
+    std::fs::write(&package_list, package_list_content)
+        .unwrap_or_else(|e| panic!("failed to write {}: {e}", package_list.display()));
+
+    let mut checksums = vec![
+        checksum_for_path(binary),
+        checksum_for_path(&lock),
+        checksum_for_path(&package_list),
+    ];
+    if let Some(bundle) = bundle {
+        checksums.push(checksum_for_path(bundle));
+    }
+
+    let info = out_dir.join(format!("{stem}.info.json"));
+    let info_doc = ArtifactInfo {
+        schema_version: 1,
+        name: stem.to_string(),
+        layout: layout.as_str().to_string(),
+        platform: platform.to_string(),
+        binary: file_name(binary),
+        bundle: bundle.map(file_name),
+        lock: file_name(&lock),
+        package_list: file_name(&package_list),
+        package_count: package_infos.len(),
+        checksums,
+    };
+    let info_json = serde_json::to_string_pretty(&info_doc).expect("failed to render info JSON");
+    std::fs::write(&info, format!("{info_json}\n"))
+        .unwrap_or_else(|e| panic!("failed to write {}: {e}", info.display()));
+
+    let mut final_checksums = info_doc.checksums;
+    final_checksums.push(checksum_for_path(&info));
+    final_checksums.sort_by(|a, b| a.path.cmp(&b.path));
+
+    let checksums = out_dir.join(format!("{stem}.sha256"));
+    write_checksums(&checksums, &final_checksums);
+
+    ArtifactMetadataPaths {
+        info,
+        checksums,
+        lock,
+        package_list,
+    }
+}
+
+fn parse_platform(platform_str: Option<String>) -> Platform {
+    if let Some(ref platform) = platform_str {
+        platform
+            .parse::<Platform>()
+            .unwrap_or_else(|_| panic!("invalid platform: {platform}"))
+    } else {
+        Platform::current()
+    }
+}
+
+fn validate_artifact_name(name: &str) {
+    assert!(!name.is_empty(), "artifact name must not be empty");
+    assert!(
+        !name.contains('/') && !name.contains('\\'),
+        "artifact name must not contain path separators"
+    );
+}
+
+fn artifact_stem(name: &str, layout: BundleLayout, target_label: Option<&str>) -> String {
+    let base = if layout == BundleLayout::Embedded {
+        format!("{name}z")
+    } else {
+        name.to_string()
+    };
+
+    if let Some(label) = target_label {
+        format!("{base}-{label}")
+    } else {
+        base
+    }
+}
+
+fn binary_filename(stem: &str, target: Option<&str>) -> String {
+    if target_is_windows(target) {
+        format!("{stem}.exe")
+    } else {
+        stem.to_string()
+    }
+}
+
+fn source_binary_path(root: &Path, target: Option<&str>) -> PathBuf {
+    let mut path = root.join("target");
+    if let Some(target) = target {
+        path.push(target);
+    }
+    path.push("release");
+    path.push(if target_is_windows(target) {
+        "cx.exe"
+    } else {
+        "cx"
+    });
+    path
+}
+
+fn target_is_windows(target: Option<&str>) -> bool {
+    target
+        .map(|target| target.contains("windows"))
+        .unwrap_or(cfg!(windows))
+}
+
+fn resolve_out_dir(root: &Path, out_dir: &Path) -> PathBuf {
+    if out_dir.is_absolute() {
+        out_dir.to_path_buf()
+    } else {
+        root.join(out_dir)
+    }
+}
+
+fn platform_summaries(lock_file: &LockFile, artifact_lock_path: &Path) -> Vec<PlatformSummary> {
+    let env = lock_file
+        .default_environment()
+        .unwrap_or_else(|| panic!("no default environment in {}", artifact_lock_path.display()));
+
+    let mut summaries: Vec<_> = env
+        .conda_packages_by_platform()
+        .map(|(platform, packages)| PlatformSummary {
+            platform: platform.to_string(),
+            packages: packages.count(),
+        })
+        .collect();
+    summaries.sort_by(|a, b| a.platform.cmp(&b.platform));
+    summaries
+}
+
+fn packages_for_platform<'a>(
+    lock_file: &'a LockFile,
+    artifact_lock_path: &Path,
+    platform: Platform,
+) -> Vec<&'a CondaPackageData> {
+    let env = lock_file
+        .default_environment()
+        .unwrap_or_else(|| panic!("no default environment in {}", artifact_lock_path.display()));
+
+    let packages: Vec<_> = env
+        .conda_packages_by_platform()
+        .filter(|(p, _)| *p == platform)
+        .flat_map(|(_, pkgs)| pkgs)
+        .collect();
+
+    if packages.is_empty() {
+        panic!(
+            "no packages for platform {platform} in {}",
+            artifact_lock_path.display()
+        );
+    }
+
+    packages
+}
+
+fn package_infos(packages: &[&CondaPackageData]) -> Vec<PackageInfo> {
+    let mut infos: Vec<_> = packages
+        .iter()
+        .map(|pkg| {
+            let record = pkg.record();
+            PackageInfo {
+                name: record.name.as_normalized().to_string(),
+                version: record.version.to_string(),
+                build: record.build.to_string(),
+                url: pkg
+                    .location()
+                    .as_url()
+                    .map(|url| url.to_string())
+                    .unwrap_or_default(),
+                sha256: record
+                    .sha256
+                    .as_ref()
+                    .map(|hash| hex_bytes(hash.as_slice())),
+            }
+        })
+        .collect();
+    infos.sort_by(|a, b| a.name.cmp(&b.name).then(a.version.cmp(&b.version)));
+    infos
+}
+
+fn render_package_list(packages: &[PackageInfo]) -> String {
+    let mut content = String::from("name\tversion\tbuild\turl\tsha256\n");
+    for package in packages {
+        content.push_str(&format!(
+            "{}\t{}\t{}\t{}\t{}\n",
+            package.name,
+            package.version,
+            package.build,
+            package.url,
+            package.sha256.as_deref().unwrap_or("")
+        ));
+    }
+    content
+}
+
+fn checksum_for_path(path: &Path) -> ArtifactChecksum {
+    let data = std::fs::read(path)
+        .unwrap_or_else(|e| panic!("failed to read {} for checksum: {e}", path.display()));
+    ArtifactChecksum {
+        path: file_name(path),
+        sha256: hex_bytes(Sha256::digest(&data).as_slice()),
+        bytes: data.len() as u64,
+    }
+}
+
+fn write_checksums(path: &Path, checksums: &[ArtifactChecksum]) {
+    let mut content = String::new();
+    for checksum in checksums {
+        content.push_str(&format!("{}  {}\n", checksum.sha256, checksum.path));
+    }
+    std::fs::write(path, content)
+        .unwrap_or_else(|e| panic!("failed to write {}: {e}", path.display()));
+}
+
+fn hex_bytes(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .unwrap_or_else(|| panic!("path has no file name: {}", path.display()))
+        .to_string_lossy()
+        .to_string()
+}
+
 fn configure(
     packages: Option<String>,
     channels: Option<String>,
@@ -514,6 +1108,38 @@ fn main() {
     match cli.command {
         Command::Lock { check, root } => write_artifact_lock(check, root),
         Command::Bundle { platform, root } => gen_bundle(platform, root),
+        Command::Build {
+            layout,
+            name,
+            target_label,
+            platform,
+            target,
+            out_dir,
+            root,
+        } => {
+            let output =
+                build_artifact(layout, name, target_label, platform, target, out_dir, root);
+            eprintln!("metadata {}", output.info.display());
+            eprintln!("checksums {}", output.checksums.display());
+            eprintln!("lock {}", output.lock.display());
+            eprintln!("packages {}", output.package_list.display());
+            if let Some(bundle) = output.bundle {
+                eprintln!("bundle {}", bundle.display());
+            }
+        }
+        Command::Run {
+            layout,
+            name,
+            platform,
+            out_dir,
+            root,
+            args,
+        } => run_artifact(layout, name, platform, out_dir, root, args),
+        Command::Inspect {
+            platform,
+            json,
+            root,
+        } => inspect_artifact(platform, json, root),
         Command::Configure {
             packages,
             channels,
@@ -630,5 +1256,45 @@ mod tests {
         let (filtered, removed) = filter_excluded(&packages, &excludes);
         assert_eq!(removed, vec!["a", "b", "only-b", "shared"]);
         assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_artifact_stem_embedded_adds_z_before_target_label() {
+        assert_eq!(
+            artifact_stem("cx", BundleLayout::Embedded, Some("linux-64")),
+            "cxz-linux-64"
+        );
+    }
+
+    #[test]
+    fn test_artifact_stem_external_keeps_base_name() {
+        assert_eq!(
+            artifact_stem("cx", BundleLayout::External, Some("linux-64")),
+            "cx-linux-64"
+        );
+    }
+
+    #[test]
+    fn test_binary_filename_uses_windows_extension_for_target() {
+        assert_eq!(
+            binary_filename("cx", Some("x86_64-pc-windows-msvc")),
+            "cx.exe"
+        );
+    }
+
+    #[test]
+    fn test_render_package_list_is_tab_separated() {
+        let packages = vec![PackageInfo {
+            name: "python".to_string(),
+            version: "3.12.0".to_string(),
+            build: "h123_0".to_string(),
+            url: "https://example.com/python.conda".to_string(),
+            sha256: Some("abc123".to_string()),
+        }];
+
+        assert_eq!(
+            render_package_list(&packages),
+            "name\tversion\tbuild\turl\tsha256\npython\t3.12.0\th123_0\thttps://example.com/python.conda\tabc123\n"
+        );
     }
 }
