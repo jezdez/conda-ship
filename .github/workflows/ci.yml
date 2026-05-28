@@ -128,6 +128,7 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     env:
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -142,11 +143,12 @@ jobs:
         run: pixi run coverage
 
       - name: Upload to Codecov
+        if: env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
         with:
           files: lcov.info
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: ${{ github.event_name != 'pull_request' }}
+          token: ${{ env.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
   lint:
     name: Lint
