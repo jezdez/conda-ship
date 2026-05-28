@@ -32,9 +32,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Extract cx.lock from pixi.lock's cx-env environment and apply exclude filters
+    /// Extract artifact.lock from pixi.lock's cx-env environment and apply exclude filters
     Prepare {
-        /// Only verify cx.lock is up-to-date; exit 1 if stale
+        /// Only verify artifact.lock is up-to-date; exit 1 if stale
         #[arg(long)]
         check: bool,
 
@@ -43,7 +43,7 @@ enum Command {
         root: Option<PathBuf>,
     },
 
-    /// Download packages from cx.lock and bundle them for embedded builds
+    /// Download packages from artifact.lock and bundle them for embedded builds
     Bundle {
         /// Target platform (default: current)
         #[arg(long)]
@@ -89,8 +89,8 @@ fn project_root(override_root: Option<&Path>) -> PathBuf {
 fn prepare(check: bool, root_override: Option<PathBuf>) {
     let root = project_root(root_override.as_deref());
     let pixi_lock_path = root.join("pixi.lock");
-    let cx_lock_path = root.join("cx.lock");
-    let cx_hash_path = root.join("cx.lock.hash");
+    let artifact_lock_path = root.join("artifact.lock");
+    let artifact_hash_path = root.join("artifact.lock.hash");
     let pixi_toml_path = root.join("pixi.toml");
 
     let pixi_toml = std::fs::read_to_string(&pixi_toml_path)
@@ -110,26 +110,26 @@ fn prepare(check: bool, root_override: Option<PathBuf>) {
     };
 
     if check {
-        if !cx_lock_path.exists() {
+        if !artifact_lock_path.exists() {
             eprintln!(
-                "cx.lock does not exist; run `cargo run -p pronto-build -- prepare` to create it"
+                "artifact.lock does not exist; run `cargo run -p pronto-build -- prepare` to create it"
             );
             std::process::exit(1);
         }
-        if !cx_hash_path.exists() {
+        if !artifact_hash_path.exists() {
             eprintln!(
-                "cx.lock.hash does not exist; run `cargo run -p pronto-build -- prepare` to create it"
+                "artifact.lock.hash does not exist; run `cargo run -p pronto-build -- prepare` to create it"
             );
             std::process::exit(1);
         }
-        let stored_hash = std::fs::read_to_string(&cx_hash_path).unwrap_or_default();
+        let stored_hash = std::fs::read_to_string(&artifact_hash_path).unwrap_or_default();
         if stored_hash.trim() != input_hash {
             eprintln!(
-                "cx.lock is stale (hash mismatch); run `cargo run -p pronto-build -- prepare` to update"
+                "artifact.lock is stale (hash mismatch); run `cargo run -p pronto-build -- prepare` to update"
             );
             std::process::exit(1);
         }
-        eprintln!("cx.lock is up-to-date");
+        eprintln!("artifact.lock is up-to-date");
         return;
     }
 
@@ -182,16 +182,16 @@ fn prepare(check: bool, root_override: Option<PathBuf>) {
     let new_lock = builder.finish();
     let new_content = new_lock
         .render_to_string()
-        .expect("failed to render cx.lock");
+        .expect("failed to render artifact.lock");
 
-    std::fs::write(&cx_lock_path, &new_content)
-        .unwrap_or_else(|e| panic!("failed to write {}: {e}", cx_lock_path.display()));
-    std::fs::write(&cx_hash_path, &input_hash)
-        .unwrap_or_else(|e| panic!("failed to write {}: {e}", cx_hash_path.display()));
+    std::fs::write(&artifact_lock_path, &new_content)
+        .unwrap_or_else(|e| panic!("failed to write {}: {e}", artifact_lock_path.display()));
+    std::fs::write(&artifact_hash_path, &input_hash)
+        .unwrap_or_else(|e| panic!("failed to write {}: {e}", artifact_hash_path.display()));
 
     let platforms: Vec<Platform> = cx_env.platforms().collect();
     eprintln!(
-        "wrote cx.lock: {} packages across {} platforms (excluded {})",
+        "wrote artifact.lock: {} packages across {} platforms (excluded {})",
         total_packages,
         platforms.len(),
         total_excluded
@@ -284,7 +284,7 @@ fn filter_excluded(
 
 fn gen_bundle(platform_str: Option<String>, root_override: Option<PathBuf>) {
     let root = project_root(root_override.as_deref());
-    let cx_lock_path = root.join("cx.lock");
+    let artifact_lock_path = root.join("artifact.lock");
     let bundle_path = root.join("bundle.tar.zst");
 
     let platform = if let Some(ref s) = platform_str {
@@ -294,12 +294,12 @@ fn gen_bundle(platform_str: Option<String>, root_override: Option<PathBuf>) {
         Platform::current()
     };
 
-    let lock_file = LockFile::from_path(&cx_lock_path)
-        .unwrap_or_else(|e| panic!("failed to parse {}: {e}", cx_lock_path.display()));
+    let lock_file = LockFile::from_path(&artifact_lock_path)
+        .unwrap_or_else(|e| panic!("failed to parse {}: {e}", artifact_lock_path.display()));
 
     let env = lock_file
         .default_environment()
-        .unwrap_or_else(|| panic!("no default environment in {}", cx_lock_path.display()));
+        .unwrap_or_else(|| panic!("no default environment in {}", artifact_lock_path.display()));
 
     let packages: Vec<_> = env
         .conda_packages_by_platform()
@@ -310,7 +310,7 @@ fn gen_bundle(platform_str: Option<String>, root_override: Option<PathBuf>) {
     if packages.is_empty() {
         panic!(
             "no packages for platform {platform} in {}",
-            cx_lock_path.display()
+            artifact_lock_path.display()
         );
     }
 

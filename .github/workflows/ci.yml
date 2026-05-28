@@ -16,8 +16,8 @@ on:
       - "pixi.toml"
       - "pixi.lock"
       - "pyproject.toml"
-      - "cx.lock"
-      - "cx.lock.hash"
+      - "artifact.lock"
+      - "artifact.lock.hash"
   pull_request:
     branches: [main]
     paths:
@@ -33,8 +33,8 @@ on:
       - "pixi.toml"
       - "pixi.lock"
       - "pyproject.toml"
-      - "cx.lock"
-      - "cx.lock.hash"
+      - "artifact.lock"
+      - "artifact.lock.hash"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -161,7 +161,7 @@ jobs:
         with:
           cache: true
       - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
-      - name: Check cx.lock freshness
+      - name: Check artifact.lock freshness
         run: pixi run check-lock
       - name: Lint
         run: pixi run lint

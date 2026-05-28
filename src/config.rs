@@ -5,8 +5,8 @@ use std::sync::LazyLock;
 
 use miette::IntoDiagnostic;
 
-/// The rattler-lock v6 lockfile embedded at compile time by `build.rs`.
-pub const EMBEDDED_LOCK: &str = include_str!(concat!(env!("OUT_DIR"), "/cx.lock"));
+/// The rattler-lock v6 artifact lock embedded at compile time by `build.rs`.
+pub const EMBEDDED_LOCK: &str = include_str!(concat!(env!("OUT_DIR"), "/artifact.lock"));
 
 /// Zstd-compressed tar of package archives, embedded when built with
 /// `PRONTO_EMBED_BUNDLE=1`. Empty (0 bytes) for standard `cx` builds.

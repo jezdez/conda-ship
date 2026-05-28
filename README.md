@@ -12,9 +12,9 @@ The intended artifact layouts are:
 - `embedded`: `<name>z`, the runtime plus compressed bundle embedded in one binary.
 
 The current repository contents are the initial history-preserving extraction of
-the generic builder/runtime pieces. The next migration work is to rename the
-remaining `cx.lock` concepts into artifact lock metadata, then split generic
-runtime behavior from the opinionated `conda-express` distribution.
+the generic builder/runtime pieces. The next migration work is to split generic
+runtime behavior from the opinionated `conda-express` distribution and add
+complete artifact metadata.
 
 The GitHub Action uses `embed-bundle: true` for embedded `cxz` builds.
 
