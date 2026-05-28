@@ -98,9 +98,9 @@ pub enum Command {
         /// Directory containing pre-downloaded .conda / .tar.bz2 package archives
         /// for offline installation
         #[clap(long)]
-        payload: Option<PathBuf>,
+        bundle: Option<PathBuf>,
 
-        /// Disable network access (install only from cache or --payload)
+        /// Disable network access (install only from cache or --bundle)
         #[clap(long)]
         offline: bool,
     },
@@ -157,7 +157,7 @@ mod tests {
                 package: None,
                 no_lock: false,
                 lockfile: None,
-                payload: None,
+                bundle: None,
                 offline: false,
             })
         );
@@ -324,24 +324,21 @@ mod tests {
     }
 
     #[rstest]
-    #[case::payload_only(&["cx", "bootstrap", "--payload", "/tmp/pkgs"], Some("/tmp/pkgs"), false)]
+    #[case::bundle_only(&["cx", "bootstrap", "--bundle", "/tmp/pkgs"], Some("/tmp/pkgs"), false)]
     #[case::offline_only(&["cx", "bootstrap", "--offline"], None, true)]
-    #[case::both(&["cx", "bootstrap", "--payload", "/p", "--offline"], Some("/p"), true)]
+    #[case::both(&["cx", "bootstrap", "--bundle", "/p", "--offline"], Some("/p"), true)]
     #[case::defaults(&["cx", "bootstrap"], None, false)]
     fn test_parse_bootstrap_offline_flags(
         #[case] args: &[&str],
-        #[case] expected_payload: Option<&str>,
+        #[case] expected_bundle: Option<&str>,
         #[case] expected_offline: bool,
     ) {
         let cli = Cli::parse_from(args);
         match cli.command {
             Some(Command::Bootstrap {
-                payload, offline, ..
+                bundle, offline, ..
             }) => {
-                assert_eq!(
-                    payload.as_deref(),
-                    expected_payload.map(std::path::Path::new)
-                );
+                assert_eq!(bundle.as_deref(), expected_bundle.map(std::path::Path::new));
                 assert_eq!(offline, expected_offline);
             }
             other => panic!("expected Bootstrap, got {other:?}"),

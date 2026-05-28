@@ -85,32 +85,32 @@ pub async fn from_lockfile(prefix: &Path, lock_content: &str) -> miette::Result<
     .await
 }
 
-/// Install packages from a lockfile using a local payload directory.
+/// Install packages from a lockfile using a local bundle directory.
 ///
-/// Pre-populates the rattler package cache from the payload directory, then
+/// Pre-populates the rattler package cache from the bundle directory, then
 /// runs the normal install path. When `offline` is true, no download client
-/// is configured — all packages must be present in the payload or cache.
-pub async fn from_lockfile_with_payload(
+/// is configured — all packages must be present in the bundle or cache.
+pub async fn from_lockfile_with_bundle(
     prefix: &Path,
     lock_content: &str,
-    payload_dir: &Path,
+    bundle_dir: &Path,
     offline: bool,
 ) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
-    let payload_index = index_payload_dir(payload_dir)?;
-    let (matched, missing) = match_records_to_payload(&required_packages, &payload_index);
+    let bundle_index = index_bundle_dir(bundle_dir)?;
+    let (matched, missing) = match_records_to_bundle(&required_packages, &bundle_index);
 
     if offline && !missing.is_empty() {
         return Err(miette::miette!(
-            "offline mode: {} package(s) not found in payload: {}",
+            "offline mode: {} package(s) not found in bundle: {}",
             missing.len(),
             missing.join(", ")
         ));
     }
 
     eprintln!(
-        "   Payload: {}/{} packages found locally",
+        "   Bundle: {}/{} packages found locally",
         matched.len(),
         required_packages.len()
     );
@@ -131,14 +131,14 @@ pub async fn from_lockfile_with_payload(
                 .await
                 .into_diagnostic()
                 .context(format!(
-                    "failed to cache package from payload: {}",
+                    "failed to cache package from bundle: {}",
                     path.display()
                 ))
         }
     });
     futures::future::try_join_all(cache_futures).await?;
     eprintln!(
-        "   Cached {} packages from payload in {:.1}s",
+        "   Cached {} packages from bundle in {:.1}s",
         matched.len(),
         start.elapsed().as_secs_f64()
     );
@@ -182,7 +182,7 @@ pub async fn from_lockfile_with_payload(
     Ok(())
 }
 
-/// Install packages from a lockfile in offline mode (cache only, no payload).
+/// Install packages from a lockfile in offline mode (cache only, no bundle).
 pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
@@ -223,26 +223,26 @@ pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette:
     Ok(())
 }
 
-/// Extract the embedded payload (if any) to a temporary directory.
+/// Extract the embedded bundle (if any) to a temporary directory.
 ///
 /// Returns `Some(path)` when the binary was built with `PRONTO_EMBED_BUNDLE=1`
-/// and contains a non-empty `payload.tar.zst`. Returns `None` for standard
-/// `cx` builds where the payload is empty.
-pub fn extract_embedded_payload() -> miette::Result<Option<PathBuf>> {
-    let payload = config::EMBEDDED_PAYLOAD;
-    if payload.is_empty() {
+/// and contains a non-empty `bundle.tar.zst`. Returns `None` for standard
+/// `cx` builds where the bundle is empty.
+pub fn extract_embedded_bundle() -> miette::Result<Option<PathBuf>> {
+    let bundle = config::EMBEDDED_BUNDLE;
+    if bundle.is_empty() {
         return Ok(None);
     }
 
     let tmp_dir = tempfile::Builder::new()
-        .prefix("cxz-payload-")
+        .prefix("cxz-bundle-")
         .tempdir()
         .into_diagnostic()
-        .context("failed to create temp dir for embedded payload")?;
+        .context("failed to create temp dir for embedded bundle")?;
 
-    let decoder = zstd::Decoder::new(payload)
+    let decoder = zstd::Decoder::new(bundle)
         .into_diagnostic()
-        .context("failed to decompress embedded payload")?;
+        .context("failed to decompress embedded bundle")?;
     let mut archive = tar::Archive::new(decoder);
     archive.set_preserve_permissions(false);
     archive.set_unpack_xattrs(false);
@@ -250,19 +250,19 @@ pub fn extract_embedded_payload() -> miette::Result<Option<PathBuf>> {
     for entry in archive
         .entries()
         .into_diagnostic()
-        .context("failed to read embedded payload entries")?
+        .context("failed to read embedded bundle entries")?
     {
         let mut entry = entry
             .into_diagnostic()
-            .context("failed to read payload entry")?;
+            .context("failed to read bundle entry")?;
         let path = entry
             .path()
             .into_diagnostic()
-            .context("failed to read payload entry path")?;
+            .context("failed to read bundle entry path")?;
         let path_str = path.to_string_lossy();
         if path_str.contains("..") || path.is_absolute() {
             return Err(miette::miette!(
-                "unsafe path in embedded payload: {}",
+                "unsafe path in embedded bundle: {}",
                 path_str
             ));
         }
@@ -273,12 +273,12 @@ pub fn extract_embedded_payload() -> miette::Result<Option<PathBuf>> {
         entry
             .unpack_in(tmp_dir.path())
             .into_diagnostic()
-            .context("failed to unpack payload entry")?;
+            .context("failed to unpack bundle entry")?;
     }
 
     eprintln!(
-        "   Extracted embedded payload ({:.1} MB) to {}",
-        payload.len() as f64 / 1_048_576.0,
+        "   Extracted embedded bundle ({:.1} MB) to {}",
+        bundle.len() as f64 / 1_048_576.0,
         tmp_dir.path().display()
     );
 
@@ -289,10 +289,10 @@ pub fn extract_embedded_payload() -> miette::Result<Option<PathBuf>> {
 /// Scan a directory for `.conda` and `.tar.bz2` package archives.
 ///
 /// Returns a map from filename to full path.
-pub(crate) fn index_payload_dir(dir: &Path) -> miette::Result<HashMap<String, PathBuf>> {
+pub(crate) fn index_bundle_dir(dir: &Path) -> miette::Result<HashMap<String, PathBuf>> {
     let mut index = HashMap::new();
     let entries = std::fs::read_dir(dir).into_diagnostic().context(format!(
-        "failed to read payload directory: {}",
+        "failed to read bundle directory: {}",
         dir.display()
     ))?;
 
@@ -313,13 +313,13 @@ pub(crate) fn index_payload_dir(dir: &Path) -> miette::Result<HashMap<String, Pa
     Ok(index)
 }
 
-/// Match lockfile records to files in a payload index.
+/// Match lockfile records to files in a bundle index.
 ///
 /// Returns `(matched_paths, missing_names)` where `missing_names` lists
-/// packages not found in the payload.
-pub(crate) fn match_records_to_payload(
+/// packages not found in the bundle.
+pub(crate) fn match_records_to_bundle(
     records: &[RepoDataRecord],
-    payload_index: &HashMap<String, PathBuf>,
+    bundle_index: &HashMap<String, PathBuf>,
 ) -> (Vec<PathBuf>, Vec<String>) {
     let mut matched = Vec::new();
     let mut missing = Vec::new();
@@ -332,7 +332,7 @@ pub(crate) fn match_records_to_payload(
             .unwrap_or_default()
             .to_string();
 
-        if let Some(path) = payload_index.get(&filename) {
+        if let Some(path) = bundle_index.get(&filename) {
             matched.push(path.clone());
         } else {
             missing.push(filename);
@@ -563,12 +563,12 @@ mod tests {
     #[case::conda_only(vec!["foo-1.0-h1.conda"], 1)]
     #[case::tar_bz2(vec!["bar-2.0-h2.tar.bz2"], 1)]
     #[case::mixed_with_junk(vec!["a-1-h1.conda", "b-2-h2.tar.bz2", "readme.txt"], 2)]
-    fn test_index_payload_dir(#[case] files: Vec<&str>, #[case] expected_count: usize) {
+    fn test_index_bundle_dir(#[case] files: Vec<&str>, #[case] expected_count: usize) {
         let tmp = tempfile::TempDir::new().unwrap();
         for name in &files {
             std::fs::write(tmp.path().join(name), b"").unwrap();
         }
-        let index = index_payload_dir(tmp.path()).unwrap();
+        let index = index_bundle_dir(tmp.path()).unwrap();
         assert_eq!(index.len(), expected_count);
         for (name, path) in &index {
             assert!(name.ends_with(".conda") || name.ends_with(".tar.bz2"));
@@ -612,20 +612,20 @@ mod tests {
         1
     )]
     #[case::none_found(vec![], vec!["a-1-h1.conda"], 1)]
-    fn test_match_records_to_payload(
-        #[case] payload_files: Vec<&str>,
+    fn test_match_records_to_bundle(
+        #[case] bundle_files: Vec<&str>,
         #[case] record_filenames: Vec<&str>,
         #[case] expected_missing: usize,
     ) {
-        let mut payload_index = HashMap::new();
-        for name in &payload_files {
-            payload_index.insert(name.to_string(), PathBuf::from(format!("/payload/{name}")));
+        let mut bundle_index = HashMap::new();
+        for name in &bundle_files {
+            bundle_index.insert(name.to_string(), PathBuf::from(format!("/bundle/{name}")));
         }
         let records: Vec<RepoDataRecord> = record_filenames
             .iter()
             .map(|f| make_record_with_url(f))
             .collect();
-        let (matched, missing) = match_records_to_payload(&records, &payload_index);
+        let (matched, missing) = match_records_to_bundle(&records, &bundle_index);
         assert_eq!(
             matched.len(),
             record_filenames.len() - expected_missing,

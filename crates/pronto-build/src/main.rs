@@ -44,7 +44,6 @@ enum Command {
     },
 
     /// Download packages from cx.lock and bundle them for embedded builds
-    #[command(alias = "payload")]
     Bundle {
         /// Target platform (default: current)
         #[arg(long)]
@@ -286,7 +285,7 @@ fn filter_excluded(
 fn gen_bundle(platform_str: Option<String>, root_override: Option<PathBuf>) {
     let root = project_root(root_override.as_deref());
     let cx_lock_path = root.join("cx.lock");
-    let payload_path = root.join("payload.tar.zst");
+    let bundle_path = root.join("bundle.tar.zst");
 
     let platform = if let Some(ref s) = platform_str {
         s.parse::<Platform>()
@@ -322,29 +321,29 @@ fn gen_bundle(platform_str: Option<String>, root_override: Option<PathBuf>) {
         .build()
         .expect("failed to create tokio runtime");
 
-    rt.block_on(download_and_bundle(&packages, &payload_path))
-        .expect("failed to download/bundle payload");
+    rt.block_on(download_and_bundle(&packages, &bundle_path))
+        .expect("failed to download bundle");
 }
 
 async fn download_and_bundle(
     packages: &[&rattler_lock::CondaPackageData],
-    payload_path: &Path,
+    bundle_path: &Path,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use futures::stream::{self, StreamExt};
 
     let client = reqwest::Client::builder().no_gzip().build()?;
 
-    let payload_dir = payload_path
+    let bundle_dir = bundle_path
         .parent()
-        .expect("payload path has parent")
-        .join("payload");
-    std::fs::create_dir_all(&payload_dir)?;
+        .expect("bundle path has parent")
+        .join("bundle");
+    std::fs::create_dir_all(&bundle_dir)?;
 
     let start = std::time::Instant::now();
 
     let download_tasks = packages.iter().map(|pkg| {
         let client = client.clone();
-        let payload_dir = payload_dir.clone();
+        let bundle_dir = bundle_dir.clone();
         async move {
             let url = pkg.location().as_url().expect("package has URL");
             let archive_name = url
@@ -352,7 +351,7 @@ async fn download_and_bundle(
                 .and_then(|mut s| s.next_back())
                 .unwrap_or("unknown");
 
-            let dest = payload_dir.join(archive_name);
+            let dest = bundle_dir.join(archive_name);
 
             if dest.exists() {
                 if let Some(ref expected) = pkg.record().sha256 {
@@ -412,11 +411,11 @@ async fn download_and_bundle(
     );
 
     let bundle_start = std::time::Instant::now();
-    let out_file = std::fs::File::create(payload_path)?;
+    let out_file = std::fs::File::create(bundle_path)?;
     let zstd_encoder = zstd::Encoder::new(out_file, 1)?;
     let mut tar_builder = tar::Builder::new(zstd_encoder);
 
-    for entry in std::fs::read_dir(&payload_dir)? {
+    for entry in std::fs::read_dir(&bundle_dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.is_file() {
@@ -428,10 +427,10 @@ async fn download_and_bundle(
     let zstd_encoder = tar_builder.into_inner()?;
     zstd_encoder.finish()?;
 
-    let payload_size = std::fs::metadata(payload_path)?.len();
+    let bundle_size = std::fs::metadata(bundle_path)?.len();
     eprintln!(
-        "payload.tar.zst = {:.1} MB ({} packages, bundled in {:.1}s)",
-        payload_size as f64 / 1_048_576.0,
+        "bundle.tar.zst = {:.1} MB ({} packages, bundled in {:.1}s)",
+        bundle_size as f64 / 1_048_576.0,
         packages.len(),
         bundle_start.elapsed().as_secs_f64()
     );

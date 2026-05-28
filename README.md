@@ -13,9 +13,8 @@ The intended artifact layouts are:
 
 The current repository contents are the initial history-preserving extraction of
 the generic builder/runtime pieces. The next migration work is to rename the
-remaining `cx.lock` and payload concepts into artifact lock and bundle
-terminology, then split generic runtime behavior from the opinionated
-`conda-express` distribution.
+remaining `cx.lock` concepts into artifact lock metadata, then split generic
+runtime behavior from the opinionated `conda-express` distribution.
 
 The GitHub Action uses `embed-bundle: true` for embedded `cxz` builds.
 

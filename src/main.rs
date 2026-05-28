@@ -57,7 +57,7 @@ async fn async_main() -> miette::Result<()> {
                     package,
                     no_lock,
                     lockfile,
-                    payload,
+                    bundle,
                     offline,
                 }) => {
                     let prefix = prefix.map(Ok).unwrap_or_else(default_prefix)?;
@@ -69,8 +69,8 @@ async fn async_main() -> miette::Result<()> {
                         LockSource::Embedded
                     };
 
-                    let payload = payload.or_else(|| {
-                        env::var("CX_PAYLOAD")
+                    let bundle = bundle.or_else(|| {
+                        env::var("CX_BUNDLE")
                             .ok()
                             .filter(|v| !v.is_empty())
                             .map(std::path::PathBuf::from)
@@ -81,7 +81,7 @@ async fn async_main() -> miette::Result<()> {
                             .filter(|v| !v.is_empty())
                             .is_some_and(|v| v != "0" && v.to_lowercase() != "false");
 
-                    validate_bootstrap_flags(offline, no_lock, &payload)?;
+                    validate_bootstrap_flags(offline, no_lock, &bundle)?;
 
                     return bootstrap(
                         &prefix,
@@ -89,7 +89,7 @@ async fn async_main() -> miette::Result<()> {
                         channel,
                         package,
                         lock_source,
-                        payload,
+                        bundle,
                         offline,
                         verbosity,
                     )

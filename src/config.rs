@@ -10,7 +10,7 @@ pub const EMBEDDED_LOCK: &str = include_str!(concat!(env!("OUT_DIR"), "/cx.lock"
 
 /// Zstd-compressed tar of package archives, embedded when built with
 /// `PRONTO_EMBED_BUNDLE=1`. Empty (0 bytes) for standard `cx` builds.
-pub const EMBEDDED_PAYLOAD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/payload.tar.zst"));
+pub const EMBEDDED_BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/bundle.tar.zst"));
 
 pub(crate) const INSTALL_METHOD: Option<&str> = option_env!("CX_INSTALL_METHOD");
 

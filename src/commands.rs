@@ -66,18 +66,18 @@ fn reject_dangerous_prefix(prefix: &Path) -> miette::Result<()> {
 pub(crate) fn validate_bootstrap_flags(
     offline: bool,
     no_lock: bool,
-    payload: &Option<std::path::PathBuf>,
+    bundle: &Option<std::path::PathBuf>,
 ) -> miette::Result<()> {
     if offline && no_lock {
         return Err(miette::miette!(
             "--offline and --no-lock are incompatible (offline mode requires a lockfile)"
         ));
     }
-    if let Some(dir) = payload
+    if let Some(dir) = bundle
         && !dir.is_dir()
     {
         return Err(miette::miette!(
-            "--payload path is not a directory: {}",
+            "--bundle path is not a directory: {}",
             dir.display()
         ));
     }
@@ -91,7 +91,7 @@ pub(crate) async fn bootstrap(
     channels: Option<Vec<String>>,
     extra_packages: Option<Vec<String>>,
     lock_source: LockSource,
-    payload: Option<std::path::PathBuf>,
+    bundle: Option<std::path::PathBuf>,
     offline: bool,
     verbosity: Verbosity,
 ) -> miette::Result<()> {
@@ -163,22 +163,22 @@ pub(crate) async fn bootstrap(
         }
     };
 
-    if let Some(ref payload_dir) = payload {
+    if let Some(ref bundle_dir) = bundle {
         let content = lock_content.ok_or_else(|| {
-            miette::miette!("--payload requires a lockfile (embedded or --lockfile)")
+            miette::miette!("--bundle requires a lockfile (embedded or --lockfile)")
         })?;
         if verbosity != Verbosity::Quiet {
-            eprintln!("   Payload:  {}", payload_dir.display());
+            eprintln!("   Bundle:   {}", bundle_dir.display());
         }
-        install::from_lockfile_with_payload(prefix, &content, payload_dir, offline).await?;
-    } else if let Some(embedded_dir) = install::extract_embedded_payload()? {
+        install::from_lockfile_with_bundle(prefix, &content, bundle_dir, offline).await?;
+    } else if let Some(embedded_dir) = install::extract_embedded_bundle()? {
         let content =
-            lock_content.ok_or_else(|| miette::miette!("embedded payload requires a lockfile"))?;
+            lock_content.ok_or_else(|| miette::miette!("embedded bundle requires a lockfile"))?;
         if verbosity != Verbosity::Quiet {
-            eprintln!("   Payload:  embedded");
+            eprintln!("   Bundle:   embedded");
         }
         let result =
-            install::from_lockfile_with_payload(prefix, &content, &embedded_dir, true).await;
+            install::from_lockfile_with_bundle(prefix, &content, &embedded_dir, true).await;
         let _ = std::fs::remove_dir_all(&embedded_dir);
         result?;
     } else if offline {
@@ -247,16 +247,16 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
 
     let meta = read_metadata(prefix)?;
 
-    let payload = crate::config::EMBEDDED_PAYLOAD;
-    let binary_name = if payload.is_empty() { "cx" } else { "cxz" };
+    let bundle = crate::config::EMBEDDED_BUNDLE;
+    let binary_name = if bundle.is_empty() { "cx" } else { "cxz" };
     println!("{} {}", binary_name, env!("CARGO_PKG_VERSION"));
     println!("  prefix:   {}", prefix.display());
     println!("  channels: {}", meta.channels.join(", "));
     println!("  packages: {}", meta.packages.join(", "));
-    if !payload.is_empty() {
+    if !bundle.is_empty() {
         println!(
-            "  payload:  embedded ({:.1} MB)",
-            payload.len() as f64 / 1_048_576.0
+            "  bundle:   embedded ({:.1} MB)",
+            bundle.len() as f64 / 1_048_576.0
         );
     }
 
@@ -676,19 +676,19 @@ mod tests {
 
     #[rstest]
     #[case::offline_no_lock(true, true, false, "incompatible")]
-    #[case::payload_missing_dir(false, false, true, "not a directory")]
+    #[case::bundle_missing_dir(false, false, true, "not a directory")]
     fn test_validate_bootstrap_flags(
         #[case] offline: bool,
         #[case] no_lock: bool,
-        #[case] bad_payload_path: bool,
+        #[case] bad_bundle_path: bool,
         #[case] expected_err_contains: &str,
     ) {
-        let payload = if bad_payload_path {
-            Some(std::path::PathBuf::from("/nonexistent/payload/dir"))
+        let bundle = if bad_bundle_path {
+            Some(std::path::PathBuf::from("/nonexistent/bundle/dir"))
         } else {
             None
         };
-        let result = validate_bootstrap_flags(offline, no_lock, &payload);
+        let result = validate_bootstrap_flags(offline, no_lock, &bundle);
         assert!(result.is_err(), "should fail validation");
         let err = result.unwrap_err().to_string();
         assert!(
@@ -698,11 +698,11 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_bootstrap_flags_valid_payload() {
+    fn test_validate_bootstrap_flags_valid_bundle() {
         let tmp = TempDir::new().unwrap();
-        let payload = Some(tmp.path().to_path_buf());
-        let result = validate_bootstrap_flags(false, false, &payload);
-        assert!(result.is_ok(), "valid payload dir should pass validation");
+        let bundle = Some(tmp.path().to_path_buf());
+        let result = validate_bootstrap_flags(false, false, &bundle);
+        assert!(result.is_ok(), "valid bundle dir should pass validation");
     }
 
     #[test]

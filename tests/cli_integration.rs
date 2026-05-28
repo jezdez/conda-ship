@@ -170,14 +170,14 @@ fn test_cx_bootstrap_offline_no_lock_rejected() {
 }
 
 #[test]
-fn test_cx_bootstrap_payload_bad_dir_rejected() {
+fn test_cx_bootstrap_bundle_bad_dir_rejected() {
     let tmp = TempDir::new().unwrap();
     let bad_dir = tmp.path().join("nonexistent");
     cx().args([
         "bootstrap",
         "--prefix",
         tmp.path().to_str().unwrap(),
-        "--payload",
+        "--bundle",
         bad_dir.to_str().unwrap(),
     ])
     .assert()
@@ -213,11 +213,11 @@ fn test_cx_bootstrap_offline_from_cache() {
 
 #[cfg_attr(not(feature = "online_tests"), ignore)]
 #[test]
-fn test_cx_bootstrap_payload_offline() {
+fn test_cx_bootstrap_bundle_offline() {
     let tmp = TempDir::new().unwrap();
     let prefix1 = tmp.path().join("seed");
     let prefix2 = tmp.path().join("offline");
-    let payload_dir = tmp.path().join("payload");
+    let bundle_dir = tmp.path().join("bundle");
 
     cx().args(["bootstrap", "--prefix", prefix1.to_str().unwrap()])
         .timeout(std::time::Duration::from_secs(120))
@@ -225,7 +225,7 @@ fn test_cx_bootstrap_payload_offline() {
         .success();
 
     let cache_pkgs = rattler_pkgs_cache_dir();
-    std::fs::create_dir(&payload_dir).unwrap();
+    std::fs::create_dir(&bundle_dir).unwrap();
     if cache_pkgs.is_dir() {
         for entry in std::fs::read_dir(&cache_pkgs).unwrap().flatten() {
             let path = entry.path();
@@ -233,7 +233,7 @@ fn test_cx_bootstrap_payload_offline() {
                 && (path.extension().is_some_and(|e| e == "conda")
                     || path.to_str().is_some_and(|s| s.ends_with(".tar.bz2")))
             {
-                std::fs::copy(&path, payload_dir.join(path.file_name().unwrap())).unwrap();
+                std::fs::copy(&path, bundle_dir.join(path.file_name().unwrap())).unwrap();
             }
         }
     }
@@ -242,8 +242,8 @@ fn test_cx_bootstrap_payload_offline() {
         "bootstrap",
         "--prefix",
         prefix2.to_str().unwrap(),
-        "--payload",
-        payload_dir.to_str().unwrap(),
+        "--bundle",
+        bundle_dir.to_str().unwrap(),
         "--offline",
     ])
     .assert()
@@ -290,10 +290,10 @@ fn test_cx_offline_env_var_parsing(#[case] value: &str, #[case] expect_offline: 
 }
 
 #[test]
-fn test_cx_payload_env_var() {
+fn test_cx_bundle_env_var() {
     let tmp = TempDir::new().unwrap();
     let bad_dir = tmp.path().join("nonexistent");
-    cx().env("CX_PAYLOAD", bad_dir.as_os_str())
+    cx().env("CX_BUNDLE", bad_dir.as_os_str())
         .args(["bootstrap", "--prefix", tmp.path().to_str().unwrap()])
         .assert()
         .failure()
