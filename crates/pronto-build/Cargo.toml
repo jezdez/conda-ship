@@ -1,8 +1,8 @@
 [package]
-name = "cx-build"
+name = "pronto-build"
 version = "0.1.0"
 edition = "2024"
-description = "Internal build tools for conda-express"
+description = "Pronto build helper for conda bootstrap artifacts"
 publish = false
 
 [dependencies]

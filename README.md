@@ -12,9 +12,10 @@ The intended artifact layouts are:
 - `embedded`: `<name>z`, the runtime plus compressed bundle embedded in one binary.
 
 The current repository contents are the initial history-preserving extraction of
-the generic builder/runtime pieces. The next migration work is to rename
-`cx-build` and `cx.lock` concepts to `pronto` and bundle terminology, then split
-generic runtime behavior from the opinionated `conda-express` distribution.
+the generic builder/runtime pieces. The next migration work is to rename the
+remaining `cx.lock` and payload concepts into artifact lock and bundle
+terminology, then split generic runtime behavior from the opinionated
+`conda-express` distribution.
 
 `pronto` is not an OS installer generator and does not target `.sh`, `.pkg`, or
 `.msi` output. It produces bootstrap binaries that can be distributed directly

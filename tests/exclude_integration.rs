@@ -1,5 +1,5 @@
 //! Integration tests verifying the embedded lockfile has been pre-filtered
-//! by `cx-build prepare` (exclude filter applied at build time).
+//! by `pronto-build prepare` (exclude filter applied at build time).
 
 use std::str::FromStr;
 
@@ -37,7 +37,7 @@ fn test_embedded_lockfile_package_composition() {
     for pkg in &excluded {
         assert!(
             !names.contains(&pkg.to_string()),
-            "embedded lockfile should not contain {pkg} (pre-filtered by cx-build prepare)"
+            "embedded lockfile should not contain {pkg} (pre-filtered by pronto-build prepare)"
         );
     }
 

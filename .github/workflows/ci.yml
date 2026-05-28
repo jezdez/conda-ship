@@ -88,12 +88,12 @@ jobs:
           "$BIN" bootstrap --prefix "$RUNNER_TEMP/cx-smoke"
           "$BIN" status --prefix "$RUNNER_TEMP/cx-smoke"
 
-      - name: Build cxz (embedded payload)
+      - name: Build cxz (embedded bundle)
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         env:
           CX_EMBED_PAYLOAD: "1"
         run: |
-          pixi run -- cargo run -p cx-build -- payload
+          pixi run bundle
           pixi run build
 
       - name: Smoke test cxz

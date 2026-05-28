@@ -699,24 +699,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cx-build"
-version = "0.1.0"
-dependencies = [
- "clap",
- "futures",
- "rattler_conda_types",
- "rattler_lock",
- "reqwest",
- "serde",
- "sha2 0.11.0",
- "tar",
- "tokio",
- "toml",
- "toml_edit",
- "zstd",
-]
-
-[[package]]
 name = "darling"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2399,6 +2381,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pronto-build"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "futures",
+ "rattler_conda_types",
+ "rattler_lock",
+ "reqwest",
+ "serde",
+ "sha2 0.11.0",
+ "tar",
+ "tokio",
+ "toml",
+ "toml_edit",
+ "zstd",
 ]
 
 [[package]]

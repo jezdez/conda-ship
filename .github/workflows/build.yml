@@ -27,7 +27,7 @@ on:
         type: string
         default: ""
       ref:
-        description: "Git ref of conda-express to build from (tag, branch, or SHA)."
+        description: "Git ref of Pronto to build from (tag, branch, or SHA)."
         required: false
         type: string
         default: "main"
@@ -66,7 +66,7 @@ jobs:
     steps:
       - name: Build cx
         id: build
-        uses: jezdez/conda-express@main
+        uses: jezdez/pronto@main
         with:
           packages: ${{ inputs.packages }}
           channels: ${{ inputs.channels }}

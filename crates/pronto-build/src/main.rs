@@ -24,7 +24,7 @@ struct CxConfig {
 }
 
 #[derive(Parser)]
-#[command(name = "cx-build", about = "Internal build tools for conda-express")]
+#[command(name = "pronto-build", about = "Build helper for Pronto artifacts")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -43,8 +43,9 @@ enum Command {
         root: Option<PathBuf>,
     },
 
-    /// Download packages from cx.lock and bundle into payload.tar.zst
-    Payload {
+    /// Download packages from cx.lock and bundle them for embedded builds
+    #[command(alias = "payload")]
+    Bundle {
         /// Target platform (default: current)
         #[arg(long)]
         platform: Option<String>,
@@ -112,20 +113,20 @@ fn prepare(check: bool, root_override: Option<PathBuf>) {
     if check {
         if !cx_lock_path.exists() {
             eprintln!(
-                "cx.lock does not exist; run `cargo run -p cx-build -- prepare` to create it"
+                "cx.lock does not exist; run `cargo run -p pronto-build -- prepare` to create it"
             );
             std::process::exit(1);
         }
         if !cx_hash_path.exists() {
             eprintln!(
-                "cx.lock.hash does not exist; run `cargo run -p cx-build -- prepare` to create it"
+                "cx.lock.hash does not exist; run `cargo run -p pronto-build -- prepare` to create it"
             );
             std::process::exit(1);
         }
         let stored_hash = std::fs::read_to_string(&cx_hash_path).unwrap_or_default();
         if stored_hash.trim() != input_hash {
             eprintln!(
-                "cx.lock is stale (hash mismatch); run `cargo run -p cx-build -- prepare` to update"
+                "cx.lock is stale (hash mismatch); run `cargo run -p pronto-build -- prepare` to update"
             );
             std::process::exit(1);
         }
@@ -202,7 +203,7 @@ fn parse_pixi_lock(pixi_lock_content: &str, pixi_lock_path: &Path) -> LockFile {
     let normalized_lock;
     let lock_content = if pixi_lock_content.starts_with("version: 7\n") {
         // Pixi lock v7 is backwards-compatible with rattler_lock's v6 parser for
-        // the conda package data cx-build consumes.
+        // the conda package data pronto-build consumes.
         normalized_lock = pixi_lock_content.replacen("version: 7\n", "version: 6\n", 1);
         normalized_lock.as_str()
     } else {
@@ -282,7 +283,7 @@ fn filter_excluded(
     (filtered, removed_names)
 }
 
-fn gen_payload(platform_str: Option<String>, root_override: Option<PathBuf>) {
+fn gen_bundle(platform_str: Option<String>, root_override: Option<PathBuf>) {
     let root = project_root(root_override.as_deref());
     let cx_lock_path = root.join("cx.lock");
     let payload_path = root.join("payload.tar.zst");
@@ -519,7 +520,7 @@ fn main() {
     let cli = Cli::parse();
     match cli.command {
         Command::Prepare { check, root } => prepare(check, root),
-        Command::Payload { platform, root } => gen_payload(platform, root),
+        Command::Bundle { platform, root } => gen_bundle(platform, root),
         Command::Configure {
             packages,
             channels,

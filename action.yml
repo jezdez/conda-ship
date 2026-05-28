@@ -1,6 +1,6 @@
-name: "Build cx (conda-express)"
+name: "Build conda bootstrap binary"
 description: >
-  Build a custom cx bootstrapper binary with your choice of conda packages
+  Build a custom conda bootstrap binary with your choice of conda packages
   baked in. Runs on the current runner — use a matrix strategy for
   multi-platform builds.
 branding:
@@ -12,7 +12,7 @@ inputs:
     description: >
       Comma-separated conda package specs to include in the bootstrapper.
       Example: "python >=3.12, conda >=25.1, numpy, pandas".
-      When empty, uses the default packages from conda-express.
+      When empty, uses the default packages from this Pronto configuration.
     required: false
     default: ""
   channels:
@@ -28,7 +28,7 @@ inputs:
     required: false
     default: ""
   ref:
-    description: "Git ref of conda-express to build from (tag, branch, or SHA)."
+    description: "Git ref of Pronto to build from (tag, branch, or SHA)."
     required: false
     default: "main"
   embed-payload:
@@ -49,17 +49,17 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Checkout conda-express
+    - name: Checkout Pronto
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
-        repository: jezdez/conda-express
+        repository: jezdez/pronto
         ref: ${{ inputs.ref }}
-        path: .cx-build
+        path: .pronto-build
 
     - name: Setup pixi
       uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
       with:
-        manifest-path: .cx-build/pixi.toml
+        manifest-path: .pronto-build/pixi.toml
         cache: true
 
     - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
@@ -67,7 +67,7 @@ runs:
     - name: Configure custom packages
       if: inputs.packages != '' || inputs.channels != '' || inputs.exclude != ''
       shell: bash
-      working-directory: .cx-build
+      working-directory: .pronto-build
       run: |
         ARGS=""
         if [ -n "${{ inputs.packages }}" ]; then
@@ -79,21 +79,21 @@ runs:
         if [ -n "${{ inputs.exclude }}" ]; then
           ARGS="$ARGS --exclude '${{ inputs.exclude }}'"
         fi
-        eval pixi run -- cargo run -p cx-build -- configure $ARGS
+        eval pixi run -- cargo run -p pronto-build -- configure $ARGS
         pixi lock
         pixi run prepare
 
-    - name: Generate payload
+    - name: Generate bundle
       if: inputs.embed-payload == 'true'
       shell: bash
-      working-directory: .cx-build
-      run: pixi run payload
+      working-directory: .pronto-build
+      run: pixi run bundle
 
     - name: Build cx
       shell: bash
       env:
         CX_EMBED_PAYLOAD: ${{ inputs.embed-payload == 'true' && '1' || '' }}
-      working-directory: .cx-build
+      working-directory: .pronto-build
       run: pixi run build
 
     - name: Stage binary
@@ -115,7 +115,7 @@ runs:
           ASSET_NAME="${PREFIX}-${TARGET}"
         fi
         BINARY_PATH="${GITHUB_WORKSPACE}/${ASSET_NAME}"
-        cp ".cx-build/target/release/${BIN_NAME}" "${BINARY_PATH}"
+        cp ".pronto-build/target/release/${BIN_NAME}" "${BINARY_PATH}"
         sha256sum "${BINARY_PATH}" > "${BINARY_PATH}.sha256"
         echo "binary_path=${BINARY_PATH}" >> "$GITHUB_OUTPUT"
         echo "asset_name=${ASSET_NAME}" >> "$GITHUB_OUTPUT"
