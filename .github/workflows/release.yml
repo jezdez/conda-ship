@@ -65,6 +65,11 @@ jobs:
         with:
           cache: false
 
+      - name: Use pre-C23 C ABI for C dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: echo "CFLAGS=-std=gnu17" >> "$GITHUB_ENV"
+
       - name: Verify runner target
         shell: bash
         run: |
