@@ -68,10 +68,10 @@ jobs:
         with:
           cache: true
 
-      - name: Use pre-C23 C ABI for C dependencies
+      - name: Use pre-C23 C ABI for aws-lc-sys
         if: runner.os == 'Linux'
         shell: bash
-        run: echo "CFLAGS=-std=gnu17" >> "$GITHUB_ENV"
+        run: echo "AWS_LC_SYS_TARGET_CFLAGS=-std=gnu17" >> "$GITHUB_ENV"
 
       - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
@@ -161,10 +161,10 @@ jobs:
         with:
           cache: true
 
-      - name: Use pre-C23 C ABI for C dependencies
+      - name: Use pre-C23 C ABI for aws-lc-sys
         if: runner.os == 'Linux'
         shell: bash
-        run: echo "CFLAGS=-std=gnu17" >> "$GITHUB_ENV"
+        run: echo "AWS_LC_SYS_TARGET_CFLAGS=-std=gnu17" >> "$GITHUB_ENV"
 
       - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
@@ -206,10 +206,10 @@ jobs:
         with:
           cache: true
 
-      - name: Use pre-C23 C ABI for C dependencies
+      - name: Use pre-C23 C ABI for aws-lc-sys
         if: runner.os == 'Linux'
         shell: bash
-        run: echo "CFLAGS=-std=gnu17" >> "$GITHUB_ENV"
+        run: echo "AWS_LC_SYS_TARGET_CFLAGS=-std=gnu17" >> "$GITHUB_ENV"
 
       - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
