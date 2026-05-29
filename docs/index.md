@@ -11,11 +11,6 @@ channels, documentation URL, and release channel.
 official `cx` and `cxz` binaries. conda-pronto owns the reusable builder/runtime;
 conda-express owns the product defaults and release channels for `cx`.
 
-:::{important}
-conda-pronto does not publish a default runtime binary named `pronto`. It builds
-named downstream binaries such as `serpe`, `serpez`, `cx`, or `cxz`.
-:::
-
 ## Start Here
 
 If you are new to conda-pronto, build the tutorial runtime first. It gives you a
