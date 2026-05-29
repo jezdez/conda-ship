@@ -38,7 +38,15 @@ builds:
 - `conda-pronto` provides a `conda pronto` adapter while preserving
   `pronto` as the primary CLI.
 
-The remaining architectural work is to remove the source-checkout requirement
-from `pronto build` and `conda pronto build`. That requires a packaged generic
-runtime that an installed CLI can copy and stamp from a downstream distribution
-repository.
+The packaged builder path now uses release-published runtime templates, so
+installed `pronto build` and `conda pronto build` can stamp downstream
+artifacts without a conda-pronto source checkout.
+
+Current follow-up work is mostly distribution hardening:
+
+- document downstream signing and provenance workflows around the staged
+  `.sha256`, `.info.json`, `.runtime.lock`, and binary artifacts
+- keep the GitHub Action intentionally lockfile-first, with package and channel
+  changes made in committed project manifests rather than action inputs
+- add Windows ARM64 release assets only after the conda package ecosystem has
+  enough stable `win-arm64` coverage for conda-pronto runtimes

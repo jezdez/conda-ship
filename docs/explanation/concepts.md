@@ -24,10 +24,12 @@ artifacts.
 ## Runtime Template
 
 `pronto-runtime` is an internal generic binary target. It is not a first-party
-distribution. During `pronto build`, the builder builds the generic runtime,
-copies it under the requested artifact name, and stamps the copy with the
+distribution. During `pronto build`, the builder copies a generic runtime
+template under the requested artifact name and stamps the copy with the
 downstream distribution name, prefix, metadata filename, environment variable
-names, runtime lock, and optional bundle.
+names, runtime lock, and optional bundle. Released builds use prebuilt template
+assets; source checkouts can build the template locally as a development
+fallback.
 
 ## Runtime Lock
 

@@ -53,9 +53,20 @@ The generated runtime validates the stamped header at startup. For embedded
 artifacts, it also verifies the bundle checksum before extracting package
 archives during `bootstrap`.
 
-The binary checksum in `.sha256` covers the final stamped artifact. Release
-workflows pass that final file to Sigstore, in-toto or SLSA provenance, or
-platform signing after conda-pronto finishes staging.
+The binary checksum in `.sha256` covers the final stamped artifact. The
+conda-pronto release workflow also publishes GitHub Artifact Attestations for
+the `pronto` CLI, runtime templates, and `SHA256SUMS` manifest.
+
+Verify a downloaded release asset with:
+
+```bash
+gh attestation verify ./pronto-x86_64-unknown-linux-gnu \
+  -R jezdez/conda-pronto \
+  --signer-workflow jezdez/conda-pronto/.github/workflows/release.yml
+```
+
+Downstream distributions can add their own attestations or platform signing
+after conda-pronto finishes staging their named artifacts.
 
 ## Info JSON
 

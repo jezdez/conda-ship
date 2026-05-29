@@ -13,8 +13,9 @@ conda-express owns the product defaults and release channels for `cx`.
 
 ## Start Here
 
-If you are new to conda-pronto, build the tutorial runtime first. It gives you a
-working mental model for locks, artifacts, and the generated runtime command:
+If you are new to conda-pronto, build the tutorial runtime first. From a
+conda-pronto source checkout, this gives you a working mental model for locks,
+artifacts, and the generated runtime command:
 
 ```bash
 pronto lock

@@ -8,10 +8,9 @@ does not reserve a default name. `conda-express` is one downstream distribution
 that uses conda-pronto to publish `cx` and `cxz`; use a name owned by your
 distribution.
 
-Local builds still run from a conda-pronto source checkout. The manifest examples
-below describe the build input conda-pronto consumes. Installed-CLI builds from
-downstream repositories require the generic-runtime packaging work tracked in
-the roadmap.
+The manifest examples below describe the build input conda-pronto consumes.
+Installed CLI builds pass a released runtime template with `--template`.
+Source checkouts can omit that option while changing conda-pronto itself.
 
 ## Choose A Binary Name
 
@@ -48,14 +47,14 @@ If you want the generated runtime to follow the conda-express activation model,
 also include `conda-spawn`.
 
 Additional plugins are a distribution decision. A downstream project records
-its own plugin set in its manifest or release workflow; conda-pronto does not choose
-one for every runtime.
+its own plugin set in its manifest and committed lockfile; conda-pronto does
+not choose one for every runtime.
 
 ## Configure Local Build Input
 
-When a conda-pronto source checkout carries `conda.toml` and `conda.lock`, keep
-package and channel intent in the workspace sections and put conda-pronto-specific
-build policy in `[tool.pronto]`:
+When a project carries `conda.toml` and `conda.lock`, keep package and channel
+intent in the workspace sections and put conda-pronto-specific build policy in
+`[tool.pronto]`:
 
 ```toml
 [workspace]
@@ -81,21 +80,25 @@ docs-url = "https://example.com/serpe/"
 ```
 
 Then refresh the source lockfile and derive conda-pronto's runtime lock from the
-same checkout:
+same project:
 
 ```bash
 conda workspace lock
 pronto lock
 ```
 
-The repository's checked-in build input is still `pixi.toml` and `pixi.lock`.
-For that path, `pronto configure` rewrites the runtime package intent in the
-selected manifest:
+For Pixi-compatible projects, `pronto configure` rewrites the runtime package
+intent in the selected manifest:
 
 ```bash
 pronto configure \
-  --packages "python >=3.12, conda >=25.1, conda-rattler-solver, conda-spawn, numpy, pandas" \
-  --channels "conda-forge" \
+  --package "python >=3.12,<3.15" \
+  --package "conda >=25.1" \
+  --package "conda-rattler-solver" \
+  --package "conda-spawn" \
+  --package "numpy" \
+  --package "pandas" \
+  --channel "conda-forge" \
   --exclude "conda-libmamba-solver"
 ```
 
@@ -111,27 +114,29 @@ pronto lock
 Build the named runtime:
 
 ```bash
-pronto build --layout none --name serpe
+pronto build --layout none --name serpe --template ./pronto-runtime-template
 ```
 
 The staged binary and metadata files are written to `dist/`.
 
-## Configure In GitHub Actions
+## Build In GitHub Actions
 
-For CI builds, pass the same choices to the composite action:
+For CI builds, commit the manifest and lockfile, then point the composite action
+at that project root:
 
 ```yaml
-- uses: jezdez/conda-pronto@main
+- uses: actions/checkout@v4
+
+- uses: jezdez/conda-pronto@v0.1.0
   id: pronto
   with:
     name: serpe
-    packages: "python >=3.12, conda >=25.1, conda-rattler-solver, conda-spawn, numpy, pandas"
-    channels: "conda-forge"
-    exclude: "conda-libmamba-solver"
+    root: .
     docs-url: "https://example.com/serpe/"
 ```
 
-Pin `jezdez/conda-pronto` to a tag or commit SHA for release builds.
+The action does not run `pronto configure`, `pixi lock`, or any other solve
+step. That keeps release artifacts tied to reviewed project files.
 
 ## Build An Embedded Variant
 
@@ -139,7 +144,10 @@ Use the `embedded` layout when you want a larger single binary that carries the
 package archives inside itself:
 
 ```bash
-pronto build --layout embedded --name serpe
+pronto build \
+  --layout embedded \
+  --name serpe \
+  --template ./pronto-runtime-template
 ```
 
 The embedded artifact uses the `z` suffix, so the staged binary is

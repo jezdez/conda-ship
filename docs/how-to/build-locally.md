@@ -3,13 +3,22 @@
 Use local builds while iterating on runtime package sets, channel choices, or
 conda-pronto runtime code.
 
-Run local builds from a conda-pronto source checkout. `pronto build` builds the
-generic `pronto-runtime` target from that checkout, copies it under the
-requested distribution name, and stamps the copy with runtime data.
+Installed local builds use a prebuilt runtime template:
+
+```bash
+pronto build \
+  --layout none \
+  --name serpe \
+  --template ./pronto-runtime-template
+```
+
+When developing conda-pronto itself from a source checkout, you can omit
+`--template`. In that mode `pronto build` builds the generic
+`pronto-runtime` target from the checkout before stamping it.
 
 If you are changing a downstream distribution such as conda-express, keep the
 package-set decision in that downstream project, then reproduce the build with
-conda-pronto's source checkout or GitHub Action inputs.
+the `pronto` CLI or the GitHub Action.
 
 ## Refresh The Artifact Lock
 
@@ -45,7 +54,10 @@ pronto lock --check
 `--name` is required. conda-pronto does not provide a default distribution name.
 
 ```bash
-pronto build --layout none --name serpe
+pronto build \
+  --layout none \
+  --name serpe \
+  --template ./pronto-runtime-template
 ```
 
 Use `--out-dir` to stage somewhere other than `dist/`:
@@ -54,8 +66,12 @@ Use `--out-dir` to stage somewhere other than `dist/`:
 pronto build \
   --layout none \
   --name serpe \
+  --template ./pronto-runtime-template \
   --out-dir /tmp/pronto-artifacts
 ```
+
+Pass `--template` when using an installed `pronto` binary outside a
+conda-pronto source checkout.
 
 ## Run A Smoke Test
 
@@ -64,6 +80,7 @@ Use `pronto run` to build and immediately execute the staged runtime:
 ```bash
 pronto run \
   --name serpe \
+  --template ./pronto-runtime-template \
   -- bootstrap --prefix /tmp/serpe-smoke
 ```
 
@@ -77,7 +94,8 @@ Pass both the Rust target triple and an artifact label:
 pronto build \
   --name serpe \
   --target x86_64-unknown-linux-gnu \
-  --target-label x86_64-unknown-linux-gnu
+  --target-label x86_64-unknown-linux-gnu \
+  --template ./pronto-runtime-template-x86_64-unknown-linux-gnu
 ```
 
 The target label is appended to staged artifact names and metadata files.

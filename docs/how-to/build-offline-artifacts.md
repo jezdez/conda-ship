@@ -16,7 +16,10 @@ files. This is useful when an installer or package manager already knows how to
 place supporting files next to the binary.
 
 ```bash
-pronto build --layout external --name serpe
+pronto build \
+  --layout external \
+  --name serpe \
+  --template ./pronto-runtime-template
 ```
 :::
 
@@ -25,7 +28,10 @@ Use `embedded` when you want one larger binary that can bootstrap without a
 separate bundle file.
 
 ```bash
-pronto build --layout embedded --name serpe
+pronto build \
+  --layout embedded \
+  --name serpe \
+  --template ./pronto-runtime-template
 ```
 :::
 

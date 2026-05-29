@@ -7,14 +7,14 @@ The preferred manifest is `conda.toml` with `conda.lock`. `pixi.toml` with
 `pixi.lock` remains supported for compatibility with the original conda-pronto build
 workflow.
 
-Downstream distributions can maintain these values in a conda-pronto checkout or pass
-overrides to the GitHub Action. conda-pronto treats the values as build input; it
-does not define a universal conda distribution.
+Downstream distributions maintain these values in their own project manifest.
+conda-pronto treats the values as build input; it does not define a universal
+conda distribution.
 
-`pronto lock` and `pronto inspect` can read either manifest/lockfile pair.
-`pronto build` and `pronto run` still require a conda-pronto source checkout because
-they build the generic runtime target from the selected root before stamping
-the staged artifact.
+`pronto lock`, `pronto inspect`, `pronto build`, and `pronto run` can read either
+manifest/lockfile pair. Installed builds pass `--template` so conda-pronto
+can stamp a prebuilt generic runtime without needing the conda-pronto source
+checkout.
 
 ## Manifest Discovery
 
@@ -113,8 +113,8 @@ Non-alphanumeric characters in environment variable names become underscores.
 
 conda-pronto's repository default package set exists so the builder and runtime can be
 tested. A downstream distribution makes its own package choices and passes them
-through `pronto configure`, the GitHub Action inputs, or an equivalent release
-workflow.
+through `pronto configure` or direct manifest edits before committing the
+matching lockfile.
 
-For example, conda-express passes its own package set when building `cx` and
+For example, conda-express owns the package set used when building `cx` and
 `cxz`; those package choices are conda-express policy, not conda-pronto policy.

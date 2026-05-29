@@ -8,9 +8,10 @@ runtime binaries, see {doc}`runtime-cli`.
 The `conda-pronto` package also registers `conda pronto` as an adapter that
 delegates to this CLI. See {doc}`conda-plugin`.
 
-In this release, `pronto build` and `pronto run` require a conda-pronto source
-checkout because they build the generic `pronto-runtime` target from the
-selected root before stamping the staged artifact.
+Installed `pronto` builds use a prebuilt runtime template passed with
+`--template`. Source checkouts can omit that option while developing
+conda-pronto itself; in that mode `pronto build` compiles the internal
+`pronto-runtime` target before stamping the staged artifact.
 
 ## `pronto lock`
 
@@ -60,8 +61,13 @@ Build and stage a named runtime artifact.
 
 ```bash
 pronto build --name NAME [--layout LAYOUT] [--target-label LABEL] \
-  [--platform PLATFORM] [--target TRIPLE] [--out-dir PATH] [--root PATH]
+  [--platform PLATFORM] [--target TRIPLE] [--template PATH] \
+  [--docs-url URL] [--out-dir PATH] [--root PATH]
 ```
+
+`NAME`, `LABEL`, and `TRIPLE` are used in artifact filenames. They must start
+with an ASCII letter or digit and may only contain ASCII letters, digits, `.`,
+`_`, and `-`.
 
 Options:
 
@@ -71,10 +77,14 @@ Options:
 - `--layout embedded`: stage a runtime with the compressed bundle embedded.
 - `--target-label LABEL`: append a platform or target label to artifact names.
 - `--platform PLATFORM`: choose the conda platform for metadata and bundles.
-- `--target TRIPLE`: pass a Rust target triple to `cargo build`.
+- `--target TRIPLE`: Rust target triple for source-checkout builds; also selects
+  the staged `.exe` suffix for Windows artifacts when a template is supplied.
+  Path-like custom target specifications are not supported here.
+- `--template PATH`: prebuilt generic runtime template binary to copy and
+  stamp. When omitted, `pronto build` compiles `pronto-runtime` from `--root`.
+- `--docs-url URL`: documentation URL stamped into runtime help output.
 - `--out-dir PATH`: write staged artifacts somewhere other than `dist/`.
-- `--root PATH`: use a build root instead of auto-detecting one. For
-  `pronto build`, this root must be a conda-pronto source checkout.
+- `--root PATH`: use a project root instead of auto-detecting one.
 
 ## `pronto run`
 
@@ -82,7 +92,8 @@ Build a named runtime and execute it immediately.
 
 ```bash
 pronto run --name NAME [--layout LAYOUT] [--platform PLATFORM] \
-  [--out-dir PATH] [--root PATH] -- RUNTIME_ARGS...
+  [--template PATH] [--docs-url URL] [--out-dir PATH] [--root PATH] \
+  -- RUNTIME_ARGS...
 ```
 
 Everything after `--` is passed to the staged runtime.
@@ -94,8 +105,11 @@ Options:
 - `--layout external`: stage a runtime plus compressed bundle.
 - `--layout embedded`: stage a runtime with the compressed bundle embedded.
 - `--platform PLATFORM`: choose the conda platform for metadata and bundles.
+- `--template PATH`: prebuilt generic runtime template binary to copy and
+  stamp. When omitted, `pronto run` compiles `pronto-runtime` from `--root`.
+- `--docs-url URL`: documentation URL stamped into runtime help output.
 - `--out-dir PATH`: write staged artifacts somewhere other than `dist/`.
-- `--root PATH`: use a conda-pronto source checkout instead of auto-detecting one.
+- `--root PATH`: use a project root instead of auto-detecting one.
 - `RUNTIME_ARGS`: arguments passed to the staged runtime after it is built.
 
 ## `pronto configure`
@@ -103,16 +117,18 @@ Options:
 Patch runtime packages, channels, or excludes in the selected project manifest.
 
 ```bash
-pronto configure [--packages SPECS] [--channels CHANNELS] [--exclude NAMES] \
+pronto configure [--package SPEC]... [--channel CHANNEL]... [--exclude NAME]... \
   [--root PATH]
 ```
 
-Values are comma-separated. After configuration changes, refresh the source
-lockfile with the tool that owns the manifest, then run `pronto lock`.
+Repeat list options for each value. Package specs are conda matchspecs, so
+version constraints may contain commas. After configuration changes, refresh
+the source lockfile with the tool that owns the manifest, then run
+`pronto lock`.
 
 Options:
 
-- `--packages SPECS`: comma-separated conda package specs.
-- `--channels CHANNELS`: comma-separated conda channel names or URLs.
-- `--exclude NAMES`: comma-separated package names to prune after solving.
+- `--package SPEC`: conda package matchspec to include; repeat for multiple packages.
+- `--channel CHANNEL`: conda channel name or URL to use; repeat for multiple channels.
+- `--exclude NAME`: package name to prune after solving; repeat for multiple packages.
 - `--root PATH`: use a build root instead of auto-detecting one.

@@ -15,8 +15,10 @@ subcommand form.
   manifest needed by the packaged builder workflow.
 - Added the `conda-pronto` Python package metadata for the conda plugin entry
   point.
-- Added a generic GitHub Action and reusable build workflow for named downstream
-  runtime binaries.
+- Added a generic, lockfile-first GitHub Action and reusable build workflow for
+  named downstream runtime binaries.
+- Added a release workflow that publishes tagged `pronto` and
+  `pronto-runtime-template` assets plus `SHA256SUMS` for the action to consume.
 - Documented the split between `conda-pronto` as the generic builder/runtime and
   downstream distributions such as `conda-express`.
 
@@ -25,8 +27,14 @@ subcommand form.
 - Clarified that `conda-pronto` does not ship a default first-party runtime
   binary. Downstream projects choose the binary name, package set, channels,
   documentation URL, and release channel.
-- Reworked the build workflow to check out `conda-pronto` directly and run the
-  same Pixi/Cargo build path used locally.
+- Reworked the GitHub Action and reusable build workflow to use released
+  `pronto` and runtime-template binaries instead of rebuilding the generic
+  runtime from a Rust source checkout.
+- Simplified the GitHub Action interface so release builds consume committed
+  `conda.toml`/`conda.lock` or `pixi.toml`/`pixi.lock` input instead of
+  generating or mutating manifests in CI.
+- Updated the rattler dependency stack so current Pixi lockfiles can be read
+  directly.
 - Removed default runtime examples from the documentation landing page so the
   first screen describes the project boundary instead of implying a bundled
   distribution.

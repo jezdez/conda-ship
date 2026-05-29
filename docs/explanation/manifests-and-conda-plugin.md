@@ -9,8 +9,7 @@ and turns it into bootstrap binaries.
 ## Manifest Priority
 
 conda-pronto treats `conda.toml` as the preferred project manifest. `pixi.toml`
-remains a compatibility input for the existing conda-pronto source checkout and CI
-workflows.
+remains a compatibility input for existing Pixi-based downstream workflows.
 
 Inside a build root, conda-pronto looks for manifests in this order:
 
@@ -96,23 +95,14 @@ Conda recipes for `conda-pronto` package the Rust-built `pronto` binary and
 the Python plugin in the same environment. For adapter tests or custom
 packaging, `CONDA_PRONTO_EXECUTABLE` points at a specific executable.
 
-## Source Template Boundary
+## Runtime Template Boundary
 
-In this release, the builder builds the generic `pronto-runtime` Rust target
-from a conda-pronto source checkout. It then stamps the staged copy with the
-distribution name, runtime lock, metadata, and optional embedded bundle. That
-is why the composite GitHub Action checks out `jezdez/conda-pronto` and builds from
-that checkout.
+The downstream project manifest lives in the downstream repository. The
+conda-pronto builder and generic runtime template come from the conda-pronto
+release or package installation.
 
-For installed `pronto` and `conda pronto` to build artifacts from downstream
-repositories without checking out conda-pronto, the generic runtime needs a packaged
-build strategy:
-
-- downstream project manifest lives in the user's repository
-- conda-pronto builder and generic runtime come from the installed conda-pronto package
-- generated locks and bundles are build output
-- staged binaries and metadata land in the downstream project's artifact
-  directory
-
-In this release, `conda.toml` support applies to the source-checkout build
-model and to CI workflows that explicitly check out conda-pronto.
+`pronto build --template PATH` copies the prebuilt template, stamps the
+copy with the distribution name, runtime lock, metadata, and optional embedded
+bundle, then writes the staged artifacts to the downstream project's output
+directory. Source checkouts can omit `--template` while changing
+conda-pronto itself; that fallback builds `pronto-runtime` locally with Cargo.

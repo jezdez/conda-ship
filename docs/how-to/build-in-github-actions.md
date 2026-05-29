@@ -4,25 +4,30 @@ Use the composite action when a downstream distribution repository wants conda-p
 to build release artifacts in CI.
 
 The action is the public CI interface for conda-pronto-built binaries. Downstream
-repositories, including conda-express, pass their own package set and artifact
-name to this action instead of carrying a copy of the generic builder.
+repositories, including conda-express, keep their package set in a committed
+manifest and lockfile. The action reads that project input and stamps a named
+runtime artifact instead of carrying a copy of the generic builder.
 
-The action checks out conda-pronto, applies the input overrides to that checkout, and
-builds and stamps the generic runtime from the checked-out source.
+Pin the action to a conda-pronto release tag. The action downloads the matching
+`pronto` and `pronto-runtime-template` release assets, verifies them against the
+release `SHA256SUMS`, and stamps the generated runtime artifact.
 
 ## Single-Platform Example
+
+The checked-out repository must contain either `conda.toml` plus `conda.lock`
+or `pixi.toml` plus `pixi.lock`.
 
 ```yaml
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: jezdez/conda-pronto@main
+      - uses: actions/checkout@v4
+
+      - uses: jezdez/conda-pronto@v0.1.0
         id: pronto
         with:
           name: serpe
-          packages: "python >=3.12, conda >=25.1"
-          channels: "conda-forge"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -35,18 +40,38 @@ jobs:
             ${{ steps.pronto.outputs.checksums-path }}
 ```
 
-Pin `jezdez/conda-pronto` to a tag or commit SHA for release builds.
+Use a tag for release builds. Branch refs do not have matching release assets.
+
+## Project Root Example
+
+When the downstream manifest lives below the repository root, point the action
+at that directory:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+
+  - uses: jezdez/conda-pronto@v0.1.0
+    id: pronto
+    with:
+      name: serpe
+      root: dist/serpe
+```
+
+The action does not run a solve, generate a manifest, or refresh a lockfile.
+Update and commit the lockfile before running release builds.
 
 ## Embedded Bundle Example
 
-Set `embed-bundle` when the runtime must bootstrap without network access:
+Set `layout` to `embedded` when the runtime must bootstrap without network
+access:
 
 ```yaml
-- uses: jezdez/conda-pronto@main
+- uses: jezdez/conda-pronto@v0.1.0
   id: pronto
   with:
     name: serpe
-    embed-bundle: "true"
+    layout: embedded
 ```
 
 The output binary uses the `z` suffix, for example `serpez` on Unix or
@@ -65,7 +90,9 @@ strategy:
 runs-on: ${{ matrix.os }}
 
 steps:
-  - uses: jezdez/conda-pronto@main
+  - uses: actions/checkout@v4
+
+  - uses: jezdez/conda-pronto@v0.1.0
     id: pronto
     with:
       name: serpe

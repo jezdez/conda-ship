@@ -38,7 +38,7 @@ conda-pronto owns the reusable build and runtime machinery:
 - deriving a runtime lock from a conda or Pixi source lockfile
 - pruning excluded packages and exclusive dependencies after the solve
 - downloading package archives into compressed bundles
-- building the generic `pronto-runtime` target and stamping distribution data
+- copying or building the generic runtime template and stamping distribution data
 - staging `none`, `external`, and `embedded` artifact layouts
 - writing artifact metadata: `.runtime.lock`, `.packages.txt`, `.info.json`,
   and `.sha256`
@@ -77,8 +77,9 @@ It owns the opinionated native conda package set, the `cx`/`cxz` names,
 Homebrew and shell-script installation, Docker images, PyPI and crates.io
 distribution wrappers, and release policy for those artifacts.
 
-When conda-express needs binaries, its workflows call conda-pronto with the
-conda-express package set and artifact names. conda-pronto does not hard-code those
+When conda-express needs binaries, its workflows call conda-pronto from the
+conda-express project root and pass the `cx`/`cxz` artifact names. The package
+set remains conda-express project input; conda-pronto does not hard-code those
 choices. Its own scope page is
 {external+conda-express:doc}`Project scope <scope>`.
 

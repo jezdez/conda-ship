@@ -8,13 +8,14 @@ generic runtime; it does not publish a default runtime binary.
 
 ## Prerequisites
 
-Run this tutorial from a conda-pronto source checkout. The checkout includes a
-Pixi-compatible manifest, a lockfile, a solved `runtime` environment, and a
-`[tool.pronto]` section.
+Run this tutorial from a project root with a manifest, a lockfile, a solved
+`runtime` environment, and a `[tool.pronto]` section. A conda-pronto source
+checkout works for that purpose because it carries a Pixi-compatible example
+configuration.
 
-In this release, `pronto build` builds the generic `pronto-runtime` target from
-the conda-pronto checkout, then stamps the staged copy with runtime data. Building
-directly from a downstream repository is separate packaging work.
+Installed `pronto` builds need a prebuilt runtime template passed with
+`--template`. In a conda-pronto source checkout you can omit that option;
+the builder will compile the local `pronto-runtime` target before stamping it.
 
 Make sure the `pronto` CLI is available on your `PATH`, then derive the runtime
 lock:

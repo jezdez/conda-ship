@@ -3,14 +3,19 @@
 The repository root provides a composite GitHub Action for downstream
 distribution repositories.
 
-The action checks out conda-pronto, builds the generic runtime from that checkout,
-and stamps the staged artifact with its inputs.
+The action downloads the tagged conda-pronto release assets for the current
+runner, verifies them against `SHA256SUMS`, and runs the downloaded `pronto`
+binary. It does not build conda-pronto from source.
 
-The action does not read a downstream repository's own `conda.toml`; pass build
-policy through the action inputs.
+The action builds only from committed project input. The selected root must
+contain `conda.toml` plus `conda.lock` or `pixi.toml` plus `pixi.lock`. When the
+manifest or matching lockfile is missing, the action fails instead of generating
+or solving project configuration in CI.
 
 ```yaml
-- uses: jezdez/conda-pronto@main
+- uses: actions/checkout@v4
+
+- uses: jezdez/conda-pronto@v0.1.0
   id: pronto
   with:
     name: serpe
@@ -21,24 +26,14 @@ policy through the action inputs.
 `name`
 : Required distribution binary name. For example, conda-express passes `cx`.
 
-`packages`
-: Optional comma-separated conda package specs. When omitted, conda-pronto uses the
-  package specs in its runtime configuration.
+`root`
+: Project root containing `conda.toml`/`conda.lock` or `pixi.toml`/`pixi.lock`.
+  Defaults to the workflow workspace.
 
-`channels`
-: Optional comma-separated conda channels. When omitted, conda-pronto uses the
-  configured channels.
-
-`exclude`
-: Optional comma-separated package names to remove from the generated runtime
-  lock, including exclusive dependencies.
-
-`ref`
-: Git ref of conda-pronto to build from. Defaults to `main`.
-
-`embed-bundle`
-: Set to `"true"` to embed package archives into the runtime binary. The output
-  binary uses the `z` suffix.
+`layout`
+: Artifact layout to build. Supported values are `none` and `embedded`.
+  Defaults to `none`. Embedded artifacts carry package archives inside the
+  runtime binary and use the `z` suffix.
 
 `docs-url`
 : Documentation URL stamped into the generated runtime help output.

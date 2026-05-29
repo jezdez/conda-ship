@@ -4,10 +4,14 @@ conda-pronto keeps the runtime generic so downstream distributions own their pub
 identity.
 
 The source binary target is `pronto-runtime`. It is gated behind the
-non-default `runtime-template` Cargo feature so a normal conda-pronto build installs
-only the `pronto` builder CLI. `pronto build` enables that feature, builds the
-generic runtime, copies it under the requested artifact name, and stamps the
-copy with distribution-specific runtime data.
+non-default `runtime-template` Cargo feature so a normal conda-pronto CLI build
+installs only the `pronto` builder.
+
+Release builds publish `pronto-runtime-template-<target>` assets. Installed
+`pronto` builds copy one of those template binaries under the requested artifact
+name and stamp the copy with distribution-specific runtime data. Source
+checkouts can still omit `--template`; that local-development fallback
+builds the generic target with Cargo before stamping it.
 
 ## What Gets Stamped
 

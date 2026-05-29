@@ -16,13 +16,15 @@ Artifact layouts:
 - `external`: `<name>` plus `<name>.bundle.tar.zst`.
 - `embedded`: `<name>z`, the runtime plus compressed bundle embedded in one binary.
 
-The local CLI builds from a conda-pronto source checkout:
+The CLI builds from a solved downstream project. Installed builds should pass a
+released runtime template; source checkouts can omit `--template` while
+developing conda-pronto itself:
 
 ```bash
 pronto lock
 pronto inspect
-pronto build --layout none --name serpe
-pronto build --layout embedded --name serpe
+pronto build --layout none --name serpe --template ./pronto-runtime-template
+pronto build --layout embedded --name serpe --template ./pronto-runtime-template
 pronto run --name serpe -- bootstrap --prefix /tmp/serpe-smoke
 ```
 
@@ -30,7 +32,9 @@ Every `pronto build` writes the staged binary plus artifact metadata: the
 runtime lock, a tab-separated package list, an info JSON document, and SHA256
 checksums. The staged binary is stamped with the runtime lock, distribution
 metadata, and optional embedded bundle before checksums are written. The GitHub
-Action uses the same build path and `embed-bundle: true` for embedded builds.
+Action downloads tagged `pronto` and runtime-template release assets, verifies
+them with `SHA256SUMS`, and then uses the same stamping path against a committed
+downstream manifest and lockfile.
 
 The `conda-pronto` Python package in `python/conda_pronto` registers
 `conda pronto` as a conda plugin entry point. It delegates to the primary
