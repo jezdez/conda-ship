@@ -1,18 +1,25 @@
 # GitHub Action Reference
 
-The repository root provides a composite GitHub Action.
+The repository root provides a composite GitHub Action for downstream
+distribution repositories.
+
+The action checks out Pronto, builds the generic runtime from that checkout,
+and stamps the staged artifact with its inputs.
+
+The action does not read a downstream repository's own `conda.toml`; pass build
+policy through the action inputs.
 
 ```yaml
 - uses: jezdez/pronto@main
   id: pronto
   with:
-    name: myconda
+    name: serpe
 ```
 
 ## Inputs
 
 `name`
-: Required distribution binary name.
+: Required distribution binary name. For example, conda-express passes `cx`.
 
 `packages`
 : Optional comma-separated conda package specs. When omitted, Pronto uses the
@@ -30,10 +37,11 @@ The repository root provides a composite GitHub Action.
 : Git ref of Pronto to build from. Defaults to `main`.
 
 `embed-bundle`
-: Set to `"true"` to embed package archives into the runtime binary.
+: Set to `"true"` to embed package archives into the runtime binary. The output
+  binary uses the `z` suffix.
 
 `docs-url`
-: Documentation URL embedded in the generated runtime help output.
+: Documentation URL stamped into the generated runtime help output.
 
 ## Outputs
 

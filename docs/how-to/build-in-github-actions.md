@@ -3,6 +3,13 @@
 Use the composite action when a downstream distribution repository wants Pronto
 to build release artifacts in CI.
 
+The action is the public CI interface for Pronto-built binaries. Downstream
+repositories, including conda-express, pass their own package set and artifact
+name to this action instead of carrying a copy of the generic builder.
+
+The action checks out Pronto, applies the input overrides to that checkout, and
+builds and stamps the generic runtime from the checked-out source.
+
 ## Single-Platform Example
 
 ```yaml
@@ -13,7 +20,7 @@ jobs:
       - uses: jezdez/pronto@main
         id: pronto
         with:
-          name: myconda
+          name: serpe
           packages: "python >=3.12, conda >=25.1"
           channels: "conda-forge"
 
@@ -38,12 +45,12 @@ Set `embed-bundle` when the runtime must bootstrap without network access:
 - uses: jezdez/pronto@main
   id: pronto
   with:
-    name: myconda
+    name: serpe
     embed-bundle: "true"
 ```
 
-The output binary uses the `z` suffix by default, for example `mycondaz` on Unix
-or `mycondaz.exe` on Windows.
+The output binary uses the `z` suffix, for example `serpez` on Unix or
+`serpez.exe` on Windows.
 
 ## Matrix Builds
 
@@ -61,7 +68,14 @@ steps:
   - uses: jezdez/pronto@main
     id: pronto
     with:
-      name: myconda
+      name: serpe
 ```
 
 Each job emits an asset name qualified with the runner target triple.
+
+## Downstream Release Preparation
+
+Use the action output paths as the source of truth for release uploads and
+package-manager wrappers. A downstream repository can upload the binary,
+`.info.json`, `.runtime.lock`, `.packages.txt`, and `.sha256` files together so
+users and packagers can audit exactly what was built.
