@@ -70,7 +70,8 @@ the same name.
 
 ## conda-express
 
-`conda-express` is the downstream distribution that publishes `cx` and `cxz`.
+{external+conda-express:doc}`conda-express <index>` is the downstream
+distribution that publishes `cx` and `cxz`.
 
 It owns the opinionated native conda package set, the `cx`/`cxz` names,
 Homebrew and shell-script installation, Docker images, PyPI and crates.io
@@ -78,11 +79,13 @@ distribution wrappers, and release policy for those artifacts.
 
 When conda-express needs binaries, its workflows call Pronto with the
 conda-express package set and artifact names. Pronto does not hard-code those
-choices.
+choices. Its own scope page is
+{external+conda-express:doc}`Project scope <scope>`.
 
 ## conda-wasm
 
-Browser and WebAssembly work belongs in `conda-wasm`, not Pronto:
+Browser and WebAssembly work belongs in
+{external+conda-wasm:doc}`conda-wasm <index>`, not Pronto:
 
 - WebAssembly crates
 - Emscripten conda patches
@@ -103,7 +106,7 @@ Pronto complements other conda ecosystem tools:
 | rattler-build | Builds conda packages |
 | constructor | Builds OS installers |
 | Pronto | Builds bootstrap binaries that can be distributed directly or wrapped by other channels |
-| conda-express | A Pronto-based downstream distribution for `cx` and `cxz` |
+| {external+conda-express:doc}`conda-express <index>` | A Pronto-based downstream distribution for `cx` and `cxz` |
 
 Pronto does not produce installer-generator output such as `.sh`, `.pkg`, or
 `.msi`. Those formats can wrap Pronto-built binaries when a downstream
@@ -122,5 +125,6 @@ belong here:
 - generic GitHub Action usage
 - generated runtime command behavior
 
-The conda-express docs describe `cx` and `cxz` as products. Pronto docs
-describe how to build and reason about products like them.
+The {external+conda-express:doc}`conda-express docs <index>` describe `cx`
+and `cxz` as products. Pronto docs describe how to build and reason about
+products like them.

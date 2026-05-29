@@ -11,6 +11,7 @@ author = "conda community"
 
 extensions = [
     "myst_parser",
+    "sphinx.ext.intersphinx",
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx_reredirects",
@@ -47,5 +48,10 @@ html_context = {
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
 html_baseurl = "https://jezdez.github.io/pronto/"
+
+intersphinx_mapping = {
+    "conda-express": ("https://jezdez.github.io/conda-express/", None),
+    "conda-wasm": ("https://jezdez.github.io/conda-wasm/", None),
+}
 
 exclude_patterns = ["_build"]

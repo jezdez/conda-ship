@@ -16,56 +16,82 @@ Pronto does not publish a default runtime binary named `pronto`. It builds
 named downstream binaries such as `serpe`, `serpez`, `cx`, or `cxz`.
 :::
 
-## Choose A Path
+## Start Here
 
-::::{grid} 1 1 2 3
+If you are new to Pronto, build the tutorial runtime first. It gives you a
+working mental model for locks, artifacts, and the generated runtime command:
+
+```bash
+pronto lock
+pronto build --layout none --name serpe
+pronto run --name serpe -- bootstrap --prefix /tmp/serpe
+```
+
+Then use the documentation by the kind of help you need.
+
+## Documentation By Need
+
+::::{grid} 1 1 2 4
 :gutter: 3
 
-:::{grid-item-card} First Runtime
+:::{grid-item-card} Learn
 :link: tutorials/first-runtime
 :link-type: doc
 
-Build a local runtime named `serpe`, then smoke-test it in a temporary prefix.
+Follow a guided first build from lockfile to smoke test.
 :::
 
-:::{grid-item-card} Custom Runtime
+:::{grid-item-card} Do
 :link: how-to/customize-runtime
 :link-type: doc
 
-Choose a binary name, package set, channels, and documentation URL.
+Build a named downstream runtime with your own package set.
 :::
 
-:::{grid-item-card} GitHub Actions
-:link: how-to/build-in-github-actions
-:link-type: doc
-
-Use the composite action from a downstream distribution repository.
-:::
-
-:::{grid-item-card} Artifact Layouts
-:link: reference/artifacts
-:link-type: doc
-
-Compare `none`, `external`, and `embedded` outputs and their metadata files.
-:::
-
-:::{grid-item-card} Builder CLI
+:::{grid-item-card} Look Up
 :link: reference/cli
 :link-type: doc
 
-Look up exact `pronto lock`, `inspect`, `bundle`, `build`, and `run` options.
+Find exact commands, options, artifact names, and configuration keys.
 :::
 
-:::{grid-item-card} Project Boundaries
+:::{grid-item-card} Understand
+:link: explanation/concepts
+:link-type: doc
+
+Read the builder/runtime model and where Pronto fits in the conda ecosystem.
+:::
+
+::::
+
+## Project Boundaries
+
+::::{grid} 1 1 3 3
+:gutter: 3
+
+:::{grid-item-card} Pronto
 :link: explanation/project-boundaries
 :link-type: doc
 
-See what belongs in Pronto, conda-express, conda-wasm, and installer tooling.
+Generic builder/runtime machinery for native bootstrap binaries.
+:::
+
+:::{grid-item-card} conda-express
+:link: https://jezdez.github.io/conda-express/
+
+Downstream distribution that publishes the official `cx` and `cxz` binaries.
+:::
+
+:::{grid-item-card} conda-wasm
+:link: https://jezdez.github.io/conda-wasm/
+
+Browser, WebAssembly, Emscripten, and JupyterLite conda tooling.
 :::
 
 ::::
 
 ```{toctree}
+:hidden:
 :caption: Tutorials
 :maxdepth: 1
 
@@ -73,6 +99,7 @@ tutorials/first-runtime
 ```
 
 ```{toctree}
+:hidden:
 :caption: How-To Guides
 :maxdepth: 1
 
@@ -83,6 +110,7 @@ how-to/build-offline-artifacts
 ```
 
 ```{toctree}
+:hidden:
 :caption: Reference
 :maxdepth: 1
 
@@ -95,6 +123,7 @@ reference/artifacts
 ```
 
 ```{toctree}
+:hidden:
 :caption: Explanation
 :maxdepth: 1
 
@@ -105,6 +134,7 @@ explanation/manifests-and-conda-plugin
 ```
 
 ```{toctree}
+:hidden:
 :caption: Project
 :maxdepth: 1
 
