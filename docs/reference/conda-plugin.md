@@ -1,6 +1,6 @@
 # Conda Plugin Reference
 
-The `conda-pronto` package provides a conda plugin entry point for Pronto.
+The `conda-pronto` package provides a conda plugin entry point for conda-pronto.
 
 It registers a `conda pronto` subcommand that delegates to the primary
 `pronto` executable:
@@ -12,10 +12,10 @@ conda pronto build --layout none --name serpe
 ```
 
 The plugin does not reimplement the builder in Python and it does not make
-Pronto part of conda core.
+conda-pronto part of conda core.
 
 The plugin has the same build limitations as the standalone CLI. In particular,
-`pronto build` still needs a Pronto source checkout for the generic runtime.
+`pronto build` still needs a conda-pronto source checkout for the generic runtime.
 
 ## Packaging Contract
 
@@ -38,7 +38,7 @@ conda pronto build --layout embedded --name serpe
 ```
 
 When you need to pass an argument that conda's own parser would consume, insert
-`--` before the Pronto arguments:
+`--` before the conda-pronto arguments:
 
 ```bash
 conda pronto -- --help

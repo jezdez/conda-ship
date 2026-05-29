@@ -1,17 +1,17 @@
 # Runtime Template
 
-Pronto keeps the runtime generic so downstream distributions own their public
+conda-pronto keeps the runtime generic so downstream distributions own their public
 identity.
 
 The source binary target is `pronto-runtime`. It is gated behind the
-non-default `runtime-template` Cargo feature so a normal Pronto build installs
+non-default `runtime-template` Cargo feature so a normal conda-pronto build installs
 only the `pronto` builder CLI. `pronto build` enables that feature, builds the
 generic runtime, copies it under the requested artifact name, and stamps the
 copy with distribution-specific runtime data.
 
 ## What Gets Stamped
 
-During a named build, Pronto stamps distribution data onto a copy of the
+During a named build, conda-pronto stamps distribution data onto a copy of the
 generic runtime:
 
 - the runtime lock
@@ -23,7 +23,7 @@ generic runtime:
 - bundle and offline environment variable names
 
 This lets the same Rust runtime code produce many distribution-specific
-binaries without hard-coding a distribution into Pronto itself.
+binaries without hard-coding a distribution into conda-pronto itself.
 
 ## Runtime Behavior
 
@@ -49,6 +49,6 @@ Some runtime-template behavior is visible to users:
 - automatic bootstrap before pass-through conda commands
 - uninstall that removes the managed prefix and prints a binary-removal hint
 
-Those behaviors are part of the Pronto runtime template. The package set,
+Those behaviors are part of the conda-pronto runtime template. The package set,
 public name, documentation URL, and release channel remain downstream
 distribution decisions.

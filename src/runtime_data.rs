@@ -1,4 +1,4 @@
-//! Runtime data stamped onto generated Pronto artifacts.
+//! Runtime data stamped onto generated conda-pronto artifacts.
 //!
 //! This module is shared by the builder and runtime binaries. The builder uses
 //! the writer path, while the runtime uses the reader path.
@@ -62,7 +62,7 @@ impl RuntimeDataHeader {
             metadata_file: format!(".{name}.json"),
             bundle_env_var: runtime_env_var(name, "BUNDLE"),
             offline_env_var: runtime_env_var(name, "OFFLINE"),
-            docs_url: "https://jezdez.github.io/pronto/".to_string(),
+            docs_url: "https://jezdez.github.io/conda-pronto/".to_string(),
             install_method: None,
             runtime_config: RuntimeConfig::default(),
             runtime_lock: String::new(),
@@ -114,7 +114,7 @@ pub struct RuntimeData {
 static CURRENT_RUNTIME_DATA: LazyLock<RuntimeData> = LazyLock::new(|| match from_current_exe() {
     Ok(Some(data)) => data,
     Ok(None) => RuntimeData::default(),
-    Err(err) => panic!("invalid Pronto runtime data: {err}"),
+    Err(err) => panic!("invalid conda-pronto runtime data: {err}"),
 });
 
 pub fn current() -> &'static RuntimeData {

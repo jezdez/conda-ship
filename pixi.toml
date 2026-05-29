@@ -1,5 +1,5 @@
 [workspace]
-name = "pronto"
+name = "conda-pronto"
 description = "Build ready-to-run conda bootstrap binaries"
 channels = ["conda-forge"]
 platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
@@ -14,9 +14,9 @@ sccache = ">=0.10"
 RUSTC_WRAPPER = "sccache"
 
 [tasks]
-prepare = "cargo run -p pronto -- lock"
-check-lock = "cargo run -p pronto -- lock --check"
-bundle = "cargo run -p pronto -- bundle"
+prepare = "cargo run -p conda-pronto -- lock"
+check-lock = "cargo run -p conda-pronto -- lock --check"
+bundle = "cargo run -p conda-pronto -- bundle"
 build = "cargo build --release --bin pronto"
 build-debug = "cargo build --bin pronto"
 test = { cmd = "cargo test --release --features runtime-template", depends-on = ["prepare"] }

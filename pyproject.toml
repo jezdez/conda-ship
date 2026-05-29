@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "conda-pronto"
 version = "0.6.0"
-description = "Conda plugin entry point for the Pronto bootstrap binary builder."
+description = "Conda plugin entry point for the conda-pronto bootstrap binary builder."
 requires-python = ">=3.10"
 readme = "README.md"
 license = "BSD-3-Clause"
@@ -24,7 +24,7 @@ classifiers = [
 dependencies = ["conda >=25.1"]
 
 [project.urls]
-repository = "https://github.com/jezdez/pronto"
+repository = "https://github.com/jezdez/conda-pronto"
 
 [project.entry-points.conda]
 conda-pronto = "conda_pronto.plugin"

@@ -24,7 +24,7 @@ or enterprise package manager recipes live outside the core builder.
 
 ## Manifest And Plugin Work
 
-Pronto supports the conda-native pieces needed for downstream distribution
+conda-pronto supports the conda-native pieces needed for downstream distribution
 builds:
 
 - `conda.toml` is the primary manifest.

@@ -11,14 +11,14 @@ on:
         description: >
           Comma-separated conda package specs to include in the bootstrapper.
           Example: "python >=3.12, conda >=25.1, numpy, pandas"
-          Defaults to the packages defined in the Pronto project manifest.
+          Defaults to the packages defined in the conda-pronto project manifest.
         required: false
         type: string
         default: ""
       channels:
         description: >
           Comma-separated conda channels.
-          Defaults to the channels defined in the Pronto project manifest.
+          Defaults to the channels defined in the conda-pronto project manifest.
         required: false
         type: string
         default: ""
@@ -26,12 +26,12 @@ on:
         description: >
           Comma-separated packages to exclude from the bootstrapper
           (along with their exclusive dependencies).
-          Defaults to the excludes defined in the Pronto project manifest.
+          Defaults to the excludes defined in the conda-pronto project manifest.
         required: false
         type: string
         default: ""
       ref:
-        description: "Git ref of Pronto to build from (tag, branch, or SHA)."
+        description: "Git ref of conda-pronto to build from (tag, branch, or SHA)."
         required: false
         type: string
         default: "main"
@@ -70,7 +70,7 @@ jobs:
     steps:
       - name: Build runtime
         id: build
-        uses: jezdez/pronto@main
+        uses: jezdez/conda-pronto@main
         with:
           name: ${{ inputs.name }}
           packages: ${{ inputs.packages }}

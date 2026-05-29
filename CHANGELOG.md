@@ -2,8 +2,9 @@
 
 ## Split from conda-express (2026-05-28)
 
-`pronto` was split out of `jezdez/conda-express` to own the generic builder and
-runtime foundation for ready-to-run conda bootstrap binaries.
+`conda-pronto` was split out of `jezdez/conda-express` to own the generic
+builder and runtime foundation for ready-to-run conda bootstrap binaries. The
+installed CLI remains `pronto`.
 
 Moved project areas:
 
@@ -28,7 +29,7 @@ the generic builder moved into this repository.
 - Replaced the large `conda-express` build script with a small script that
   copies pre-generated lock and bundle inputs into `$OUT_DIR`.
 - Added the internal `cx-build` helper with `prepare`, `payload`, and
-  `configure` subcommands. These concepts became Pronto's `lock`, `bundle`,
+  `configure` subcommands. These concepts became conda-pronto's `lock`, `bundle`,
   `configure`, and `build` workflow.
 - Added a Pixi runtime environment for the bootstrap package set so Pixi owns
   dependency solving before the runtime binary is built.
@@ -41,7 +42,7 @@ the generic builder moved into this repository.
 
 - Added offline bootstrap from a local directory of pre-downloaded `.conda` and
   `.tar.bz2` archives.
-- Added the compressed self-contained `cxz` binary variant. In Pronto terms,
+- Added the compressed self-contained `cxz` binary variant. In conda-pronto terms,
   this is the `embedded` bundle layout with the `z` suffix.
 - Added SHA256 verification for all downloaded package archives used by
   embedded builds.

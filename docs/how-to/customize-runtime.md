@@ -1,15 +1,15 @@
 # Customize A Runtime
 
-Use this guide when you want a Pronto-built runtime with your own package set,
+Use this guide when you want a conda-pronto-built runtime with your own package set,
 binary name, channels, or documentation URL.
 
-Pronto is generic. It does not publish a first-party runtime binary, and it
+conda-pronto is generic. It does not publish a first-party runtime binary, and it
 does not reserve a default name. `conda-express` is one downstream distribution
-that uses Pronto to publish `cx` and `cxz`; use a name owned by your
+that uses conda-pronto to publish `cx` and `cxz`; use a name owned by your
 distribution.
 
-Local builds still run from a Pronto source checkout. The manifest examples
-below describe the build input Pronto consumes. Installed-CLI builds from
+Local builds still run from a conda-pronto source checkout. The manifest examples
+below describe the build input conda-pronto consumes. Installed-CLI builds from
 downstream repositories require the generic-runtime packaging work tracked in
 the roadmap.
 
@@ -48,13 +48,13 @@ If you want the generated runtime to follow the conda-express activation model,
 also include `conda-spawn`.
 
 Additional plugins are a distribution decision. A downstream project records
-its own plugin set in its manifest or release workflow; Pronto does not choose
+its own plugin set in its manifest or release workflow; conda-pronto does not choose
 one for every runtime.
 
 ## Configure Local Build Input
 
-When a Pronto source checkout carries `conda.toml` and `conda.lock`, keep
-package and channel intent in the workspace sections and put Pronto-specific
+When a conda-pronto source checkout carries `conda.toml` and `conda.lock`, keep
+package and channel intent in the workspace sections and put conda-pronto-specific
 build policy in `[tool.pronto]`:
 
 ```toml
@@ -80,7 +80,7 @@ exclude = ["conda-libmamba-solver"]
 docs-url = "https://example.com/serpe/"
 ```
 
-Then refresh the source lockfile and derive Pronto's runtime lock from the
+Then refresh the source lockfile and derive conda-pronto's runtime lock from the
 same checkout:
 
 ```bash
@@ -99,7 +99,7 @@ pronto configure \
   --exclude "conda-libmamba-solver"
 ```
 
-Then refresh the source lockfile and derive Pronto's runtime lock. Pronto
+Then refresh the source lockfile and derive conda-pronto's runtime lock. conda-pronto
 consumes the solved `runtime` environment; it does not replace the workspace
 solver.
 
@@ -121,7 +121,7 @@ The staged binary and metadata files are written to `dist/`.
 For CI builds, pass the same choices to the composite action:
 
 ```yaml
-- uses: jezdez/pronto@main
+- uses: jezdez/conda-pronto@main
   id: pronto
   with:
     name: serpe
@@ -131,7 +131,7 @@ For CI builds, pass the same choices to the composite action:
     docs-url: "https://example.com/serpe/"
 ```
 
-Pin `jezdez/pronto` to a tag or commit SHA for release builds.
+Pin `jezdez/conda-pronto` to a tag or commit SHA for release builds.
 
 ## Build An Embedded Variant
 

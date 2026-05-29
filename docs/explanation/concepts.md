@@ -1,12 +1,12 @@
 # Concepts
 
-Pronto separates three concerns:
+conda-pronto separates three concerns:
 
 - resolving and recording a conda runtime package set
 - building a generic bootstrap runtime and stamping it with distribution data
 - staging release artifacts that downstream projects can distribute
 
-The split from conda-express makes that separation explicit. Pronto owns these
+The split from conda-express makes that separation explicit. conda-pronto owns these
 generic concerns; conda-express owns the `cx` and `cxz` distribution built with
 them.
 
@@ -17,7 +17,7 @@ compatible `pixi.toml`/`pixi.lock` pair, applies `[tool.pronto]`, then derives
 a runtime lock, bundle files, runtime binaries, and artifact metadata.
 
 The selected source lockfile is the source of the concrete conda package
-records. Pronto is not a replacement for conda-workspaces, Pixi, or any other
+records. conda-pronto is not a replacement for conda-workspaces, Pixi, or any other
 workspace solver; it consumes a solved environment and turns it into bootstrap
 artifacts.
 
@@ -32,7 +32,7 @@ names, runtime lock, and optional bundle.
 ## Runtime Lock
 
 The runtime lock is derived from the configured environment, then filtered
-through `[tool.pronto].exclude`. Pronto writes it to
+through `[tool.pronto].exclude`. conda-pronto writes it to
 `target/pronto/runtime.lock` as generated build output, stamps it into every
 runtime artifact, and stages a copy next to the output binary. It is not a
 second checked-in project lockfile.

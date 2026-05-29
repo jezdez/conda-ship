@@ -1,23 +1,23 @@
 # Manifests And Plugin Entry Points
 
-Pronto supports a conda-native manifest path and keeps Pixi compatibility for
+conda-pronto supports a conda-native manifest path and keeps Pixi compatibility for
 existing builder workflows.
 
-Pronto is not an environment manager. It consumes a solved conda environment
+conda-pronto is not an environment manager. It consumes a solved conda environment
 and turns it into bootstrap binaries.
 
 ## Manifest Priority
 
-Pronto treats `conda.toml` as the preferred project manifest. `pixi.toml`
-remains a compatibility input for the existing Pronto source checkout and CI
+conda-pronto treats `conda.toml` as the preferred project manifest. `pixi.toml`
+remains a compatibility input for the existing conda-pronto source checkout and CI
 workflows.
 
-Inside a build root, Pronto looks for manifests in this order:
+Inside a build root, conda-pronto looks for manifests in this order:
 
 1. `conda.toml`
 2. `pixi.toml`
 
-When `conda.toml` is selected, Pronto reads package records from `conda.lock`.
+When `conda.toml` is selected, conda-pronto reads package records from `conda.lock`.
 When `pixi.toml` is selected, it reads package records from `pixi.lock`.
 
 The lockfile remains the source of concrete package records. If the selected
@@ -36,18 +36,18 @@ exclude = ["conda-libmamba-solver"]
 docs-url = "https://example.com/serpe/"
 ```
 
-If `environment` is omitted, Pronto first looks for a solved environment named
+If `environment` is omitted, conda-pronto first looks for a solved environment named
 `runtime`. If that is not present, it uses the lockfile's default environment.
 
-Pronto writes a new generated lock at `target/pronto/runtime.lock`. That lock
+conda-pronto writes a new generated lock at `target/pronto/runtime.lock`. That lock
 contains only the selected runtime environment, renamed to `default` for the
 generated bootstrap binary. It is build output, not another source project
 lockfile.
 
 ## Conda Workspace Shape
 
-A conda-native Pronto project puts conda intent in the workspace schema and
-Pronto-specific build policy in `[tool.pronto]`:
+A conda-native conda-pronto project puts conda intent in the workspace schema and
+conda-pronto-specific build policy in `[tool.pronto]`:
 
 ```toml
 [workspace]
@@ -69,7 +69,7 @@ environment = "runtime"
 exclude = ["conda-libmamba-solver"]
 ```
 
-`[tool.pronto]` is for Pronto build behavior: which solved environment to turn
+`[tool.pronto]` is for conda-pronto build behavior: which solved environment to turn
 into a runtime, which packages to prune after the solve, artifact naming
 policy, bundle policy, and runtime documentation links.
 
@@ -85,8 +85,8 @@ The `conda-pronto` Python package exposes the same builder through
 
 - `pronto ...` remains the primary CLI.
 - `conda pronto ...` dispatches to the `pronto` executable.
-- Pronto does not depend on being loaded as a conda plugin.
-- The plugin package does not make Pronto part of conda core.
+- conda-pronto does not depend on being loaded as a conda plugin.
+- The plugin package does not make conda-pronto part of conda core.
 
 The plugin entry point is for conda CLI discovery. The builder identity remains
 `pronto`, and downstream distributions still own the binaries they publish.
@@ -99,20 +99,20 @@ packaging, `CONDA_PRONTO_EXECUTABLE` points at a specific executable.
 ## Source Template Boundary
 
 In this release, the builder builds the generic `pronto-runtime` Rust target
-from a Pronto source checkout. It then stamps the staged copy with the
+from a conda-pronto source checkout. It then stamps the staged copy with the
 distribution name, runtime lock, metadata, and optional embedded bundle. That
-is why the composite GitHub Action checks out `jezdez/pronto` and builds from
+is why the composite GitHub Action checks out `jezdez/conda-pronto` and builds from
 that checkout.
 
 For installed `pronto` and `conda pronto` to build artifacts from downstream
-repositories without checking out Pronto, the generic runtime needs a packaged
+repositories without checking out conda-pronto, the generic runtime needs a packaged
 build strategy:
 
 - downstream project manifest lives in the user's repository
-- Pronto builder and generic runtime come from the installed Pronto package
+- conda-pronto builder and generic runtime come from the installed conda-pronto package
 - generated locks and bundles are build output
 - staged binaries and metadata land in the downstream project's artifact
   directory
 
 In this release, `conda.toml` support applies to the source-checkout build
-model and to CI workflows that explicitly check out Pronto.
+model and to CI workflows that explicitly check out conda-pronto.

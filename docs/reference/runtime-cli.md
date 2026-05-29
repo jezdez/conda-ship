@@ -1,6 +1,6 @@
 # Generated Runtime CLI Reference
 
-Every Pronto artifact is a named runtime binary. In this page, `NAME` stands for
+Every conda-pronto artifact is a named runtime binary. In this page, `NAME` stands for
 the distribution name passed to `pronto build --name NAME`.
 
 For conda-express, `NAME` is `cx`. For an embedded conda-express artifact, the
@@ -78,7 +78,7 @@ NAME bootstrap --no-lock --package conda-build --package rattler-build
 NAME bootstrap --bundle ./packages --offline
 ```
 
-For an embedded artifact, Pronto detects the built-in bundle automatically:
+For an embedded artifact, conda-pronto detects the built-in bundle automatically:
 
 ```bash
 NAMEz bootstrap

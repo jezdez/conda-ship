@@ -1,11 +1,11 @@
-"""Sphinx configuration for pronto documentation."""
+"""Sphinx configuration for conda-pronto documentation."""
 
 import os
 import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
-project = html_title = "pronto"
+project = html_title = "conda-pronto"
 copyright = "2026, conda community"
 author = "conda community"
 
@@ -31,7 +31,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/jezdez/pronto",
+            "url": "https://github.com/jezdez/conda-pronto",
             "icon": "fa-brands fa-square-github",
             "type": "fontawesome",
         },
@@ -40,14 +40,14 @@ html_theme_options = {
 
 html_context = {
     "github_user": "jezdez",
-    "github_repo": "pronto",
+    "github_repo": "conda-pronto",
     "github_version": "main",
     "doc_path": "docs",
 }
 
 html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
-html_baseurl = "https://jezdez.github.io/pronto/"
+html_baseurl = "https://jezdez.github.io/conda-pronto/"
 
 intersphinx_mapping = {
     "conda-express": ("https://jezdez.github.io/conda-express/", None),

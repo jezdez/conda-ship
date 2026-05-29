@@ -45,4 +45,4 @@ Pass-through:
   Any command not listed above is passed through to conda:
   pronto-runtime install, pronto-runtime remove, pronto-runtime list, pronto-runtime env, pronto-runtime info, pronto-runtime config, ...
 
-Docs: https://jezdez.github.io/pronto/
+Docs: https://jezdez.github.io/conda-pronto/

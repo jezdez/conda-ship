@@ -15,7 +15,7 @@ inputs:
     description: >
       Comma-separated conda package specs to include in the bootstrapper.
       Example: "python >=3.12, conda >=25.1, numpy, pandas".
-      When empty, uses the default packages from this Pronto configuration.
+      When empty, uses the default packages from this conda-pronto configuration.
     required: false
     default: ""
   channels:
@@ -31,7 +31,7 @@ inputs:
     required: false
     default: ""
   ref:
-    description: "Git ref of Pronto to build from (tag, branch, or SHA)."
+    description: "Git ref of conda-pronto to build from (tag, branch, or SHA)."
     required: false
     default: "main"
   embed-bundle:
@@ -43,7 +43,7 @@ inputs:
   docs-url:
     description: "Documentation URL embedded in the runtime help output."
     required: false
-    default: "https://jezdez.github.io/pronto/"
+    default: "https://jezdez.github.io/conda-pronto/"
 
 outputs:
   binary-path:
@@ -68,17 +68,17 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Checkout Pronto
+    - name: Checkout conda-pronto
       uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
-        repository: jezdez/pronto
+        repository: jezdez/conda-pronto
         ref: ${{ inputs.ref }}
-        path: .pronto
+        path: .conda-pronto
 
     - name: Setup pixi
       uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
       with:
-        manifest-path: .pronto/pixi.toml
+        manifest-path: .conda-pronto/pixi.toml
         cache: true
 
     - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
@@ -86,7 +86,7 @@ runs:
     - name: Configure custom packages
       if: inputs.packages != '' || inputs.channels != '' || inputs.exclude != ''
       shell: bash
-      working-directory: .pronto
+      working-directory: .conda-pronto
       run: |
         ARGS=""
         if [ -n "${{ inputs.packages }}" ]; then
@@ -98,13 +98,13 @@ runs:
         if [ -n "${{ inputs.exclude }}" ]; then
           ARGS="$ARGS --exclude '${{ inputs.exclude }}'"
         fi
-        eval pixi run -- cargo run -p pronto -- configure $ARGS
+        eval pixi run -- cargo run -p conda-pronto -- configure $ARGS
         pixi lock
         pixi run prepare
 
     - name: Build runtime
       shell: bash
-      working-directory: .pronto
+      working-directory: .conda-pronto
       env:
         EMBED_BUNDLE: ${{ inputs.embed-bundle }}
         PRONTO_DOCS_URL: ${{ inputs.docs-url }}
@@ -115,7 +115,7 @@ runs:
         else
           LAYOUT="none"
         fi
-        pixi run -- cargo run -p pronto -- build \
+        pixi run -- cargo run -p conda-pronto -- build \
           --layout "$LAYOUT" \
           --name "${{ inputs.name }}" \
           --target-label "$TARGET" \

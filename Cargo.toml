@@ -3,7 +3,7 @@ members = ["."]
 default-members = ["."]
 
 [package]
-name = "pronto"
+name = "conda-pronto"
 version = "0.6.0"
 edition = "2024"
 description = "Build ready-to-run conda bootstrap binaries"

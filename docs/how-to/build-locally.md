@@ -1,15 +1,15 @@
 # Build Locally
 
 Use local builds while iterating on runtime package sets, channel choices, or
-Pronto runtime code.
+conda-pronto runtime code.
 
-Run local builds from a Pronto source checkout. `pronto build` builds the
+Run local builds from a conda-pronto source checkout. `pronto build` builds the
 generic `pronto-runtime` target from that checkout, copies it under the
 requested distribution name, and stamps the copy with runtime data.
 
 If you are changing a downstream distribution such as conda-express, keep the
 package-set decision in that downstream project, then reproduce the build with
-Pronto's source checkout or GitHub Action inputs.
+conda-pronto's source checkout or GitHub Action inputs.
 
 ## Refresh The Artifact Lock
 
@@ -20,7 +20,7 @@ pronto lock
 ```
 
 If you changed the `runtime` environment in `conda.toml`, refresh the source
-lockfile before deriving Pronto's runtime lock:
+lockfile before deriving conda-pronto's runtime lock:
 
 ```bash
 conda workspace lock
@@ -42,7 +42,7 @@ pronto lock --check
 
 ## Build A Named Distribution Binary
 
-`--name` is required. Pronto does not provide a default distribution name.
+`--name` is required. conda-pronto does not provide a default distribution name.
 
 ```bash
 pronto build --layout none --name serpe

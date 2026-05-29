@@ -1,4 +1,4 @@
-"""Conda plugin adapter for Pronto."""
+"""Conda plugin adapter for conda-pronto."""
 
 from __future__ import annotations
 

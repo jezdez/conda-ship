@@ -71,7 +71,7 @@ jobs:
 
       - name: Build smoke runtime
         shell: bash
-        run: pixi run -- cargo run -p pronto -- build --layout none --name demo --target-label "$TARGET"
+        run: pixi run -- cargo run -p conda-pronto -- build --layout none --name demo --target-label "$TARGET"
 
       - name: Smoke test built runtime
         shell: bash
@@ -86,7 +86,7 @@ jobs:
 
       - name: Build embedded bundle
         if: matrix.target == 'x86_64-unknown-linux-gnu'
-        run: pixi run -- cargo run -p pronto -- build --layout embedded --name demo --target-label "$TARGET"
+        run: pixi run -- cargo run -p conda-pronto -- build --layout embedded --name demo --target-label "$TARGET"
 
       - name: Smoke test embedded bundle
         if: matrix.target == 'x86_64-unknown-linux-gnu'

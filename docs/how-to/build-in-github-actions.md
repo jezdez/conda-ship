@@ -1,13 +1,13 @@
 # Build In GitHub Actions
 
-Use the composite action when a downstream distribution repository wants Pronto
+Use the composite action when a downstream distribution repository wants conda-pronto
 to build release artifacts in CI.
 
-The action is the public CI interface for Pronto-built binaries. Downstream
+The action is the public CI interface for conda-pronto-built binaries. Downstream
 repositories, including conda-express, pass their own package set and artifact
 name to this action instead of carrying a copy of the generic builder.
 
-The action checks out Pronto, applies the input overrides to that checkout, and
+The action checks out conda-pronto, applies the input overrides to that checkout, and
 builds and stamps the generic runtime from the checked-out source.
 
 ## Single-Platform Example
@@ -17,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: jezdez/pronto@main
+      - uses: jezdez/conda-pronto@main
         id: pronto
         with:
           name: serpe
@@ -35,14 +35,14 @@ jobs:
             ${{ steps.pronto.outputs.checksums-path }}
 ```
 
-Pin `jezdez/pronto` to a tag or commit SHA for release builds.
+Pin `jezdez/conda-pronto` to a tag or commit SHA for release builds.
 
 ## Embedded Bundle Example
 
 Set `embed-bundle` when the runtime must bootstrap without network access:
 
 ```yaml
-- uses: jezdez/pronto@main
+- uses: jezdez/conda-pronto@main
   id: pronto
   with:
     name: serpe
@@ -65,7 +65,7 @@ strategy:
 runs-on: ${{ matrix.os }}
 
 steps:
-  - uses: jezdez/pronto@main
+  - uses: jezdez/conda-pronto@main
     id: pronto
     with:
       name: serpe

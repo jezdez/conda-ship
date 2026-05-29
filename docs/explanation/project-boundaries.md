@@ -1,6 +1,6 @@
 # Project Boundaries
 
-Pronto builds ready-to-run conda bootstrap binaries. It is not itself a conda
+conda-pronto builds ready-to-run conda bootstrap binaries. It is not itself a conda
 distribution.
 
 The split from conda-express puts the generic pieces here and leaves
@@ -11,7 +11,7 @@ distribution policy in downstream projects.
 ::::{grid} 1 1 3 3
 :gutter: 3
 
-:::{grid-item-card} Pronto
+:::{grid-item-card} conda-pronto
 
 Generic builder, runtime behavior, artifact layouts, bundle handling, and
 metadata files.
@@ -31,9 +31,9 @@ handling.
 
 ::::
 
-## What Pronto Owns
+## What conda-pronto Owns
 
-Pronto owns the reusable build and runtime machinery:
+conda-pronto owns the reusable build and runtime machinery:
 
 - deriving a runtime lock from a conda or Pixi source lockfile
 - pruning excluded packages and exclusive dependencies after the solve
@@ -64,7 +64,7 @@ Downstream projects decide what their users get:
 - GitHub Release policy
 - constructor-based installers or enterprise package manager recipes
 
-Pronto produces the binaries and metadata those channels can distribute. It
+conda-pronto produces the binaries and metadata those channels can distribute. It
 does not decide whether every runtime includes the same conda plugins or uses
 the same name.
 
@@ -77,15 +77,15 @@ It owns the opinionated native conda package set, the `cx`/`cxz` names,
 Homebrew and shell-script installation, Docker images, PyPI and crates.io
 distribution wrappers, and release policy for those artifacts.
 
-When conda-express needs binaries, its workflows call Pronto with the
-conda-express package set and artifact names. Pronto does not hard-code those
+When conda-express needs binaries, its workflows call conda-pronto with the
+conda-express package set and artifact names. conda-pronto does not hard-code those
 choices. Its own scope page is
 {external+conda-express:doc}`Project scope <scope>`.
 
 ## conda-wasm
 
 Browser and WebAssembly work belongs in
-{external+conda-wasm:doc}`conda-wasm <index>`, not Pronto:
+{external+conda-wasm:doc}`conda-wasm <index>`, not conda-pronto:
 
 - WebAssembly crates
 - Emscripten conda patches
@@ -93,23 +93,23 @@ Browser and WebAssembly work belongs in
 - browser package extraction and solving behavior
 - emscripten-forge packaging
 
-Pronto is focused on native bootstrap binaries.
+conda-pronto is focused on native bootstrap binaries.
 
 ## Relationship To Other Tools
 
-Pronto complements other conda ecosystem tools:
+conda-pronto complements other conda ecosystem tools:
 
 | Tool | Role |
 | --- | --- |
-| conda-workspaces | Defines conda-native workspace manifests and lockfiles that Pronto can consume |
-| Pixi | Solves and records compatible runtime environments that Pronto can consume |
+| conda-workspaces | Defines conda-native workspace manifests and lockfiles that conda-pronto can consume |
+| Pixi | Solves and records compatible runtime environments that conda-pronto can consume |
 | rattler-build | Builds conda packages |
 | constructor | Builds OS installers |
-| Pronto | Builds bootstrap binaries that can be distributed directly or wrapped by other channels |
-| {external+conda-express:doc}`conda-express <index>` | A Pronto-based downstream distribution for `cx` and `cxz` |
+| conda-pronto | Builds bootstrap binaries that can be distributed directly or wrapped by other channels |
+| {external+conda-express:doc}`conda-express <index>` | A conda-pronto-based downstream distribution for `cx` and `cxz` |
 
-Pronto does not produce installer-generator output such as `.sh`, `.pkg`, or
-`.msi`. Those formats can wrap Pronto-built binaries when a downstream
+conda-pronto does not produce installer-generator output such as `.sh`, `.pkg`, or
+`.msi`. Those formats can wrap conda-pronto-built binaries when a downstream
 distribution needs them.
 
 ## What Moved From conda-express
@@ -126,5 +126,5 @@ belong here:
 - generated runtime command behavior
 
 The {external+conda-express:doc}`conda-express docs <index>` describe `cx`
-and `cxz` as products. Pronto docs describe how to build and reason about
+and `cxz` as products. conda-pronto docs describe how to build and reason about
 products like them.

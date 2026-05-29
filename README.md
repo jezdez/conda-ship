@@ -1,12 +1,12 @@
-# pronto
+# conda-pronto
 
 Build ready-to-run conda bootstrap binaries.
 
-`pronto` is a generic builder and runtime for single-binary conda
-distributions.
+`conda-pronto` is a generic builder and runtime for single-binary conda
+distributions. It installs the `pronto` CLI.
 
-`conda-express` is a downstream distribution that uses Pronto to publish the
-official `cx` and `cxz` binaries. Pronto owns the generic builder/runtime; a
+`conda-express` is a downstream distribution that uses conda-pronto to publish the
+official `cx` and `cxz` binaries. conda-pronto owns the generic builder/runtime; a
 downstream distribution owns its package set, binary names, release channels,
 and installer wrappers.
 
@@ -16,7 +16,7 @@ Artifact layouts:
 - `external`: `<name>` plus `<name>.bundle.tar.zst`.
 - `embedded`: `<name>z`, the runtime plus compressed bundle embedded in one binary.
 
-The local CLI builds from a Pronto source checkout:
+The local CLI builds from a conda-pronto source checkout:
 
 ```bash
 pronto lock
@@ -41,8 +41,8 @@ Generic runtime behavior stays here; opinionated package sets and distribution
 defaults belong in downstream distributions.
 
 `conda.toml` plus `conda.lock` is the preferred manifest/lockfile pair for new
-Pronto project metadata. `pixi.toml` plus `pixi.lock` remains supported for the
-Pixi-compatible workflow.
+conda-pronto project metadata. `pixi.toml` plus `pixi.lock` remains supported
+for the Pixi-compatible workflow.
 
 Historical builder release notes from `conda-express` live in
 [CHANGELOG.md](CHANGELOG.md).

@@ -1061,7 +1061,7 @@ fn stamp_runtime_data(
             .runtime_config
             .docs_url
             .clone()
-            .unwrap_or_else(|| "https://jezdez.github.io/pronto/".to_string()),
+            .unwrap_or_else(|| "https://jezdez.github.io/conda-pronto/".to_string()),
         install_method: None,
         runtime_config: runtime_data::RuntimeConfig {
             channels: derived.runtime_config.channels.clone(),

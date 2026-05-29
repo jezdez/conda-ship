@@ -1,13 +1,13 @@
-# AGENTS.md — pronto coding guidelines
+# AGENTS.md - conda-pronto coding guidelines
 
 ## Project structure
 
-- `pronto` is the generic build system for producing ready-to-run conda
-  bootstrap binaries.
+- `conda-pronto` is the generic build system for producing ready-to-run conda
+  bootstrap binaries. It installs the `pronto` CLI.
 
-- The Cargo workspace has one package, `pronto`, with two binaries:
+- The Cargo workspace has one package, `conda-pronto`, with two binaries:
   `pronto` for the builder CLI and `pronto-runtime` as the generic bootstrap
-  runtime template that Pronto stages into distribution artifacts.
+  runtime template that conda-pronto stages into distribution artifacts.
 
 - Do not add browser, WebAssembly, Emscripten, or JupyterLite behavior
   here. That work belongs in the separate `conda-wasm` repository.

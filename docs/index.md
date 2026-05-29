@@ -1,24 +1,24 @@
-# pronto
+# conda-pronto
 
 Build ready-to-run conda bootstrap binaries.
 
-`pronto` is a generic builder and runtime for single-binary conda
-distributions. It does not ship a first-party distribution runtime. Downstream
-projects choose the binary name, package set, channels, documentation URL, and
-release channel.
+`conda-pronto` is a generic builder and runtime for single-binary conda
+distributions. It installs the `pronto` CLI, but it does not ship a first-party
+distribution runtime. Downstream projects choose the binary name, package set,
+channels, documentation URL, and release channel.
 
-`conda-express` is one downstream distribution: it uses Pronto to build the
-official `cx` and `cxz` binaries. Pronto owns the reusable builder/runtime;
+`conda-express` is one downstream distribution: it uses conda-pronto to build the
+official `cx` and `cxz` binaries. conda-pronto owns the reusable builder/runtime;
 conda-express owns the product defaults and release channels for `cx`.
 
 :::{important}
-Pronto does not publish a default runtime binary named `pronto`. It builds
+conda-pronto does not publish a default runtime binary named `pronto`. It builds
 named downstream binaries such as `serpe`, `serpez`, `cx`, or `cxz`.
 :::
 
 ## Start Here
 
-If you are new to Pronto, build the tutorial runtime first. It gives you a
+If you are new to conda-pronto, build the tutorial runtime first. It gives you a
 working mental model for locks, artifacts, and the generated runtime command:
 
 ```bash
@@ -59,7 +59,7 @@ Find exact commands, options, artifact names, and configuration keys.
 :link: explanation/concepts
 :link-type: doc
 
-Read the builder/runtime model and where Pronto fits in the conda ecosystem.
+Read the builder/runtime model and where conda-pronto fits in the conda ecosystem.
 :::
 
 ::::
@@ -69,7 +69,7 @@ Read the builder/runtime model and where Pronto fits in the conda ecosystem.
 ::::{grid} 1 1 3 3
 :gutter: 3
 
-:::{grid-item-card} Pronto
+:::{grid-item-card} conda-pronto
 :link: explanation/project-boundaries
 :link-type: doc
 

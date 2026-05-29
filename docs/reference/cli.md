@@ -8,7 +8,7 @@ runtime binaries, see {doc}`runtime-cli`.
 The `conda-pronto` package also registers `conda pronto` as an adapter that
 delegates to this CLI. See {doc}`conda-plugin`.
 
-In this release, `pronto build` and `pronto run` require a Pronto source
+In this release, `pronto build` and `pronto run` require a conda-pronto source
 checkout because they build the generic `pronto-runtime` target from the
 selected root before stamping the staged artifact.
 
@@ -74,7 +74,7 @@ Options:
 - `--target TRIPLE`: pass a Rust target triple to `cargo build`.
 - `--out-dir PATH`: write staged artifacts somewhere other than `dist/`.
 - `--root PATH`: use a build root instead of auto-detecting one. For
-  `pronto build`, this root must be a Pronto source checkout.
+  `pronto build`, this root must be a conda-pronto source checkout.
 
 ## `pronto run`
 
@@ -95,7 +95,7 @@ Options:
 - `--layout embedded`: stage a runtime with the compressed bundle embedded.
 - `--platform PLATFORM`: choose the conda platform for metadata and bundles.
 - `--out-dir PATH`: write staged artifacts somewhere other than `dist/`.
-- `--root PATH`: use a Pronto source checkout instead of auto-detecting one.
+- `--root PATH`: use a conda-pronto source checkout instead of auto-detecting one.
 - `RUNTIME_ARGS`: arguments passed to the staged runtime after it is built.
 
 ## `pronto configure`

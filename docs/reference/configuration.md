@@ -1,24 +1,24 @@
 # Configuration Reference
 
-Pronto reads project intent from a conda-compatible manifest and concrete
+conda-pronto reads project intent from a conda-compatible manifest and concrete
 package records from the matching lockfile.
 
 The preferred manifest is `conda.toml` with `conda.lock`. `pixi.toml` with
-`pixi.lock` remains supported for compatibility with the original Pronto build
+`pixi.lock` remains supported for compatibility with the original conda-pronto build
 workflow.
 
-Downstream distributions can maintain these values in a Pronto checkout or pass
-overrides to the GitHub Action. Pronto treats the values as build input; it
+Downstream distributions can maintain these values in a conda-pronto checkout or pass
+overrides to the GitHub Action. conda-pronto treats the values as build input; it
 does not define a universal conda distribution.
 
 `pronto lock` and `pronto inspect` can read either manifest/lockfile pair.
-`pronto build` and `pronto run` still require a Pronto source checkout because
+`pronto build` and `pronto run` still require a conda-pronto source checkout because
 they build the generic runtime target from the selected root before stamping
 the staged artifact.
 
 ## Manifest Discovery
 
-Pronto looks in the build root for:
+conda-pronto looks in the build root for:
 
 1. `conda.toml`
 2. `pixi.toml`
@@ -32,7 +32,7 @@ The selected manifest determines the lockfile:
 
 `conda.lock` and `pixi.lock` are source lockfiles owned by their respective
 workspace tools. `target/pronto/runtime.lock` is generated build output owned
-by Pronto.
+by conda-pronto.
 
 ## Runtime Environment
 
@@ -53,7 +53,7 @@ runtime = { features = ["runtime"], no-default-feature = true }
 
 ## `[tool.pronto]`
 
-`[tool.pronto]` records Pronto-specific build policy:
+`[tool.pronto]` records conda-pronto-specific build policy:
 
 ```toml
 [tool.pronto]
@@ -64,7 +64,7 @@ docs-url = "https://example.com/serpe/"
 
 `environment`
 : Name of the solved environment to turn into the runtime lock. When omitted,
-  Pronto first tries `runtime`, then falls back to the default environment.
+  conda-pronto first tries `runtime`, then falls back to the default environment.
 
 `exclude`
 : Package names removed from the derived runtime lock, including dependencies
@@ -111,10 +111,10 @@ Non-alphanumeric characters in environment variable names become underscores.
 
 ## Downstream Defaults
 
-Pronto's repository default package set exists so the builder and runtime can be
+conda-pronto's repository default package set exists so the builder and runtime can be
 tested. A downstream distribution makes its own package choices and passes them
 through `pronto configure`, the GitHub Action inputs, or an equivalent release
 workflow.
 
 For example, conda-express passes its own package set when building `cx` and
-`cxz`; those package choices are conda-express policy, not Pronto policy.
+`cxz`; those package choices are conda-express policy, not conda-pronto policy.

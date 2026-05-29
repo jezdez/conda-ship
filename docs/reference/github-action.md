@@ -3,14 +3,14 @@
 The repository root provides a composite GitHub Action for downstream
 distribution repositories.
 
-The action checks out Pronto, builds the generic runtime from that checkout,
+The action checks out conda-pronto, builds the generic runtime from that checkout,
 and stamps the staged artifact with its inputs.
 
 The action does not read a downstream repository's own `conda.toml`; pass build
 policy through the action inputs.
 
 ```yaml
-- uses: jezdez/pronto@main
+- uses: jezdez/conda-pronto@main
   id: pronto
   with:
     name: serpe
@@ -22,11 +22,11 @@ policy through the action inputs.
 : Required distribution binary name. For example, conda-express passes `cx`.
 
 `packages`
-: Optional comma-separated conda package specs. When omitted, Pronto uses the
+: Optional comma-separated conda package specs. When omitted, conda-pronto uses the
   package specs in its runtime configuration.
 
 `channels`
-: Optional comma-separated conda channels. When omitted, Pronto uses the
+: Optional comma-separated conda channels. When omitted, conda-pronto uses the
   configured channels.
 
 `exclude`
@@ -34,7 +34,7 @@ policy through the action inputs.
   lock, including exclusive dependencies.
 
 `ref`
-: Git ref of Pronto to build from. Defaults to `main`.
+: Git ref of conda-pronto to build from. Defaults to `main`.
 
 `embed-bundle`
 : Set to `"true"` to embed package archives into the runtime binary. The output

@@ -3,17 +3,17 @@
 This tutorial builds a local conda bootstrap binary named `serpe` and runs it
 against a temporary prefix.
 
-`serpe` is the example binary name. Pronto itself provides the builder and
+`serpe` is the example binary name. conda-pronto itself provides the builder and
 generic runtime; it does not publish a default runtime binary.
 
 ## Prerequisites
 
-Run this tutorial from a Pronto source checkout. The checkout includes a
+Run this tutorial from a conda-pronto source checkout. The checkout includes a
 Pixi-compatible manifest, a lockfile, a solved `runtime` environment, and a
 `[tool.pronto]` section.
 
 In this release, `pronto build` builds the generic `pronto-runtime` target from
-the Pronto checkout, then stamps the staged copy with runtime data. Building
+the conda-pronto checkout, then stamps the staged copy with runtime data. Building
 directly from a downstream repository is separate packaging work.
 
 Make sure the `pronto` CLI is available on your `PATH`, then derive the runtime
@@ -24,7 +24,7 @@ pronto lock
 ```
 
 `pronto lock` derives the runtime lock from the selected solved environment and
-the Pronto runtime configuration, then writes it to `target/pronto/runtime.lock`.
+the conda-pronto runtime configuration, then writes it to `target/pronto/runtime.lock`.
 
 ## Inspect The Runtime Package Set
 
@@ -51,7 +51,7 @@ and `serpe.exe` on Windows.
 
 ## Smoke Test The Runtime
 
-Run the staged binary through Pronto:
+Run the staged binary through conda-pronto:
 
 ```bash
 pronto run --name serpe -- bootstrap --prefix /tmp/serpe

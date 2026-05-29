@@ -50,7 +50,7 @@ tar -I zstd -xf serpe.bundle.tar.zst -C /opt/serpe-bundle
 serpe bootstrap --prefix /opt/serpe --bundle /opt/serpe-bundle --offline
 ```
 
-Pronto also stamps a distribution-specific bundle environment variable into the
+conda-pronto also stamps a distribution-specific bundle environment variable into the
 runtime. For a distribution named `serpe`, that variable is
 `SERPE_BUNDLE`.
 

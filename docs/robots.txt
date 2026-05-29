@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://jezdez.github.io/pronto/sitemap.xml
+Sitemap: https://jezdez.github.io/conda-pronto/sitemap.xml

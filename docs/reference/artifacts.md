@@ -2,7 +2,7 @@
 
 Every `pronto build` writes a runtime binary plus metadata files. The runtime
 binary is the final stamped artifact. Downstream signing and attestation
-workflows run after Pronto writes these files.
+workflows run after conda-pronto writes these files.
 
 ## Layouts
 
@@ -16,7 +16,7 @@ On Windows, binary filenames also include `.exe`.
 
 ## Metadata Files
 
-For a `none` build named `serpe`, Pronto stages:
+For a `none` build named `serpe`, conda-pronto stages:
 
 - `serpe` or `serpe.exe`
 - `serpe.runtime.lock`
@@ -30,12 +30,12 @@ When `--target-label` is used, the label is inserted into the stem, for example
 For an `embedded` build, the stem uses the `z` suffix, for example
 `serpez.info.json` or `serpez-linux-64.info.json`.
 
-For an `external` build, Pronto also stages `serpe.bundle.tar.zst` or a
+For an `external` build, conda-pronto also stages `serpe.bundle.tar.zst` or a
 target-qualified equivalent.
 
 ## Stamped Runtime Data
 
-Pronto appends a runtime data block to every staged binary. The block contains
+conda-pronto appends a runtime data block to every staged binary. The block contains
 the runtime lock, runtime metadata, command names, default prefix, docs URL,
 bundle environment variable names, and the embedded bundle bytes for
 `embedded` builds.
@@ -47,7 +47,7 @@ The data block ends with:
 - bundle length
 - header SHA256
 - bundle SHA256, or the SHA256 of empty bytes when no embedded bundle is present
-- Pronto runtime-data magic bytes
+- conda-pronto runtime-data magic bytes
 
 The generated runtime validates the stamped header at startup. For embedded
 artifacts, it also verifies the bundle checksum before extracting package
@@ -55,7 +55,7 @@ archives during `bootstrap`.
 
 The binary checksum in `.sha256` covers the final stamped artifact. Release
 workflows pass that final file to Sigstore, in-toto or SLSA provenance, or
-platform signing after Pronto finishes staging.
+platform signing after conda-pronto finishes staging.
 
 ## Info JSON
 
