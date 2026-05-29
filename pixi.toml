@@ -54,8 +54,11 @@ conda = ">=25.1"
 pytest = ">=8.0"
 ruff = ">=0.15"
 
+[feature.test.pypi-dependencies]
+conda-pronto = { path = ".", editable = true }
+
 [feature.test.tasks]
-pytest = "PYTHONPATH=python pytest python/tests"
+pytest = "python -m pytest python/tests"
 ruff-check = "ruff check python pyproject.toml"
 ruff-format-check = "ruff format --check python pyproject.toml"
 
