@@ -69,14 +69,12 @@ runtime below the platform user data directory, such as
 
 ## Choose Runtime Packages
 
-A conda runtime typically needs at least:
+A conda-pronto runtime must include:
 
 - `python`
 - `conda`
-- a solver plugin, such as `conda-rattler-solver`
-
-If you want the generated runtime to follow the conda-express activation model,
-also include `conda-spawn`.
+- `conda-rattler-solver`
+- `conda-spawn`
 
 Additional plugins are a distribution decision. A downstream project records
 its own plugin set in its manifest and committed lockfile; conda-pronto does

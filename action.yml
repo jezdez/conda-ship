@@ -252,6 +252,11 @@ runs:
             exit 1
           fi
         elif [ -f "${root}/pyproject.toml" ]; then
+          if ! grep -Eq '^[[:space:]]*\[tool\.pixi(\]|\.)' "${root}/pyproject.toml"; then
+            echo "Found ${root}/pyproject.toml, but it does not contain a [tool.pixi] table." >&2
+            echo "Use conda.toml, pixi.toml, or a Pixi-compatible pyproject.toml." >&2
+            exit 1
+          fi
           if [ ! -f "${root}/pixi.lock" ]; then
             echo "Found ${root}/pyproject.toml but missing ${root}/pixi.lock." >&2
             echo "Commit a solved lockfile before building release artifacts." >&2

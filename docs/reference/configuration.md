@@ -56,6 +56,11 @@ runtime = { features = ["runtime"], no-default-feature = true }
 In Pixi's `pyproject.toml` layout, the same Pixi sections live below
 `[tool.pixi]`, for example `[tool.pixi.feature.runtime.dependencies]`.
 
+The selected environment must include `conda`, `conda-rattler-solver`, and
+`conda-spawn`. Generated runtimes delegate commands to conda, write
+`solver: rattler` into the installed `.condarc`, and implement `COMMAND shell`
+through conda-spawn.
+
 ## `[tool.pronto]`
 
 `[tool.pronto]` records conda-pronto-specific build policy:

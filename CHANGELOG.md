@@ -20,7 +20,8 @@ subcommand for conda installations that want plugin-style integration.
 - Built-in install schemes are `conda` for `~/.conda/INSTALL_NAME` and `data`
   for the platform user data directory.
 - Runtime metadata protects bootstrapped prefixes from accidental overwrite or
-  removal by the wrong generated runtime.
+  removal by the wrong generated runtime, and malformed runtime metadata is
+  rejected before use.
 - Generated runtimes also accept a global `--path` option for local override
   workflows where the default install location is not appropriate.
 - `pronto-runtime-template`, the generic runtime template used for generated
@@ -35,6 +36,8 @@ subcommand for conda installations that want plugin-style integration.
   trim packages from a solved environment before building a runtime.
 - Package and channel intent comes from the selected manifest environment and
   lockfile; `[tool.pronto]` is reserved for conda-pronto build policy.
+- Build validation requires the selected runtime environment to contain `conda`,
+  `conda-rattler-solver`, and `conda-spawn`, matching the generated runtime CLI.
 - Generated runtime `.condarc` files use the channels stamped into the runtime lock.
 - Runtime `--channel` and `--package` flags are available for live solves with
   `--no-lock`; lockfile-based builds use the committed lockfile contents.

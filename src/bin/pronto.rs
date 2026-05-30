@@ -208,6 +208,7 @@ enum Command {
 const PRONTO_STATE_DIR: &str = "target/pronto";
 const RUNTIME_LOCK_FILE: &str = "runtime.lock";
 const BUNDLE_ARCHIVE_FILE: &str = "bundle.tar.zst";
+const REQUIRED_RUNTIME_PACKAGES: &[&str] = &["conda", "conda-spawn", "conda-rattler-solver"];
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum BundleLayout {
@@ -386,6 +387,7 @@ fn derive_runtime_lock(root: &Path) -> DerivedRuntimeLock {
             total_excluded += removed.len();
             kept
         };
+        validate_required_runtime_packages(platform.name().as_str(), &filtered);
 
         total_packages += filtered.len();
         for pkg in filtered {
@@ -418,6 +420,24 @@ fn derive_runtime_lock(root: &Path) -> DerivedRuntimeLock {
         total_packages,
         total_excluded,
     }
+}
+
+fn validate_required_runtime_packages(platform: &str, packages: &[CondaPackageData]) {
+    let package_names: HashSet<String> = packages
+        .iter()
+        .map(|pkg| package_record(pkg).name.as_normalized().to_string())
+        .collect();
+    let missing: Vec<_> = REQUIRED_RUNTIME_PACKAGES
+        .iter()
+        .copied()
+        .filter(|name| !package_names.contains(*name))
+        .collect();
+
+    assert!(
+        missing.is_empty(),
+        "runtime environment for {platform} is missing required package(s): {}\n  Add them to the selected source environment or choose another source-environment.",
+        missing.join(", ")
+    );
 }
 
 fn discover_project_input(root: &Path) -> ProjectInput {
@@ -1853,6 +1873,28 @@ source-environment = "runtime"
         let (filtered, removed) = filter_excluded(&packages, &excludes);
         assert_eq!(removed, vec!["a", "b", "only-b", "shared"]);
         assert_eq!(filtered.len(), 1);
+    }
+
+    #[test]
+    fn test_validate_required_runtime_packages_accepts_runtime_contract() {
+        let packages = vec![
+            make_pkg("conda", &[]),
+            make_pkg("conda-spawn", &[]),
+            make_pkg("conda-rattler-solver", &[]),
+        ];
+
+        validate_required_runtime_packages("linux-64", &packages);
+    }
+
+    #[test]
+    #[should_panic(expected = "missing required package(s): conda-spawn")]
+    fn test_validate_required_runtime_packages_rejects_missing_runtime_package() {
+        let packages = vec![
+            make_pkg("conda", &[]),
+            make_pkg("conda-rattler-solver", &[]),
+        ];
+
+        validate_required_runtime_packages("linux-64", &packages);
     }
 
     #[test]

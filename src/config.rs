@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 
 use crate::{policy, runtime_data};
 
@@ -52,7 +52,7 @@ pub struct PrefixMetadata {
     pub packages: Vec<String>,
 }
 
-fn metadata_path(prefix: &Path) -> PathBuf {
+pub(crate) fn metadata_path(prefix: &Path) -> PathBuf {
     prefix.join(policy::metadata_file())
 }
 
@@ -73,16 +73,12 @@ pub fn write_metadata(
 
 pub fn read_metadata(prefix: &Path) -> miette::Result<PrefixMetadata> {
     let path = metadata_path(prefix);
-    if !path.exists() {
-        let config = embedded_config();
-        return Ok(PrefixMetadata {
-            version: "unknown".to_string(),
-            channels: config.channels.clone(),
-            packages: config.packages.clone(),
-        });
-    }
-    let data = std::fs::read_to_string(&path).into_diagnostic()?;
-    serde_json::from_str(&data).into_diagnostic()
+    let data = std::fs::read_to_string(&path)
+        .into_diagnostic()
+        .with_context(|| format!("failed to read runtime metadata at {}", path.display()))?;
+    serde_json::from_str(&data)
+        .into_diagnostic()
+        .with_context(|| format!("failed to parse runtime metadata at {}", path.display()))
 }
 
 // conda-meta/frozen (CEP 22).
@@ -188,20 +184,6 @@ mod tests {
             meta.version,
             env!("CARGO_PKG_VERSION"),
             "metadata version should match crate version"
-        );
-    }
-
-    #[test]
-    fn test_read_metadata_fallback() {
-        let tmp = TempDir::new().unwrap();
-
-        let meta = read_metadata(tmp.path()).unwrap();
-        let embedded = embedded_config();
-        assert_eq!(meta.channels, embedded.channels);
-        assert_eq!(meta.packages, embedded.packages);
-        assert_eq!(
-            meta.version, "unknown",
-            "fallback version should be 'unknown'"
         );
     }
 

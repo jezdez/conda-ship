@@ -16,7 +16,8 @@ mod tls;
 use cli::{Cli, Command, LockSource};
 use commands::{
     bootstrap, ensure_bootstrapped, is_bootstrapped, print_disabled_init,
-    print_disabled_shell_command, status, uninstall, validate_bootstrap_flags,
+    print_disabled_shell_command, require_managed_prefix, status, uninstall,
+    validate_bootstrap_flags,
 };
 
 fn main() -> miette::Result<()> {
@@ -150,6 +151,7 @@ async fn async_main() -> miette::Result<()> {
                 );
                 std::process::exit(1);
             }
+            require_managed_prefix(&prefix, "use")?;
             return exec::replace_process_with_conda(&prefix, &["--help"]);
         }
     }

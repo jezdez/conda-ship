@@ -106,6 +106,20 @@ fn test_runtime_bootstrap_refuses_unmanaged_prefix() {
         .stderr(predicate::str::contains("unmanaged install path"));
 }
 
+#[cfg(unix)]
+#[test]
+fn test_runtime_default_command_refuses_unmanaged_default_prefix() {
+    let tmp = TempDir::new().unwrap();
+    let prefix = tmp.path().join(".conda").join("pronto-runtime");
+    std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
+
+    runtime()
+        .env("HOME", tmp.path().as_os_str())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unmanaged install path"));
+}
+
 #[cfg_attr(not(feature = "online_tests"), ignore)]
 #[test]
 fn test_runtime_bootstrap_to_temp_prefix() {

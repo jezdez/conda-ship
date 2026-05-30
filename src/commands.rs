@@ -8,16 +8,13 @@ use rattler_conda_types::PrefixRecord;
 
 use crate::cli::{LockSource, Verbosity};
 use crate::config::{
-    embedded_config, embedded_lock, read_metadata, write_condarc, write_frozen, write_metadata,
+    PrefixMetadata, embedded_config, embedded_lock, read_metadata, write_condarc, write_frozen,
+    write_metadata,
 };
 use crate::{exec, install, policy};
 
 pub(crate) fn is_bootstrapped(prefix: &Path) -> bool {
     prefix.join("conda-meta").is_dir()
-}
-
-fn is_managed_prefix(prefix: &Path) -> bool {
-    prefix.join(policy::metadata_file()).is_file()
 }
 
 fn is_empty_dir(prefix: &Path) -> miette::Result<bool> {
@@ -30,21 +27,32 @@ fn is_empty_dir(prefix: &Path) -> miette::Result<bool> {
         .is_none())
 }
 
-fn reject_unmanaged_prefix(prefix: &Path, action: &str) -> miette::Result<()> {
-    if is_managed_prefix(prefix) {
-        return Ok(());
+pub(crate) fn require_managed_prefix(prefix: &Path, action: &str) -> miette::Result<()> {
+    read_managed_metadata(prefix, action).map(|_| ())
+}
+
+fn read_managed_metadata(prefix: &Path, action: &str) -> miette::Result<PrefixMetadata> {
+    let metadata_path = crate::config::metadata_path(prefix);
+    if !metadata_path.is_file() {
+        return Err(miette::miette!(
+            "refusing to {action} unmanaged install path: {}\n  Expected runtime metadata file: {}",
+            prefix.display(),
+            metadata_path.display()
+        ));
     }
 
-    Err(miette::miette!(
-        "refusing to {action} unmanaged install path: {}\n  Expected runtime metadata file: {}",
-        prefix.display(),
-        prefix.join(policy::metadata_file()).display()
-    ))
+    read_metadata(prefix).map_err(|err| {
+        miette::miette!(
+            "refusing to {action} unmanaged install path: {}\n  Invalid runtime metadata file: {}\n  {err}",
+            prefix.display(),
+            metadata_path.display()
+        )
+    })
 }
 
 pub(crate) async fn ensure_bootstrapped(prefix: &Path) -> miette::Result<()> {
     if is_bootstrapped(prefix) {
-        reject_unmanaged_prefix(prefix, "use")?;
+        require_managed_prefix(prefix, "use")?;
     } else {
         eprintln!(
             "{} No conda installation found. Bootstrapping now...",
@@ -138,7 +146,7 @@ pub(crate) async fn bootstrap(
     if prefix.exists() {
         if is_bootstrapped(prefix) {
             if !force {
-                reject_unmanaged_prefix(prefix, "use")?;
+                require_managed_prefix(prefix, "use")?;
                 eprintln!(
                     "{} conda is already installed at {}",
                     console::style("✔").green(),
@@ -158,7 +166,7 @@ pub(crate) async fn bootstrap(
     if force && prefix.exists() {
         reject_dangerous_prefix(prefix)?;
         if !is_empty_dir(prefix)? {
-            reject_unmanaged_prefix(prefix, "remove")?;
+            require_managed_prefix(prefix, "remove")?;
         }
         eprintln!(
             "{} Removing existing install path at {}",
@@ -300,9 +308,7 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
         eprintln!("No conda installation found at {}", prefix.display());
         return Ok(());
     }
-    reject_unmanaged_prefix(prefix, "inspect")?;
-
-    let meta = read_metadata(prefix)?;
+    let meta = read_managed_metadata(prefix, "inspect")?;
 
     let bundle_len = crate::config::embedded_bundle_len();
     let binary_name = policy::status_binary_name(bundle_len.is_some());
@@ -343,7 +349,7 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
         eprintln!("  Nothing to uninstall.");
         return Ok(());
     }
-    reject_unmanaged_prefix(prefix, "uninstall")?;
+    require_managed_prefix(prefix, "uninstall")?;
 
     let envs_dir = prefix.join("envs");
     let named_envs: Vec<String> = if envs_dir.is_dir() {
@@ -546,7 +552,7 @@ pub(crate) fn clean_path_entries_from_profiles(
     }
 }
 
-pub(crate) fn print_disabled_shell_command(command: &str) {
+pub(crate) fn print_disabled_shell_command(command: &str) -> ! {
     eprintln!(
         "{} `conda {command}` is not available in {}.",
         console::style("!").yellow().bold(),
@@ -570,7 +576,7 @@ pub(crate) fn print_disabled_shell_command(command: &str) {
     std::process::exit(1);
 }
 
-pub(crate) fn print_disabled_init() {
+pub(crate) fn print_disabled_init() -> ! {
     eprintln!(
         "{} `conda init` is not needed with {}.",
         console::style("!").yellow().bold(),
@@ -663,6 +669,21 @@ mod tests {
         assert!(
             result.is_ok(),
             "status on bootstrapped prefix should succeed"
+        );
+    }
+
+    #[test]
+    fn test_status_refuses_invalid_runtime_metadata() {
+        let tmp = TempDir::new().unwrap();
+        let prefix = tmp.path();
+
+        std::fs::create_dir(prefix.join("conda-meta")).unwrap();
+        std::fs::write(crate::config::metadata_path(prefix), "not json").unwrap();
+
+        let err = status(prefix).unwrap_err().to_string();
+        assert!(
+            err.contains("Invalid runtime metadata file"),
+            "status should reject invalid runtime metadata, got: {err}"
         );
     }
 

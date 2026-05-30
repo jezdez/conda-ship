@@ -2,7 +2,6 @@
 //!
 //! This module is shared by the builder and runtime binaries. The builder uses
 //! the writer path, while the runtime uses the reader path.
-#![allow(dead_code)]
 
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
@@ -14,6 +13,7 @@ use sha2::{Digest, Sha256};
 const FOOTER_MAGIC: &[u8; 16] = b"PRONTO_DATA_V001";
 const FORMAT_VERSION: u32 = 1;
 const FOOTER_LEN: usize = 8 + 8 + 32 + 32 + 4 + FOOTER_MAGIC.len();
+#[allow(dead_code)]
 const MAX_HEADER_LEN: u64 = 16 * 1024 * 1024;
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -27,6 +27,7 @@ pub struct RuntimeConfig {
 }
 
 impl RuntimeConfig {
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.channels.is_empty() && self.packages.is_empty() && self.exclude.is_empty()
     }
@@ -48,15 +49,6 @@ pub enum InstallScheme {
     #[default]
     Conda,
     Data,
-}
-
-impl InstallScheme {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Conda => "conda",
-            Self::Data => "data",
-        }
-    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -106,6 +98,7 @@ impl Default for RuntimeDataHeader {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct EmbeddedBundle {
     executable: PathBuf,
@@ -114,6 +107,7 @@ pub struct EmbeddedBundle {
     sha256: [u8; 32],
 }
 
+#[allow(dead_code)]
 impl EmbeddedBundle {
     pub fn len(&self) -> u64 {
         self.len
@@ -135,6 +129,7 @@ impl EmbeddedBundle {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
 pub struct RuntimeData {
     pub header: RuntimeDataHeader,
@@ -142,16 +137,19 @@ pub struct RuntimeData {
     pub stamped: bool,
 }
 
+#[allow(dead_code)]
 static CURRENT_RUNTIME_DATA: LazyLock<RuntimeData> = LazyLock::new(|| match from_current_exe() {
     Ok(Some(data)) => data,
     Ok(None) => RuntimeData::default(),
     Err(err) => panic!("invalid conda-pronto runtime data: {err}"),
 });
 
+#[allow(dead_code)]
 pub fn current() -> &'static RuntimeData {
     &CURRENT_RUNTIME_DATA
 }
 
+#[allow(dead_code)]
 pub fn append_to_binary(
     binary: &Path,
     header: &RuntimeDataHeader,
@@ -201,11 +199,13 @@ pub fn append_to_binary(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn from_current_exe() -> io::Result<Option<RuntimeData>> {
     let exe = std::env::current_exe()?;
     read_from_path(&exe)
 }
 
+#[allow(dead_code)]
 pub fn read_from_path(path: &Path) -> io::Result<Option<RuntimeData>> {
     let mut file = File::open(path)?;
     let file_len = file.metadata()?.len();
@@ -273,6 +273,7 @@ pub fn read_from_path(path: &Path) -> io::Result<Option<RuntimeData>> {
     }))
 }
 
+#[allow(dead_code)]
 struct DecodedFooter {
     header_len: u64,
     bundle_len: u64,
@@ -280,6 +281,7 @@ struct DecodedFooter {
     bundle_sha256: [u8; 32],
 }
 
+#[allow(dead_code)]
 fn encode_footer(
     header_len: u64,
     bundle_len: u64,
@@ -296,6 +298,7 @@ fn encode_footer(
     footer
 }
 
+#[allow(dead_code)]
 fn decode_footer(footer: &[u8; FOOTER_LEN]) -> io::Result<Option<DecodedFooter>> {
     if &footer[84..100] != FOOTER_MAGIC {
         return Ok(None);
@@ -321,6 +324,7 @@ fn decode_footer(footer: &[u8; FOOTER_LEN]) -> io::Result<Option<DecodedFooter>>
     }))
 }
 
+#[allow(dead_code)]
 fn hash_file_range(file: &mut File, offset: u64, len: u64) -> io::Result<[u8; 32]> {
     file.seek(SeekFrom::Start(offset))?;
     let mut remaining = len;
