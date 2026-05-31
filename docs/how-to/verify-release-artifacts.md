@@ -26,6 +26,10 @@ release assets.
 Self-hosted runners must provide the GitHub CLI because the action calls
 `gh attestation verify`.
 
+conda-ship releases are immutable after publication. If a released asset set is
+wrong, use a newer release tag instead of expecting the existing tag or files to
+change.
+
 ## Verify Staged Checksums
 
 Every `cs build` writes a `.sha256` file next to the runtime and metadata:
@@ -93,14 +97,49 @@ find /tmp/demo-bundle -maxdepth 2 -type f
 The runtime verifies package archive hashes against the runtime lock before
 installing. Embedded bundles are verified by the runtime before extraction.
 
-## Add Downstream Signing
+## Add Downstream Signing And Release Controls
 
 conda-ship does not sign downstream runtime artifacts. Sign after `cs build`,
 when the final files are staged and checksums are written.
 
-Good downstream signing points are:
+In GitHub Actions, attest the complete `dist-path` output:
+
+```{warning}
+Use the latest reviewed `actions/attest` release in your workflow and pin it by
+commit SHA. The SHA below is an example, not a recommendation to keep using that
+exact revision indefinitely.
+```
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+steps:
+  - uses: jezdez/conda-ship@v0.1.0
+    id: cs
+
+  - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+    with:
+      subject-path: ${{ steps.cs.outputs.dist-path }}/*
+```
+
+That attests the runtime binary, `.runtime.lock`, `.packages.txt`,
+`.info.json`, `.sha256`, and the optional external bundle as the output of the
+downstream workflow. Verify a published file against that workflow identity:
+
+```bash
+gh attestation verify dist/demo \
+  --repo OWNER/REPO \
+  --signer-workflow OWNER/REPO/.github/workflows/release.yml
+```
+
+Good downstream controls include:
 
 - GitHub Release artifact attestations
+- GitHub release immutability
 - Sigstore signing for uploaded artifacts
 - in-toto provenance around the packaging workflow
 - platform-specific signing for installer wrappers
@@ -108,4 +147,3 @@ Good downstream signing points are:
 Keep signing outside the generic runtime. A runtime built by conda-ship may be
 wrapped by several downstream channels, and each channel owns its own trust
 policy.
-

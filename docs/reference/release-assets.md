@@ -16,6 +16,9 @@ Tagged conda-ship releases publish builder assets:
 `SHA256SUMS`
 : Checksums for release assets.
 
+Published release assets are immutable. A tag represents one complete asset set;
+fixes use a new tag rather than replacing files under an existing tag.
+
 Target examples:
 
 ```text
@@ -116,4 +119,3 @@ The composite action exposes:
 
 `bundle-path`
 : External bundle path when present.
-

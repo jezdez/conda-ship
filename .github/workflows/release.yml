@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to build and upload."
+        description: "Existing tag to build into a new immutable release."
         required: true
         type: string
 
@@ -108,7 +108,7 @@ jobs:
     needs: build-assets
 
     permissions:
-      contents: write # create or update the GitHub release for this tag
+      contents: write # create the immutable GitHub release for this tag
       id-token: write # mint the OIDC token required for artifact attestations
       attestations: write # publish provenance attestations for release metadata
       artifact-metadata: write # create artifact storage records for attestations
@@ -139,12 +139,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
+          set -euo pipefail
+
+          shopt -s nullglob
           files=(release-assets/*)
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
-          else
-            gh release create "$RELEASE_TAG" "${files[@]}" \
-              --verify-tag \
-              --title "$RELEASE_TAG" \
-              --notes "conda-ship ${RELEASE_TAG}"
+            echo "Release ${RELEASE_TAG} already exists." >&2
+            echo "Release immutability is enabled; create a new tag instead of replacing assets." >&2
+            exit 1
           fi
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release assets found." >&2
+            exit 1
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            --draft \
+            --verify-tag \
+            --title "$RELEASE_TAG" \
+            --notes "conda-ship ${RELEASE_TAG}"
+
+          cleanup_draft() {
+            gh release delete "$RELEASE_TAG" --yes >/dev/null 2>&1 || true
+          }
+          trap cleanup_draft ERR
+
+          gh release upload "$RELEASE_TAG" "${files[@]}"
+          gh release edit "$RELEASE_TAG" --draft=false
+
+          trap - ERR

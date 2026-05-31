@@ -148,3 +148,46 @@ runtime, optional external bundle, `.info.json`, `.runtime.lock`,
 `.packages.txt`, and `.sha256` files for that build. The individual path
 outputs are still available when release tooling or package-manager wrappers
 need to address one file directly.
+
+## Attest Runtime Outputs
+
+For release workflows, attest the complete `dist-path` before publishing or
+wrapping the files. This records the GitHub workflow identity that produced the
+runtime output set.
+
+```{warning}
+Use the latest reviewed `actions/attest` release in your workflow and pin it by
+commit SHA. The SHA below is an example, not a recommendation to keep using that
+exact revision indefinitely.
+```
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: jezdez/conda-ship@v0.1.0
+        id: cs
+
+      - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ steps.cs.outputs.dist-path }}/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.cs.outputs.asset-name }}
+          path: ${{ steps.cs.outputs.dist-path }}
+```
+
+The attestation covers the runtime binary, `.runtime.lock`, `.packages.txt`,
+`.info.json`, `.sha256`, and the optional external bundle for that job. Keep
+package-manager signing and platform installer signing as separate downstream
+steps when those distribution channels require them.

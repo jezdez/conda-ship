@@ -18,6 +18,11 @@ published SHA256 sums before running `cs`.
 This protects the builder path from accidentally executing an unverified
 downloaded binary in CI.
 
+Published conda-ship GitHub releases are immutable. The release workflow creates
+a draft release, uploads the complete asset set, and publishes the release once.
+After publication, the tag and assets are not replaced. If a release is wrong,
+the project should publish a new version instead of modifying the existing one.
+
 ## Source Lock Trust
 
 The source lockfile is committed project input. conda-ship assumes the
@@ -54,10 +59,14 @@ Every staged build writes checksums and metadata:
 These files describe and verify what conda-ship produced. They are not a
 replacement for signing.
 
-## Downstream Signing
+## Downstream Signing And Attestation
 
-Sign after conda-ship has staged the final files. Good places for downstream
-signing include:
+Sign or attest after conda-ship has staged the final files. The GitHub Action
+exposes `dist-path` so downstream workflows can attest the complete output set:
+the runtime binary, `.runtime.lock`, `.packages.txt`, `.info.json`, `.sha256`,
+and optional external bundle.
+
+Good places for downstream release controls include:
 
 - GitHub Release artifact attestations
 - Sigstore signatures
@@ -67,6 +76,9 @@ signing include:
 
 Signing belongs downstream because one runtime can be distributed through
 several channels, and each channel has different trust requirements.
+GitHub release immutability is useful downstream too, but it is not a
+replacement for signing. It keeps a published asset set stable; attestations and
+signatures explain who produced that asset set and from which workflow.
 
 ## What conda-ship Does Not Promise
 
@@ -80,4 +92,3 @@ conda-ship does not:
 
 It provides reproducible build output, narrow runtime verification, and metadata
 that downstream release systems can sign.
-

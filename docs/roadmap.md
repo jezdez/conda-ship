@@ -50,8 +50,7 @@ runtimes without a conda-ship source checkout.
 
 Current follow-up work is mostly distribution hardening:
 
-- document downstream signing and provenance workflows around the staged
-  `.sha256`, `.info.json`, `.runtime.lock`, and runtime artifacts
+- add richer provenance examples for package-manager specific release workflows
 - keep the GitHub Action intentionally lockfile-first, with package and channel
   changes made in committed project manifests rather than action inputs
 - add Windows ARM64 release assets only after the conda package ecosystem has
