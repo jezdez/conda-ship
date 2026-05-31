@@ -6,7 +6,7 @@
   runtimes. It installs the `cs` CLI.
 
 - The Cargo workspace has one package, `conda-ship`, with two binaries:
-  `cs` for the builder CLI and `conda-ship-runtime` as the generic runtime
+  `cs` for the builder CLI and `cs-template` as the generic runtime
   template that conda-ship stages into distribution artifacts.
 
 - Do not add browser, WebAssembly, Emscripten, or JupyterLite behavior

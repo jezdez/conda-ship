@@ -150,7 +150,7 @@ runs:
         echo "tool_dir=${tool_dir}" >> "$GITHUB_OUTPUT"
         echo "repository=${repository}" >> "$GITHUB_OUTPUT"
         echo "cs_asset=cs-${target}${ext}" >> "$GITHUB_OUTPUT"
-        echo "template_asset=cs-runtime-template-${target}${ext}" >> "$GITHUB_OUTPUT"
+        echo "template_asset=cs-template-${target}${ext}" >> "$GITHUB_OUTPUT"
 
     - name: Download conda-ship
       id: download

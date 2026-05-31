@@ -1,8 +1,0 @@
----
-source: src/config.rs
-assertion_line: 230
-expression: contents
----
-{
-  "message": "This base environment is managed by conda-ship-runtime.\nCreate a new environment instead: conda create -n myenv\nTo re-bootstrap: conda-ship-runtime bootstrap --force\nTo override: pass --override-frozen-env"
-}

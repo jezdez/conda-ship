@@ -31,7 +31,7 @@ publish = false
 default-run = "cs"
 
 [[bin]]
-name = "conda-ship-runtime"
+name = "cs-template"
 path = "src/main.rs"
 required-features = ["runtime-template"]
 

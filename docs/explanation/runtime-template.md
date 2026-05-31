@@ -32,14 +32,14 @@ For packaged builds, the template is downloaded from conda-ship's GitHub
 Release assets. The asset name includes the platform it runs on, for example:
 
 ```text
-cs-runtime-template-x86_64-unknown-linux-gnu
-cs-runtime-template-aarch64-apple-darwin
-cs-runtime-template-x86_64-pc-windows-msvc.exe
+cs-template-x86_64-unknown-linux-gnu
+cs-template-aarch64-apple-darwin
+cs-template-x86_64-pc-windows-msvc.exe
 ```
 
 You usually only see those names when wiring a packaging job. The GitHub Action
 downloads the matching template automatically. A packaged `cs` CLI looks for
-an installed `cs-runtime-template` next to the `cs` executable; it does not
+an installed `cs-template` next to the `cs` executable; it does not
 search arbitrary `PATH` entries for a template. `--template PATH` is an
 override for custom packaging or cross-builds.
 

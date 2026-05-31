@@ -9,7 +9,7 @@ committed manifest and lockfile. The action reads that project input and stamps
 a runtime instead of carrying a copy of the generic builder.
 
 Pin the action to a conda-ship release tag. The action downloads the matching
-`cs` and `cs-runtime-template` release assets, verifies their GitHub
+`cs` and `cs-template` release assets, verifies their GitHub
 artifact attestations and release `SHA256SUMS`, and stamps the generated
 runtime. It runs `cs build --dry-run` before the real build so manifest,
 lockfile, naming, template, install location, and bundle metadata issues fail

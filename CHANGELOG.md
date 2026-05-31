@@ -29,12 +29,12 @@ integration.
   stamped install method to print a package-manager hint for the runtime binary.
 - Generated runtimes also accept a global `--path` option for local override
   workflows where the default install location is not appropriate.
-- `cs-runtime-template`, the generic runtime template used for generated
+- `cs-template`, the generic runtime template used for generated
   downstream binaries.
 - Support for `conda.toml` with `conda.lock`, `pyproject.toml` with
   `[tool.conda]` and `conda.lock`, `pixi.toml` with `pixi.lock`, and
   `pyproject.toml` with `[tool.pixi]` and `pixi.lock`.
-- Packaged `cs` builds discover an installed `cs-runtime-template`
+- Packaged `cs` builds discover an installed `cs-template`
   automatically; `--template` remains available for explicit template paths,
   custom packaging, and cross-builds.
 - `cs build` can read runtime name, delegate executable, layout, install
@@ -70,7 +70,7 @@ integration.
   `conda-ship` assets.
 - Staged build metadata for generated runtimes includes `.runtime.lock`,
   `.packages.txt`, `.info.json`, and `.sha256` files.
-- Release assets for tagged builds: `cs`, `cs-runtime-template`, and
+- Release assets for tagged builds: `cs`, `cs-template`, and
   `SHA256SUMS`.
 - Runtime template assets refuse to run directly; `cs build` must stamp a
   copy before it becomes a downstream runtime.
@@ -82,7 +82,7 @@ integration.
 - Cached, downloaded, embedded, and offline package archives are verified before
   they are staged or installed.
 - The GitHub Action verifies artifact attestations for downloaded `cs`,
-  `cs-runtime-template`, and `SHA256SUMS` assets before running them.
+  `cs-template`, and `SHA256SUMS` assets before running them.
 - GitHub workflows and the composite action use pinned actions, minimal
   permissions, explicit artifact verification, and no shell `eval` for user
   inputs.

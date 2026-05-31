@@ -333,7 +333,7 @@ fn test_artifact_stem_external_keeps_base_name() {
 #[test]
 fn test_stage_artifacts_external_outputs_bundle_and_metadata() {
     let tmp = TempDir::new().unwrap();
-    let source_binary = tmp.path().join("runtime-template");
+    let source_binary = tmp.path().join("cs-template");
     let source_bundle = tmp.path().join("bundle.tar.zst");
     std::fs::write(&source_binary, b"runtime template").unwrap();
     std::fs::write(&source_bundle, b"bundle archive").unwrap();

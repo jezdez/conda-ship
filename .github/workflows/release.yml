@@ -78,7 +78,7 @@ jobs:
         run: pixi run -- cargo build --locked --release --bin cs
 
       - name: Build runtime template
-        run: pixi run -- cargo build --locked --release --bin conda-ship-runtime --features runtime-template
+        run: pixi run -- cargo build --locked --release --bin cs-template --features runtime-template
 
       - name: Stage release assets
         shell: bash
@@ -89,7 +89,7 @@ jobs:
             ext=".exe"
           fi
           cp "target/release/cs${ext}" "release-assets/cs-${TARGET}${ext}"
-          cp "target/release/conda-ship-runtime${ext}" "release-assets/cs-runtime-template-${TARGET}${ext}"
+          cp "target/release/cs-template${ext}" "release-assets/cs-template-${TARGET}${ext}"
 
       - name: Attest release assets
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0

@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_parse_bootstrap_defaults() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "bootstrap"]);
+        let cli = Cli::parse_from(["cs-template", "bootstrap"]);
         assert!(cli.path.is_none());
         assert_matches!(
             cli.command,
@@ -182,35 +182,30 @@ mod tests {
 
     #[test]
     fn test_parse_global_path_for_bootstrap() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "--path", "/tmp/test", "bootstrap"]);
+        let cli = Cli::parse_from(["cs-template", "--path", "/tmp/test", "bootstrap"]);
         assert_eq!(cli.path.as_deref(), Some(std::path::Path::new("/tmp/test")));
         assert_matches!(cli.command, Some(Command::Bootstrap { force: false, .. }));
     }
 
     #[test]
     fn test_parse_status() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "status"]);
+        let cli = Cli::parse_from(["cs-template", "status"]);
         assert_matches!(cli.command, Some(Command::Status));
     }
 
     #[test]
     fn test_parse_status_with_global_path() {
-        let cli = Cli::parse_from([
-            "conda-ship-runtime",
-            "--path",
-            "/opt/conda-ship-runtime",
-            "status",
-        ]);
+        let cli = Cli::parse_from(["cs-template", "--path", "/opt/cs-template", "status"]);
         assert_eq!(
             cli.path.as_deref(),
-            Some(std::path::Path::new("/opt/conda-ship-runtime"))
+            Some(std::path::Path::new("/opt/cs-template"))
         );
         assert_matches!(cli.command, Some(Command::Status));
     }
 
     #[test]
     fn test_parse_shell_with_env() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "shell", "myenv"]);
+        let cli = Cli::parse_from(["cs-template", "shell", "myenv"]);
         assert_matches!(
             cli.command,
             Some(Command::Shell { env: Some(ref e), ref args }) if e == "myenv" && args.is_empty()
@@ -219,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_parse_shell_no_env() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "shell"]);
+        let cli = Cli::parse_from(["cs-template", "shell"]);
         assert_matches!(
             cli.command,
             Some(Command::Shell {
@@ -231,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_parse_shell_extra_args() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "shell", "myenv", "--", "python", "-q"]);
+        let cli = Cli::parse_from(["cs-template", "shell", "myenv", "--", "python", "-q"]);
         assert_matches!(
             cli.command,
             Some(Command::Shell {
@@ -244,22 +239,22 @@ mod tests {
 
     #[test]
     fn test_parse_uninstall_yes() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "uninstall", "--yes"]);
+        let cli = Cli::parse_from(["cs-template", "uninstall", "--yes"]);
         assert_matches!(cli.command, Some(Command::Uninstall { yes: true }));
     }
 
     #[test]
     fn test_parse_uninstall_with_global_path() {
         let cli = Cli::parse_from([
-            "conda-ship-runtime",
+            "cs-template",
             "--path",
-            "/opt/conda-ship-runtime",
+            "/opt/cs-template",
             "uninstall",
             "-y",
         ]);
         assert_eq!(
             cli.path.as_deref(),
-            Some(std::path::Path::new("/opt/conda-ship-runtime"))
+            Some(std::path::Path::new("/opt/cs-template"))
         );
         assert_matches!(cli.command, Some(Command::Uninstall { yes: true, .. }));
     }
@@ -267,15 +262,15 @@ mod tests {
     #[test]
     fn test_parse_global_path_for_passthrough() {
         let cli = Cli::parse_from([
-            "conda-ship-runtime",
+            "cs-template",
             "--path",
-            "/opt/conda-ship-runtime",
+            "/opt/cs-template",
             "install",
             "numpy",
         ]);
         assert_eq!(
             cli.path.as_deref(),
-            Some(std::path::Path::new("/opt/conda-ship-runtime"))
+            Some(std::path::Path::new("/opt/cs-template"))
         );
         assert_matches!(
             cli.command,
@@ -286,7 +281,7 @@ mod tests {
 
     #[test]
     fn test_parse_no_args() {
-        let cli = Cli::parse_from(["conda-ship-runtime"]);
+        let cli = Cli::parse_from(["cs-template"]);
         assert!(
             cli.command.is_none(),
             "bare `runtime` should have no command"
@@ -295,46 +290,45 @@ mod tests {
 
     #[test]
     fn test_parse_verbose_flag() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "--verbose", "bootstrap"]);
+        let cli = Cli::parse_from(["cs-template", "--verbose", "bootstrap"]);
         assert_eq!(cli.verbosity(), Verbosity::Verbose);
     }
 
     #[test]
     fn test_parse_quiet_flag() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "--quiet", "bootstrap"]);
+        let cli = Cli::parse_from(["cs-template", "--quiet", "bootstrap"]);
         assert_eq!(cli.verbosity(), Verbosity::Quiet);
     }
 
     #[test]
     fn test_parse_short_verbose_flag() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "-v", "status"]);
+        let cli = Cli::parse_from(["cs-template", "-v", "status"]);
         assert_eq!(cli.verbosity(), Verbosity::Verbose);
     }
 
     #[test]
     fn test_parse_short_quiet_flag() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "-q", "status"]);
+        let cli = Cli::parse_from(["cs-template", "-q", "status"]);
         assert_eq!(cli.verbosity(), Verbosity::Quiet);
     }
 
     #[test]
     fn test_parse_no_verbosity_flags() {
-        let cli = Cli::parse_from(["conda-ship-runtime", "bootstrap"]);
+        let cli = Cli::parse_from(["cs-template", "bootstrap"]);
         assert_eq!(cli.verbosity(), Verbosity::Normal);
     }
 
     #[test]
     fn test_verbose_quiet_conflict() {
-        let result =
-            Cli::try_parse_from(["conda-ship-runtime", "--verbose", "--quiet", "bootstrap"]);
+        let result = Cli::try_parse_from(["cs-template", "--verbose", "--quiet", "bootstrap"]);
         assert!(result.is_err(), "--verbose and --quiet should conflict");
     }
 
     #[rstest]
-    #[case::bundle_only(&["conda-ship-runtime", "bootstrap", "--bundle", "/tmp/pkgs"], Some("/tmp/pkgs"), false)]
-    #[case::offline_only(&["conda-ship-runtime", "bootstrap", "--offline"], None, true)]
-    #[case::both(&["conda-ship-runtime", "bootstrap", "--bundle", "/p", "--offline"], Some("/p"), true)]
-    #[case::defaults(&["conda-ship-runtime", "bootstrap"], None, false)]
+    #[case::bundle_only(&["cs-template", "bootstrap", "--bundle", "/tmp/pkgs"], Some("/tmp/pkgs"), false)]
+    #[case::offline_only(&["cs-template", "bootstrap", "--offline"], None, true)]
+    #[case::both(&["cs-template", "bootstrap", "--bundle", "/p", "--offline"], Some("/p"), true)]
+    #[case::defaults(&["cs-template", "bootstrap"], None, false)]
     fn test_parse_bootstrap_offline_flags(
         #[case] args: &[&str],
         #[case] expected_bundle: Option<&str>,

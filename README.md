@@ -40,7 +40,7 @@ Every `cs build` writes the runtime binary plus artifact metadata: the
 runtime lock, a tab-separated package list, an info JSON document, and SHA256
 checksums. The runtime is stamped with the runtime lock, distribution
 metadata, and optional embedded bundle before checksums are written. The GitHub
-Action downloads tagged `cs` and runtime-template release assets, verifies
+Action downloads tagged `cs` and `cs-template` release assets, verifies
 their GitHub attestations and `SHA256SUMS`, and then uses the same stamping path
 against a committed downstream manifest and lockfile.
 

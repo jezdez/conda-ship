@@ -7,7 +7,7 @@ This runtime installs a conda environment from a stamped lockfile.
 
 After bootstrap, commands are passed through to the configured delegate executable.
 
-Usage: conda-ship-runtime [OPTIONS] [COMMAND]
+Usage: cs-template [OPTIONS] [COMMAND]
 
 Commands:
   bootstrap  Bootstrap a fresh conda installation into the install path
@@ -34,19 +34,19 @@ Options:
 
 Quick start:
 
-  conda-ship-runtime bootstrap                           Install conda into ~/.conda/conda-ship-runtime
-  conda-ship-runtime create -n myenv python=3.12 numpy   Create an environment
-  conda-ship-runtime shell myenv                         Activate (spawns a subshell)
+  cs-template bootstrap                           Install conda into ~/.conda/cs-template
+  cs-template create -n myenv python=3.12 numpy   Create an environment
+  cs-template shell myenv                         Activate (spawns a subshell)
   exit                                   Leave the environment
 
 Management:
 
-  conda-ship-runtime status                              Show installation details
-  conda-ship-runtime uninstall                           Remove the install path and environments
+  cs-template status                              Show installation details
+  cs-template uninstall                           Remove the install path and environments
 
 Pass-through:
 
   Any command not listed above is passed through to conda:
-  conda-ship-runtime install, conda-ship-runtime remove, conda-ship-runtime list, conda-ship-runtime env, conda-ship-runtime info, conda-ship-runtime config, ...
+  cs-template install, cs-template remove, cs-template list, cs-template env, cs-template info, cs-template config, ...
 
 Docs: https://jezdez.github.io/conda-ship/

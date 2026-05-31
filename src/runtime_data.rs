@@ -94,7 +94,7 @@ impl RuntimeDataHeader {
 
 impl Default for RuntimeDataHeader {
     fn default() -> Self {
-        Self::for_name("conda-ship-runtime")
+        Self::for_name("cs-template")
     }
 }
 

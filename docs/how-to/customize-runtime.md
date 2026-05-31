@@ -12,7 +12,7 @@ owned by your distribution.
 The manifest examples below describe the build input conda-ship consumes.
 Packaged CLI builds find the runtime template installed next to `cs`
 automatically. Source checkouts need either a packaged install that includes
-`cs-runtime-template` or an explicit `--template` path.
+`cs-template` or an explicit `--template` path.
 
 ## Choose A Runtime Name
 

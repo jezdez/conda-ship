@@ -77,13 +77,13 @@ jobs:
         run: pixi run test
 
       - name: Build runtime template
-        run: pixi run -- cargo build --locked --release --bin conda-ship-runtime --features runtime-template
+        run: pixi run -- cargo build --locked --release --bin cs-template --features runtime-template
 
       - name: Build smoke runtime
         shell: bash
         run: |
           cs="./target/release/cs"
-          template="./target/release/conda-ship-runtime"
+          template="./target/release/cs-template"
           if [[ "$TARGET" == *"windows"* ]]; then
             cs="${cs}.exe"
             template="${template}.exe"
@@ -116,7 +116,7 @@ jobs:
             --delegate conda \
             --target "$TARGET" \
             --target-label "$TARGET" \
-            --template ./target/release/conda-ship-runtime
+            --template ./target/release/cs-template
 
       - name: Smoke test embedded bundle
         if: matrix.target == 'x86_64-unknown-linux-gnu'

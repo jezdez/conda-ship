@@ -1,4 +1,4 @@
-//! Integration tests for the conda-ship-runtime binary using assert_cmd.
+//! Integration tests for the cs-template binary using assert_cmd.
 #![cfg(feature = "runtime-template")]
 
 use std::path::PathBuf;
@@ -9,22 +9,22 @@ use rstest::rstest;
 use tempfile::TempDir;
 
 fn runtime() -> assert_cmd::Command {
-    let mut cmd = cargo_bin_cmd!("conda-ship-runtime");
+    let mut cmd = cargo_bin_cmd!("cs-template");
     cmd.env("CONDA_SHIP_ALLOW_UNSTAMPED_TEMPLATE", "1");
     cmd
 }
 
 fn write_runtime_metadata(prefix: &std::path::Path) {
     std::fs::write(
-        prefix.join(".conda-ship-runtime.json"),
-        r#"{"schema_version":1,"display_name":"conda-ship-runtime","install_name":"conda-ship-runtime","metadata_file":".conda-ship-runtime.json","version":"test","channels":["conda-forge"],"packages":["python"]}"#,
+        prefix.join(".cs-template.json"),
+        r#"{"schema_version":1,"display_name":"cs-template","install_name":"cs-template","metadata_file":".cs-template.json","version":"test","channels":["conda-forge"],"packages":["python"]}"#,
     )
     .unwrap();
 }
 
 #[test]
 fn test_runtime_template_refuses_to_run_without_stamp() {
-    cargo_bin_cmd!("conda-ship-runtime")
+    cargo_bin_cmd!("cs-template")
         .assert()
         .failure()
         .stderr(predicate::str::contains(
@@ -35,12 +35,8 @@ fn test_runtime_template_refuses_to_run_without_stamp() {
 #[test]
 fn test_runtime_help() {
     let output = runtime().arg("--help").output().unwrap();
-    assert!(
-        output.status.success(),
-        "conda-ship-runtime --help should succeed"
-    );
-    let stdout = String::from_utf8_lossy(&output.stdout)
-        .replace("conda-ship-runtime.exe", "conda-ship-runtime");
+    assert!(output.status.success(), "cs-template --help should succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout).replace("cs-template.exe", "cs-template");
     insta::assert_snapshot!("runtime_help", stdout);
 }
 
@@ -110,7 +106,7 @@ fn test_runtime_bootstrap_refuses_unmanaged_prefix() {
 #[test]
 fn test_runtime_default_passthrough_refuses_unmanaged_default_prefix() {
     let tmp = TempDir::new().unwrap();
-    let prefix = tmp.path().join(".conda").join("conda-ship-runtime");
+    let prefix = tmp.path().join(".conda").join("cs-template");
     std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
 
     runtime()
@@ -124,7 +120,7 @@ fn test_runtime_default_passthrough_refuses_unmanaged_default_prefix() {
 #[test]
 fn test_runtime_bootstrap_to_temp_prefix() {
     let tmp = TempDir::new().unwrap();
-    let prefix = tmp.path().join("conda-ship-runtime-test-bootstrap");
+    let prefix = tmp.path().join("cs-template-test-bootstrap");
 
     runtime()
         .args(["bootstrap", "--path", prefix.to_str().unwrap()])
@@ -138,8 +134,8 @@ fn test_runtime_bootstrap_to_temp_prefix() {
         "conda-meta should exist"
     );
     assert!(
-        prefix.join(".conda-ship-runtime.json").exists(),
-        ".conda-ship-runtime.json should exist"
+        prefix.join(".cs-template.json").exists(),
+        ".cs-template.json should exist"
     );
     assert!(prefix.join(".condarc").exists(), ".condarc should exist");
     assert!(
@@ -152,7 +148,7 @@ fn test_runtime_bootstrap_to_temp_prefix() {
 #[test]
 fn test_runtime_status_after_bootstrap() {
     let tmp = TempDir::new().unwrap();
-    let prefix = tmp.path().join("conda-ship-runtime-test-status");
+    let prefix = tmp.path().join("cs-template-test-status");
 
     runtime()
         .args(["bootstrap", "--path", prefix.to_str().unwrap()])
@@ -175,7 +171,7 @@ fn test_runtime_status_after_bootstrap() {
 #[test]
 fn test_runtime_uninstall_removes_prefix() {
     let tmp = TempDir::new().unwrap();
-    let prefix = tmp.path().join("conda-ship-runtime-test-uninstall");
+    let prefix = tmp.path().join("cs-template-test-uninstall");
 
     runtime()
         .args(["bootstrap", "--path", prefix.to_str().unwrap()])
@@ -202,7 +198,7 @@ fn test_runtime_uninstall_removes_prefix() {
 #[test]
 fn test_runtime_uninstall_interactive_prompt_declined() {
     let tmp = TempDir::new().unwrap();
-    let prefix = tmp.path().join("conda-ship-runtime-uninstall-interactive");
+    let prefix = tmp.path().join("cs-template-uninstall-interactive");
     std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
     write_runtime_metadata(&prefix);
 
@@ -224,7 +220,7 @@ fn test_runtime_uninstall_interactive_prompt_declined() {
 #[test]
 fn test_runtime_uninstall_refuses_unmanaged_prefix() {
     let tmp = TempDir::new().unwrap();
-    let prefix = tmp.path().join("conda-ship-runtime-uninstall-unmanaged");
+    let prefix = tmp.path().join("cs-template-uninstall-unmanaged");
     std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
 
     runtime()
@@ -278,7 +274,7 @@ fn test_runtime_bootstrap_offline_from_cache() {
         .stderr(predicate::str::contains("bootstrapped successfully"));
 
     assert!(install_path2.join("conda-meta").is_dir());
-    assert!(install_path2.join(".conda-ship-runtime.json").exists());
+    assert!(install_path2.join(".cs-template.json").exists());
 }
 
 #[cfg_attr(not(feature = "online_tests"), ignore)]
@@ -323,7 +319,7 @@ fn test_runtime_bootstrap_bundle_offline() {
         .stderr(predicate::str::contains("bootstrapped successfully"));
 
     assert!(install_path2.join("conda-meta").is_dir());
-    assert!(install_path2.join(".conda-ship-runtime.json").exists());
+    assert!(install_path2.join(".cs-template.json").exists());
 }
 
 #[rstest]
@@ -337,7 +333,7 @@ fn test_runtime_bootstrap_bundle_offline() {
 fn test_runtime_offline_env_var_parsing(#[case] value: &str, #[case] expect_offline: bool) {
     let tmp = TempDir::new().unwrap();
     let mut cmd = runtime();
-    cmd.env("CONDA_SHIP_RUNTIME_OFFLINE", value).args([
+    cmd.env("CS_TEMPLATE_OFFLINE", value).args([
         "bootstrap",
         "--path",
         tmp.path().to_str().unwrap(),
@@ -359,7 +355,7 @@ fn test_runtime_bundle_env_var() {
     let tmp = TempDir::new().unwrap();
     let bad_dir = tmp.path().join("nonexistent");
     runtime()
-        .env("CONDA_SHIP_RUNTIME_BUNDLE", bad_dir.as_os_str())
+        .env("CS_TEMPLATE_BUNDLE", bad_dir.as_os_str())
         .args(["bootstrap", "--path", tmp.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -379,8 +375,8 @@ fn test_runtime_status_shows_binary_name_and_version() {
         .assert()
         .success()
         .stdout(
-            predicate::str::starts_with(format!("conda-ship-runtime {version}")).or(
-                predicate::str::starts_with(format!("conda-ship-runtimez {version}")),
+            predicate::str::starts_with(format!("cs-template {version}")).or(
+                predicate::str::starts_with(format!("cs-templatez {version}")),
             ),
         );
 }
@@ -397,7 +393,7 @@ fn rattler_pkgs_cache_dir() -> PathBuf {
 #[test]
 fn test_runtime_uninstall_default_prefix_respects_home() {
     let tmp = TempDir::new().unwrap();
-    let prefix = tmp.path().join(".conda").join("conda-ship-runtime");
+    let prefix = tmp.path().join(".conda").join("cs-template");
     std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
     write_runtime_metadata(&prefix);
 

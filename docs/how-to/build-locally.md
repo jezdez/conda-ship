@@ -12,7 +12,7 @@ cs build
 ```
 
 Source checkouts do not build a runtime template implicitly. Install
-conda-ship from a package that includes `cs-runtime-template`, or pass
+conda-ship from a package that includes `cs-template`, or pass
 `--template` with an explicit prebuilt template.
 
 If you are changing a downstream distribution such as conda-express, keep the
@@ -100,7 +100,7 @@ cs build \
   --runtime demo \
   --target x86_64-unknown-linux-gnu \
   --target-label x86_64-unknown-linux-gnu \
-  --template ./cs-runtime-template-x86_64-unknown-linux-gnu
+  --template ./cs-template-x86_64-unknown-linux-gnu
 ```
 
 The target label is appended to staged artifact names and metadata files.

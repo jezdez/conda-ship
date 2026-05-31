@@ -980,9 +980,9 @@ pub(crate) fn source_binary(
 
 pub(crate) fn runtime_template_filename() -> &'static str {
     if cfg!(windows) {
-        "cs-runtime-template.exe"
+        "cs-template.exe"
     } else {
-        "cs-runtime-template"
+        "cs-template"
     }
 }
 

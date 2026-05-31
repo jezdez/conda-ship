@@ -40,7 +40,7 @@ executable inside the managed prefix that receives pass-through arguments, and
 
 ## Runtime Template
 
-`conda-ship-runtime` is an internal generic binary target. It is not a first-party
+`cs-template` is an internal generic binary target. It is not a first-party
 distribution. During `cs build`, the builder copies a generic runtime
 template under the resolved runtime name and stamps the copy with the runtime
 name, delegate, install scheme, install name, metadata filename, environment

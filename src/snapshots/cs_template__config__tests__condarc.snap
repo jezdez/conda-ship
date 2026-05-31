@@ -1,6 +1,6 @@
 ---
 source: src/config.rs
-assertion_line: 203
+assertion_line: 248
 expression: contents
 ---
 solver: rattler
