@@ -57,6 +57,12 @@ and `.tar.bz2` files named in the runtime lock.
 conda-ship also stamps a runtime-specific bundle environment variable into the
 runtime. For a runtime named `demo`, that variable is `DEMO_BUNDLE`.
 
+```{note}
+External bundles are transport artifacts, not package indexes. Do not add
+`linux-64/`, `noarch/`, or `repodata.json`; pass the directory containing the
+package archives directly.
+```
+
 ## Bootstrap From An Embedded Bundle
 
 An embedded runtime carries the bundle inside the binary:
@@ -72,6 +78,12 @@ access.
 Embedded bundle extraction is deliberately narrow. The embedded tar archive may
 only contain top-level package archive files. Nested paths, directory entries,
 symbolic links, hard links, and non-package files are rejected before install.
+
+```{important}
+Keep embedded bundles as package archives only. conda-ship rejects paths and
+links before extraction so a bundled runtime cannot write outside the temporary
+bundle directory during bootstrap.
+```
 
 An explicit `--bundle` still takes priority over the embedded bundle. Use that
 override to test a replacement package set without rebuilding the binary.

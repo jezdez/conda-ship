@@ -66,3 +66,7 @@ On Windows, the runtime prepends:
 : Allows the generic runtime template binary to run without stamped runtime
   data. This is used by tests. Downstream runtimes should not set it.
 
+```{warning}
+Do not set `CONDA_SHIP_ALLOW_UNSTAMPED_TEMPLATE` in distribution builds or user
+environments. It exists only so tests can exercise the generic template binary.
+```

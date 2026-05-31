@@ -19,6 +19,11 @@ Tagged conda-ship releases publish builder assets:
 Published release assets are immutable. A tag represents one complete asset set;
 fixes use a new tag rather than replacing files under an existing tag.
 
+```{important}
+Do not script release repair by re-uploading files to an existing tag. Published
+conda-ship releases are immutable; publish a newer tag for fixes.
+```
+
 Target examples:
 
 ```text

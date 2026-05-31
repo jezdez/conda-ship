@@ -250,6 +250,12 @@ This creates a conda installation managed by the `demo` runtime. This local
 bootstrap is only a smoke test; a real downstream distribution should document
 how its users install and update the runtime it publishes.
 
+```{note}
+The explicit `--path` keeps this tutorial install inside the project directory.
+Published runtimes should document their normal install location and reserve
+`--path` for local testing or advanced overrides.
+```
+
 Check it:
 
 ```bash

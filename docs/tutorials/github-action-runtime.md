@@ -47,8 +47,9 @@ on:
 
 permissions:
   contents: read
-  attestations: read
   id-token: write
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   build:
@@ -77,6 +78,10 @@ jobs:
           layout: ${{ matrix.layout }}
           install-method: ${{ matrix.install-method }}
 
+      - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: ${{ steps.cs.outputs.dist-path }}/*
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.cs.outputs.asset-name }}
@@ -85,6 +90,12 @@ jobs:
 
 Pin the action to a conda-ship release tag. Branch refs do not have matching
 release assets for `cs` and `cs-template`.
+
+```{warning}
+Use the latest reviewed `actions/attest` release in your workflow and pin it by
+commit SHA. The SHA above is an example, not a recommendation to keep using that
+exact revision indefinitely.
+```
 
 ## Run It
 
@@ -99,6 +110,11 @@ The action downloads these release assets for the current runner:
 
 It verifies GitHub artifact attestations and the checksums before running the
 downloaded `cs` binary.
+
+The workflow also attests the generated runtime output directory before
+uploading it. That downstream attestation covers the runtime binary,
+`.runtime.lock`, `.packages.txt`, `.info.json`, `.sha256`, and any external
+bundle produced by that job.
 
 ## Inspect The Artifact
 
@@ -145,4 +161,3 @@ You added a release-style workflow that builds conda-ship runtime artifacts from
 committed project input. The solve still belongs to conda-workspaces or Pixi;
 the action consumes the committed lockfile and stamps a runtime with
 release-specific metadata.
-

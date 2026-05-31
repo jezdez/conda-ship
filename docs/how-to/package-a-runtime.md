@@ -43,6 +43,11 @@ The metadata files help users and downstream packagers inspect what was built.
 Do not publish only the runtime binary unless your release channel has another
 place for checksums and package metadata.
 
+```{important}
+Treat `dist/` as the release unit. If a channel uploads only the runtime binary,
+it needs an equivalent place for checksums, package metadata, and provenance.
+```
+
 ## Wrap With Homebrew
 
 For an online runtime, a Homebrew formula usually installs the runtime binary
@@ -100,6 +105,12 @@ The installer should not unpack the managed conda prefix by itself. Let the
 runtime bootstrap so ownership metadata, `.condarc`, frozen marker, and package
 verification are applied consistently.
 
+```{warning}
+Do not preinstall the managed prefix behind the runtime's back. Runtime
+bootstrap writes ownership metadata and verification state that later `status`,
+pass-through, and `uninstall` commands rely on.
+```
+
 ## Package For Docker Or Internal Images
 
 For images, decide whether bootstrap happens at image build time or container
@@ -134,3 +145,5 @@ For GitHub Action builds, also keep the release attestation checks enabled in
 the action. They verify the conda-ship tools used to stamp the downstream
 runtime.
 
+For release workflows, also attest the full output directory before publishing
+it. See {doc}`verify-release-artifacts` for a GitHub Actions example.

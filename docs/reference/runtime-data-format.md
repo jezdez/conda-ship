@@ -4,6 +4,12 @@ conda-ship stamps runtime data onto a copy of the generic runtime template.
 This page documents the compatibility surface at a high level. It is not a
 general-purpose file format for other tools to write.
 
+```{important}
+Treat the stamped runtime data as private executable metadata. Release tooling
+should read `.info.json`, `.runtime.lock`, `.packages.txt`, and `.sha256`
+instead of parsing or writing bytes inside the runtime binary.
+```
+
 ## Location
 
 Runtime data is appended to the staged runtime binary.
@@ -82,4 +88,3 @@ an opaque executable plus documented artifact metadata files.
 
 Use `.info.json`, `.runtime.lock`, `.packages.txt`, and `.sha256` for release
 automation instead of parsing the appended runtime data directly.
-

@@ -15,6 +15,12 @@ Source checkouts do not build a runtime template implicitly. Install
 conda-ship from a package that includes `cs-template`, or pass
 `--template` with an explicit prebuilt template.
 
+```{note}
+Most local users should install conda-ship from a package and let `cs` find the
+installed `cs-template`. Use `--template` only for custom packaging,
+cross-builds, or template debugging.
+```
+
 If you are changing a downstream distribution such as conda-express, keep the
 package-set decision in that downstream project, then reproduce the build with
 the `cs` CLI or the GitHub Action.
