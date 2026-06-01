@@ -38,6 +38,11 @@ on:
         required: false
         type: string
         default: ""
+      install-method:
+        description: "Package-manager or installer method stamped into the runtime. Overrides [tool.conda-ship].install-method when set."
+        required: false
+        type: string
+        default: ""
       retention-days:
         description: "Number of days to retain build artifacts."
         required: false
@@ -102,6 +107,7 @@ jobs:
           docs-url: ${{ inputs.docs-url }}
           install-scheme: ${{ inputs.install-scheme }}
           install-name: ${{ inputs.install-name }}
+          install-method: ${{ inputs.install-method }}
 
       - name: Upload runtime artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

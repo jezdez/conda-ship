@@ -28,7 +28,7 @@ body:
         Provide minimal steps to reproduce the behavior.
 
         ```bash
-        myconda bootstrap
+        <runtime> bootstrap
         # ...
         ```
       render: shell
@@ -40,7 +40,7 @@ body:
         Please run the following and paste the output below.
 
         ```bash
-        myconda --version && myconda status
+        <runtime> --version && <runtime> status
         ```
       render: shell
   - type: textarea
