@@ -22,7 +22,7 @@ in CI. This minimal example assumes the manifest contains
 ```yaml
 - uses: actions/checkout@v4
 
-- uses: jezdez/conda-ship@v0.1.0
+- uses: jezdez/conda-ship@0.1.0
   id: cs
 ```
 
@@ -35,6 +35,11 @@ in CI. This minimal example assumes the manifest contains
 `delegate`
 : Delegate executable override. Set this when the release job intentionally
   changes which executable receives pass-through arguments.
+
+`runtime-version`
+: Runtime version override. Set this when the release job intentionally stamps
+  a version different from `[tool.conda-ship].runtime-version` or
+  `[project].version`.
 
 `root`
 : Project root containing `conda.toml`/`conda.lock`, `pixi.toml`/`pixi.lock`,
@@ -49,7 +54,9 @@ in CI. This minimal example assumes the manifest contains
   artifacts carry package archives inside the runtime and use the `z` suffix.
 
 `docs-url`
-: Documentation URL stamped into generated runtime help output.
+: Documentation URL stamped into generated runtime help output. Must start
+  with `https://` or `http://` and must not contain whitespace or control
+  characters.
 
 `install-scheme`
 : Install scheme stamped into the generated runtime. Supported values are

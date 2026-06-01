@@ -72,7 +72,7 @@ pub fn write_metadata(
         display_name: policy::display_name().to_string(),
         install_name: policy::install_name().to_string(),
         metadata_file: policy::metadata_file().to_string(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
+        version: policy::runtime_version().to_string(),
         channels: channels.to_vec(),
         packages: packages.to_vec(),
     };

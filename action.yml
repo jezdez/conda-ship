@@ -16,6 +16,10 @@ inputs:
     description: "Delegate executable inside the managed prefix. Overrides [tool.conda-ship].delegate when set."
     required: false
     default: ""
+  runtime-version:
+    description: "Version shown by the generated runtime. Overrides [tool.conda-ship].runtime-version when set."
+    required: false
+    default: ""
   root:
     description: "Project root containing conda.toml/conda.lock, pixi.toml/pixi.lock, or pyproject.toml with the matching lockfile."
     required: false
@@ -25,7 +29,7 @@ inputs:
     required: false
     default: ""
   docs-url:
-    description: "Documentation URL embedded in the runtime help output. Overrides [tool.conda-ship].docs-url when set."
+    description: "Documentation URL embedded in runtime help output. Must start with https:// or http://. Overrides [tool.conda-ship].docs-url when set."
     required: false
     default: ""
   install-scheme:
@@ -80,6 +84,8 @@ runs:
         RUNNER_ARCH_NAME: ${{ runner.arch }}
         RUNNER_OS_NAME: ${{ runner.os }}
       run: |
+        set -euo pipefail
+
         case "${RUNNER_OS_NAME}/${RUNNER_ARCH_NAME}" in
           Linux/X64)
             target="x86_64-unknown-linux-gnu"
@@ -107,13 +113,17 @@ runs:
             ;;
         esac
 
-        version="$ACTION_REF"
-        if [ -z "$version" ] && [ -n "$ACTION_PATH" ]; then
+        version=""
+        if [ -n "$ACTION_PATH" ]; then
           version="$(git -C "$ACTION_PATH" describe --tags --exact-match 2>/dev/null || true)"
         fi
-        if [[ ! "$version" =~ ^v[0-9]+([.][0-9]+)*([-.][0-9A-Za-z.-]+)?$ ]]; then
+        if [ -z "$version" ]; then
+          version="$ACTION_REF"
+        fi
+        version="${version#refs/tags/}"
+        if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
           echo "Could not infer a conda-ship release tag from ${version:-<empty>}." >&2
-          echo "Use jezdez/conda-ship@vX.Y.Z. Branch refs do not have release assets." >&2
+          echo "Use jezdez/conda-ship@X.Y.Z. Branch refs do not have release assets." >&2
           exit 1
         fi
 
@@ -163,6 +173,8 @@ runs:
         TEMPLATE_ASSET: ${{ steps.resolve.outputs.template_asset }}
         TOOL_DIR: ${{ steps.resolve.outputs.tool_dir }}
       run: |
+        set -euo pipefail
+
         base_url="https://github.com/${CONDA_SHIP_REPOSITORY}/releases/download/${CONDA_SHIP_VERSION}"
         curl --fail --location --show-error --silent --retry 3 \
           --output "${TOOL_DIR}/${CS_ASSET}" \
@@ -214,11 +226,14 @@ runs:
         CONDA_SHIP_INSTALL_SCHEME: ${{ inputs.install-scheme }}
         CONDA_SHIP_LAYOUT: ${{ inputs.layout }}
         CONDA_SHIP_RUNTIME: ${{ inputs.runtime }}
+        CONDA_SHIP_RUNTIME_VERSION: ${{ inputs.runtime-version }}
         CS_PATH: ${{ steps.download.outputs.cs_path }}
         CONDA_SHIP_ROOT: ${{ inputs.root }}
         CONDA_SHIP_TARGET: ${{ steps.resolve.outputs.target }}
         TEMPLATE_PATH: ${{ steps.download.outputs.template_path }}
       run: |
+        set -euo pipefail
+
         dist_dir="${RUNNER_TEMP}/conda-ship-${CONDA_SHIP_TARGET}-dist"
         rm -rf "$dist_dir"
         mkdir -p "$dist_dir"
@@ -233,6 +248,9 @@ runs:
         )
         if [ -n "$CONDA_SHIP_RUNTIME" ]; then
           build_args+=(--runtime "$CONDA_SHIP_RUNTIME")
+        fi
+        if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
+          build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
         fi
         if [ -n "$CONDA_SHIP_DELEGATE" ]; then
           build_args+=(--delegate "$CONDA_SHIP_DELEGATE")
@@ -261,6 +279,8 @@ runs:
       env:
         CONDA_SHIP_TARGET: ${{ steps.resolve.outputs.target }}
       run: |
+        set -euo pipefail
+
         artifact_dir="${RUNNER_TEMP}/conda-ship-${CONDA_SHIP_TARGET}-dist"
         info_count="$(find "$artifact_dir" -maxdepth 1 -type f -name "*.info.json" | wc -l | tr -d ' ')"
         if [ "$info_count" -ne 1 ]; then

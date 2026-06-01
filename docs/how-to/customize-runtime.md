@@ -260,7 +260,7 @@ at that project root:
 ```yaml
 - uses: actions/checkout@v4
 
-- uses: jezdez/conda-ship@v0.1.0
+- uses: jezdez/conda-ship@0.1.0
   id: cs
   with:
     root: .

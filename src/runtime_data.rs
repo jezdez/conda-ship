@@ -53,6 +53,7 @@ pub enum InstallScheme {
 pub struct RuntimeDataHeader {
     pub schema_version: u32,
     pub runtime_name: String,
+    pub runtime_version: String,
     pub embedded_runtime_name: String,
     pub delegate: String,
     pub display_name: String,
@@ -76,6 +77,7 @@ impl RuntimeDataHeader {
         Self {
             schema_version: FORMAT_VERSION,
             runtime_name: name.to_string(),
+            runtime_version: env!("CARGO_PKG_VERSION").to_string(),
             embedded_runtime_name: format!("{name}z"),
             delegate: "conda".to_string(),
             display_name: name.to_string(),

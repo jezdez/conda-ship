@@ -72,7 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jezdez/conda-ship@v0.1.0
+      - uses: jezdez/conda-ship@0.1.0
         id: cs
         with:
           layout: ${{ matrix.layout }}
@@ -139,7 +139,7 @@ Keep package and channel choices in the manifest and lockfile. Use action inputs
 for release-job metadata that may vary across a matrix:
 
 ```yaml
-- uses: jezdez/conda-ship@v0.1.0
+- uses: jezdez/conda-ship@0.1.0
   id: cs
   with:
     runtime: demo

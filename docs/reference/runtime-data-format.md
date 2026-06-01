@@ -29,6 +29,10 @@ The stamped header records:
 : Name of the generated runtime executable. Embedded layouts use the `z`
   suffix.
 
+`runtime_version`
+: Version shown by the generated runtime and written to prefix ownership
+  metadata.
+
 `embedded_runtime_name`
 : Conventional embedded runtime name for the same base runtime.
 

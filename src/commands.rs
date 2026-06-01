@@ -265,7 +265,7 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
 
     let bundle_len = crate::config::embedded_bundle_len();
     let binary_name = policy::status_binary_name(bundle_len.is_some());
-    println!("{} {}", binary_name, env!("CARGO_PKG_VERSION"));
+    println!("{} {}", binary_name, policy::runtime_version());
     println!("  path:      {}", prefix.display());
     println!("  channels:  {}", meta.channels.join(", "));
     println!("  packages:  {}", meta.packages.join(", "));

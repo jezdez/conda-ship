@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jezdez/conda-ship@v0.1.0
+      - uses: jezdez/conda-ship@0.1.0
         id: cs
 
       - uses: actions/upload-artifact@v4
@@ -54,7 +54,7 @@ at that directory:
 steps:
   - uses: actions/checkout@v4
 
-  - uses: jezdez/conda-ship@v0.1.0
+  - uses: jezdez/conda-ship@0.1.0
     id: cs
     with:
       root: dist/demo
@@ -62,9 +62,9 @@ steps:
 
 The action does not run a solve, generate a manifest, or refresh a lockfile.
 Update and commit the lockfile before running release builds.
-Release-job metadata such as `runtime`, `delegate`, `docs-url`,
-`install-scheme`, `install-name`, and `install-method` can come from the
-manifest or from action inputs. The action passes those inputs to
+Release-job metadata such as `runtime`, `runtime-version`, `delegate`,
+`docs-url`, `install-scheme`, `install-name`, and `install-method` can come
+from the manifest or from action inputs. The action passes those inputs to
 `cs build --dry-run`, so validation still happens in conda-ship.
 
 ## External Bundle Example
@@ -73,7 +73,7 @@ Set `layout` to `external` when you want to distribute the runtime and package
 bundle as separate files:
 
 ```yaml
-- uses: jezdez/conda-ship@v0.1.0
+- uses: jezdez/conda-ship@0.1.0
   id: cs
   with:
     layout: external
@@ -90,7 +90,7 @@ Set `layout` to `embedded` when the runtime must bootstrap without network
 access:
 
 ```yaml
-- uses: jezdez/conda-ship@v0.1.0
+- uses: jezdez/conda-ship@0.1.0
   id: cs
   with:
     layout: embedded
@@ -127,11 +127,12 @@ runs-on: ${{ matrix.os }}
 steps:
   - uses: actions/checkout@v4
 
-  - uses: jezdez/conda-ship@v0.1.0
+  - uses: jezdez/conda-ship@0.1.0
     id: cs
     with:
       layout: ${{ matrix.layout }}
       runtime: ${{ matrix.runtime }}
+      runtime-version: ${{ github.ref_name }}
       delegate: conda
       docs-url: https://example.com/demo/
       install-scheme: conda-home
@@ -174,7 +175,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jezdez/conda-ship@v0.1.0
+      - uses: jezdez/conda-ship@0.1.0
         id: cs
 
       - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0

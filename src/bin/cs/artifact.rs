@@ -124,6 +124,7 @@ pub(crate) fn dry_run_build_artifact(
     layout: Option<BundleLayout>,
     runtime: Option<String>,
     delegate: Option<String>,
+    runtime_version: Option<String>,
     target_label: Option<String>,
     platform_str: Option<String>,
     target: Option<String>,
@@ -151,7 +152,12 @@ pub(crate) fn dry_run_build_artifact(
     validate_runtime_name(&runtime)?;
     validate_delegate(&delegate)?;
     derived.runtime_config.delegate = Some(delegate.clone());
-    apply_runtime_metadata_overrides(&mut derived.runtime_config, docs_url, install_method)?;
+    apply_runtime_metadata_overrides(
+        &mut derived.runtime_config,
+        runtime_version,
+        docs_url,
+        install_method,
+    )?;
     apply_install_location_overrides(&mut derived.runtime_config, install_scheme, install_name)?;
     validate_install_location_config(&derived.runtime_config, &runtime)?;
 
@@ -190,6 +196,7 @@ pub(crate) fn build_artifact(
     layout: Option<BundleLayout>,
     runtime: Option<String>,
     delegate: Option<String>,
+    runtime_version: Option<String>,
     target_label: Option<String>,
     platform_str: Option<String>,
     target: Option<String>,
@@ -217,7 +224,12 @@ pub(crate) fn build_artifact(
     validate_runtime_name(&runtime)?;
     validate_delegate(&delegate)?;
     derived.runtime_config.delegate = Some(delegate);
-    apply_runtime_metadata_overrides(&mut derived.runtime_config, docs_url, install_method)?;
+    apply_runtime_metadata_overrides(
+        &mut derived.runtime_config,
+        runtime_version,
+        docs_url,
+        install_method,
+    )?;
     apply_install_location_overrides(&mut derived.runtime_config, install_scheme, install_name)?;
     validate_install_location_config(&derived.runtime_config, &runtime)?;
     let runtime_lock_path = generated_runtime_lock_path(&root);
@@ -255,6 +267,7 @@ pub(crate) fn run_artifact(
     layout: Option<BundleLayout>,
     runtime: Option<String>,
     delegate: Option<String>,
+    runtime_version: Option<String>,
     platform: Option<String>,
     out_dir: PathBuf,
     template: Option<PathBuf>,
@@ -275,6 +288,7 @@ pub(crate) fn run_artifact(
         Some(layout),
         Some(runtime),
         delegate,
+        runtime_version,
         None,
         platform,
         None,
@@ -487,6 +501,11 @@ fn print_build_dry_run(
         .docs_url
         .clone()
         .unwrap_or_else(default_docs_url);
+    let runtime_version = derived
+        .runtime_config
+        .runtime_version
+        .as_deref()
+        .unwrap_or(env!("CARGO_PKG_VERSION"));
 
     println!("Build dry run");
     println!("Project");
@@ -494,6 +513,7 @@ fn print_build_dry_run(
     println!();
     println!("Runtime");
     println!("  runtime: {runtime}");
+    println!("  version: {runtime_version}");
     println!("  delegate: {delegate}");
     println!("  layout: {}", layout.as_str());
     println!("  platform: {platform}");
@@ -852,13 +872,25 @@ fn apply_install_location_overrides(
     Ok(())
 }
 
-fn apply_runtime_metadata_overrides(
+pub(crate) fn apply_runtime_metadata_overrides(
     config: &mut RuntimeStampConfig,
+    runtime_version: Option<String>,
     docs_url: Option<String>,
     install_method: Option<String>,
 ) -> miette::Result<()> {
+    if let Some(runtime_version) = runtime_version {
+        validate_runtime_version(&runtime_version)?;
+        config.runtime_version = Some(runtime_version);
+    }
+    if let Some(runtime_version) = config.runtime_version.as_deref() {
+        validate_runtime_version(runtime_version)?;
+    }
     if let Some(docs_url) = docs_url {
+        validate_docs_url(&docs_url)?;
         config.docs_url = Some(docs_url);
+    }
+    if let Some(docs_url) = config.docs_url.as_deref() {
+        validate_docs_url(docs_url)?;
     }
     if let Some(install_method) = install_method {
         validate_install_method(&install_method)?;
@@ -877,6 +909,69 @@ fn validate_install_location_config(
 fn validate_install_method_config(config: &RuntimeStampConfig) -> miette::Result<()> {
     if let Some(method) = config.install_method.as_deref() {
         validate_artifact_component("install method", method)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_runtime_version(runtime_version: &str) -> miette::Result<()> {
+    if runtime_version.is_empty() {
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            "runtime version must not be empty",
+            Some("Use a non-empty runtime version such as 1.0.0.".to_string()),
+        ));
+    }
+    if !runtime_version
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_alphanumeric())
+    {
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            "runtime version must start with an ASCII letter or digit",
+            Some("Use a package-style version such as 1.0.0 or 1.0.0+local.".to_string()),
+        ));
+    }
+    if !runtime_version
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '+' | '!'))
+    {
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            "runtime version may only contain ASCII letters, digits, dots, dashes, underscores, plus signs, and exclamation marks",
+            Some("Remove whitespace, path separators, and shell metacharacters from the runtime version.".to_string()),
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_docs_url(docs_url: &str) -> miette::Result<()> {
+    if docs_url.is_empty() {
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            "docs URL must not be empty",
+            Some("Use a full documentation URL such as https://example.com/demo/.".to_string()),
+        ));
+    }
+    if !(docs_url.starts_with("https://") || docs_url.starts_with("http://")) {
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            "docs URL must start with https:// or http://",
+            Some("Use a full documentation URL such as https://example.com/demo/.".to_string()),
+        ));
+    }
+    if docs_url
+        .chars()
+        .any(|c| c.is_ascii_control() || c.is_whitespace())
+    {
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            "docs URL must not contain whitespace or control characters",
+            Some(
+                "Remove spaces, newlines, and terminal control characters from the docs URL."
+                    .to_string(),
+            ),
+        ));
     }
     Ok(())
 }
@@ -1111,6 +1206,11 @@ fn stamp_runtime_data(
     let header = runtime_data::RuntimeDataHeader {
         schema_version: 1,
         runtime_name,
+        runtime_version: derived
+            .runtime_config
+            .runtime_version
+            .clone()
+            .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
         embedded_runtime_name: format!("{name}z"),
         delegate,
         display_name: name.to_string(),

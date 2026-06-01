@@ -95,7 +95,7 @@ The repository root is also a composite GitHub Action for downstream release
 jobs:
 
 ```yaml
-- uses: jezdez/conda-ship@v0.1.0
+- uses: jezdez/conda-ship@0.1.0
   id: cs
   with:
     layout: embedded

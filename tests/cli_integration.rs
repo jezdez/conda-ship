@@ -22,6 +22,14 @@ fn write_runtime_metadata(prefix: &std::path::Path) {
     .unwrap();
 }
 
+fn write_demo_runtime_metadata(prefix: &std::path::Path) {
+    std::fs::write(
+        prefix.join(".demo.json"),
+        r#"{"schema_version":1,"display_name":"demo","install_name":"demo","metadata_file":".demo.json","version":"test","channels":["conda-forge"],"packages":["python"]}"#,
+    )
+    .unwrap();
+}
+
 #[test]
 fn test_runtime_template_refuses_to_run_without_stamp() {
     cargo_bin_cmd!("cs-template")
@@ -379,6 +387,44 @@ fn test_runtime_status_shows_binary_name_and_version() {
                 predicate::str::starts_with(format!("cs-templatez {version}")),
             ),
         );
+}
+
+#[test]
+fn test_stamped_runtime_status_uses_stamped_version() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let tmp = TempDir::new().unwrap();
+    let template = assert_cmd::cargo::cargo_bin("cs-template");
+
+    cargo_bin_cmd!("cs")
+        .env("CONDA_SHIP_TEMPLATE", template)
+        .args([
+            "build",
+            "--root",
+            root,
+            "--runtime",
+            "demo",
+            "--delegate",
+            "conda",
+            "--runtime-version",
+            "9.8.7",
+            "--out-dir",
+            tmp.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let runtime = tmp
+        .path()
+        .join(if cfg!(windows) { "demo.exe" } else { "demo" });
+    let prefix = tmp.path().join("prefix");
+    std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
+    write_demo_runtime_metadata(&prefix);
+
+    assert_cmd::Command::new(runtime)
+        .args(["--path", prefix.to_str().unwrap(), "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("demo 9.8.7"));
 }
 
 fn rattler_pkgs_cache_dir() -> PathBuf {

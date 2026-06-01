@@ -75,6 +75,7 @@ delegate executable inside that prefix.
 ```toml
 [tool.conda-ship]
 runtime = "demo"
+runtime-version = "1.0.0"
 delegate = "conda"
 layout = "online"
 source-environment = "ship"
@@ -89,6 +90,13 @@ install-method = "homebrew"
 : Name for the generated runtime executable. `cs build` and `cs run` require
   this value, either here or through `--runtime`. It is not a conda environment
   name.
+
+`runtime-version`
+: Version shown by the generated runtime when users run `RUNTIME --version`.
+  When omitted from `[tool.conda-ship]`, conda-ship uses `[project].version`
+  from `pyproject.toml` if it exists. Release workflows can override this with
+  `cs build --runtime-version VERSION` or the GitHub Action
+  `runtime-version` input.
 
 `delegate`
 : Executable inside the managed prefix that receives pass-through arguments
@@ -110,7 +118,9 @@ install-method = "homebrew"
   used only by excluded packages.
 
 `docs-url`
-: Documentation URL stamped into generated runtime help output.
+: Documentation URL stamped into generated runtime help output. Must start
+  with `https://` or `http://` and must not contain whitespace or control
+  characters.
 
 `install-scheme`
 : Install scheme stamped into the generated runtime. Supported values are
@@ -153,6 +163,8 @@ URLs from the source lockfile environment into generated runtime metadata.
 
 - runtime name: `RUNTIME` for `online` and `external`, `RUNTIME` plus `z` for
   `embedded`
+- runtime version: the configured `runtime-version`, `[project].version` from
+  `pyproject.toml`, or the conda-ship package version when neither value exists
 - delegate executable: the configured `delegate`
 - display name: `RUNTIME`
 - install scheme: `conda-home`, or the configured `install-scheme`

@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "*.*.*"
   workflow_dispatch:
     inputs:
       tag:
@@ -19,9 +19,64 @@ permissions:
   contents: read
 
 jobs:
+  validate-release:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Validate release tag
+        id: release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_TAG" =~ ^[0-9]+[.][0-9]+[.][0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: ${RELEASE_TAG}" >&2
+            echo "Use a version tag such as 0.1.0." >&2
+            exit 1
+          fi
+
+          {
+            echo "tag=${RELEASE_TAG}"
+            echo "version=${RELEASE_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Verify package versions
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          pyproject_version="$(
+            python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
+          )"
+          cargo_version="$(
+            python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])'
+          )"
+
+          if [ "$pyproject_version" != "$RELEASE_VERSION" ]; then
+            echo "pyproject.toml version ${pyproject_version} does not match release tag ${RELEASE_VERSION}" >&2
+            exit 1
+          fi
+          if [ "$cargo_version" != "$RELEASE_VERSION" ]; then
+            echo "Cargo.toml version ${cargo_version} does not match release tag ${RELEASE_VERSION}" >&2
+            exit 1
+          fi
+
   build-assets:
     name: Build release assets (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    needs: [validate-release]
     permissions:
       contents: read
       id-token: write # mint the OIDC token required for artifact attestations
@@ -45,20 +100,9 @@ jobs:
             os: windows-latest
 
     steps:
-      - name: Validate release tag
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+([.][0-9]+)*([-.][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid release tag: ${RELEASE_TAG}" >&2
-            echo "Use a version tag such as v0.1.0." >&2
-            exit 1
-          fi
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.validate-release.outputs.tag }}
           persist-credentials: false
 
       - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
@@ -68,6 +112,8 @@ jobs:
       - name: Verify runner target
         shell: bash
         run: |
+          set -euo pipefail
+
           host="$(pixi run -- rustc -vV | sed -n 's/^host: //p')"
           if [ "$host" != "$TARGET" ]; then
             echo "Expected runner target ${TARGET}, got ${host}" >&2
@@ -83,6 +129,8 @@ jobs:
       - name: Stage release assets
         shell: bash
         run: |
+          set -euo pipefail
+
           mkdir -p release-assets
           ext=""
           if [[ "$TARGET" == *"windows"* ]]; then
@@ -105,7 +153,7 @@ jobs:
   github-release:
     name: Publish GitHub release assets
     runs-on: ubuntu-latest
-    needs: [build-assets, build-pypi-wheels, build-pypi-sdist]
+    needs: [validate-release, build-assets, build-pypi-wheels, build-pypi-sdist]
 
     permissions:
       contents: write # create the immutable GitHub release for this tag
@@ -123,6 +171,8 @@ jobs:
       - name: Write SHA256SUMS
         shell: bash
         run: |
+          set -euo pipefail
+
           cd release-assets
           sums="${RUNNER_TEMP}/SHA256SUMS"
           find . -type f ! -name SHA256SUMS -print | sort | while read -r path; do
@@ -139,7 +189,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
         run: |
           set -euo pipefail
 
@@ -174,6 +224,7 @@ jobs:
   build-pypi-wheels:
     name: Build PyPI wheel (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    needs: [validate-release]
 
     strategy:
       fail-fast: false
@@ -193,43 +244,10 @@ jobs:
             os: windows-latest
 
     steps:
-      - name: Validate release tag
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+([.][0-9]+)*([-.][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid release tag: ${RELEASE_TAG}" >&2
-            echo "Use a version tag such as v0.1.0." >&2
-            exit 1
-          fi
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.validate-release.outputs.tag }}
           persist-credentials: false
-
-      - name: Verify package versions
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          version="${RELEASE_TAG#v}"
-          pyproject_version="$(
-            python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])'
-          )"
-          cargo_version="$(
-            python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])'
-          )"
-
-          if [ "$pyproject_version" != "$version" ]; then
-            echo "pyproject.toml version ${pyproject_version} does not match ${RELEASE_TAG}" >&2
-            exit 1
-          fi
-          if [ "$cargo_version" != "$version" ]; then
-            echo "Cargo.toml version ${cargo_version} does not match ${RELEASE_TAG}" >&2
-            exit 1
-          fi
 
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
@@ -248,22 +266,12 @@ jobs:
   build-pypi-sdist:
     name: Build PyPI sdist
     runs-on: ubuntu-latest
+    needs: [validate-release]
 
     steps:
-      - name: Validate release tag
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+([.][0-9]+)*([-.][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid release tag: ${RELEASE_TAG}" >&2
-            echo "Use a version tag such as v0.1.0." >&2
-            exit 1
-          fi
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ needs.validate-release.outputs.tag }}
           persist-credentials: false
 
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0

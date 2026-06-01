@@ -12,6 +12,10 @@ pub(crate) fn runtime_name() -> &'static str {
     &runtime_data::current().header.runtime_name
 }
 
+pub(crate) fn runtime_version() -> &'static str {
+    &runtime_data::current().header.runtime_version
+}
+
 pub(crate) fn embedded_runtime_name() -> &'static str {
     &runtime_data::current().header.embedded_runtime_name
 }

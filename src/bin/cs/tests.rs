@@ -8,12 +8,12 @@ use rstest::rstest;
 use tempfile::TempDir;
 
 use super::artifact::{
-    PackageInfo, artifact_stem, binary_filename, render_package_list, resolve_bundle_layout,
-    resolve_delegate, resolve_runtime_name, runtime_env_var, runtime_template_filename,
-    runtime_template_from_env, source_binary, source_binary_plan, stage_artifacts,
-    validate_delegate, validate_install_method, validate_install_name,
-    validate_package_archive_name, validate_runtime_name, validate_target_label,
-    validate_target_triple,
+    PackageInfo, apply_runtime_metadata_overrides, artifact_stem, binary_filename,
+    render_package_list, resolve_bundle_layout, resolve_delegate, resolve_runtime_name,
+    runtime_env_var, runtime_template_filename, runtime_template_from_env, source_binary,
+    source_binary_plan, stage_artifacts, validate_delegate, validate_docs_url,
+    validate_install_method, validate_install_name, validate_package_archive_name,
+    validate_runtime_name, validate_runtime_version, validate_target_label, validate_target_triple,
 };
 use super::project::{
     DerivedRuntimeLock, ManifestKind, ProjectInput, discover_manifest_path, discover_project_input,
@@ -82,6 +82,9 @@ fn test_discover_project_input_uses_pixi_lock_for_pyproject() {
     std::fs::write(
         tmp.path().join("pyproject.toml"),
         r#"
+[project]
+version = "1.2.3"
+
 [tool.pixi.workspace]
 name = "demo"
 channels = ["conda-forge"]
@@ -103,6 +106,7 @@ source-environment = "ship"
     assert_eq!(input.config.delegate.as_deref(), Some("conda"));
     assert_eq!(input.config.layout, Some(BundleLayout::External));
     assert_eq!(input.config.source_environment.as_deref(), Some("ship"));
+    assert_eq!(input.config.runtime_version.as_deref(), Some("1.2.3"));
 }
 
 #[test]
@@ -359,6 +363,7 @@ fn test_stage_artifacts_external_outputs_bundle_and_metadata() {
             channels: vec!["conda-forge".to_string()],
             packages: vec!["conda".to_string()],
             delegate: Some("conda".to_string()),
+            runtime_version: Some("9.8.7".to_string()),
             install_method: Some("homebrew".to_string()),
             ..RuntimeStampConfig::default()
         },
@@ -386,6 +391,7 @@ fn test_stage_artifacts_external_outputs_bundle_and_metadata() {
     let stamped = runtime_data::read_from_path(&output.binary)
         .unwrap()
         .expect("staged binary should be stamped");
+    assert_eq!(stamped.header.runtime_version, "9.8.7");
     assert_eq!(stamped.header.install_method.as_deref(), Some("homebrew"));
     assert_eq!(
         stamped.header.runtime_config.packages,
@@ -411,6 +417,8 @@ fn test_stage_artifacts_external_outputs_bundle_and_metadata() {
 
 #[rstest]
 #[case::runtime_name("runtime name", validate_runtime_name, "conda-ship_1.0")]
+#[case::runtime_version("runtime version", validate_runtime_version, "1!2.3+local")]
+#[case::docs_url("docs URL", validate_docs_url, "https://example.com/demo/")]
 #[case::delegate("delegate", validate_delegate, "python3.12")]
 #[case::install_name("install name", validate_install_name, "conda-express_1.0")]
 fn test_artifact_component_allows_filename_safe_values(
@@ -459,6 +467,21 @@ fn test_artifact_component_allows_filename_safe_values(
     "express\n",
     "install name may only contain ASCII letters, digits, dots, dashes, and underscores"
 )]
+#[case::runtime_version_path(
+    validate_runtime_version,
+    "1.0/local",
+    "runtime version may only contain ASCII letters, digits, dots, dashes, underscores, plus signs, and exclamation marks"
+)]
+#[case::docs_url_newline(
+    validate_docs_url,
+    "https://example.com/\nmalicious",
+    "docs URL must not contain whitespace or control characters"
+)]
+#[case::docs_url_relative(
+    validate_docs_url,
+    "docs/index.html",
+    "docs URL must start with https:// or http://"
+)]
 #[case::install_method_path(
     validate_install_method,
     "home/brew",
@@ -482,6 +505,8 @@ fn test_build_accepts_install_scheme_with_install_name() {
         "cx",
         "--delegate",
         "conda",
+        "--runtime-version",
+        "0.6.0",
         "--install-scheme",
         "user-data",
         "--install-name",
@@ -494,6 +519,7 @@ fn test_build_accepts_install_scheme_with_install_name() {
     let Command::Build {
         runtime,
         delegate,
+        runtime_version,
         install_scheme,
         install_name,
         install_method,
@@ -505,6 +531,7 @@ fn test_build_accepts_install_scheme_with_install_name() {
 
     assert_eq!(runtime.as_deref(), Some("cx"));
     assert_eq!(delegate.as_deref(), Some("conda"));
+    assert_eq!(runtime_version.as_deref(), Some("0.6.0"));
     assert_eq!(install_scheme, Some(runtime_data::InstallScheme::UserData));
     assert_eq!(install_name.as_deref(), Some("express"));
     assert_eq!(install_method.as_deref(), Some("homebrew"));
@@ -523,6 +550,39 @@ fn test_build_accepts_manifest_runtime_without_cli_runtime() {
 
     assert_eq!(runtime, None);
     assert_eq!(layout, None);
+}
+
+#[test]
+fn test_manifest_runtime_version_is_validated() {
+    let mut config = RuntimeStampConfig {
+        runtime_version: Some("1.0\nmalicious".to_string()),
+        ..RuntimeStampConfig::default()
+    };
+
+    let err = apply_runtime_metadata_overrides(&mut config, None, None, None)
+        .expect_err("manifest runtime version should be validated");
+
+    assert!(
+        err.to_string().contains("runtime version may only contain"),
+        "{err}"
+    );
+}
+
+#[test]
+fn test_manifest_docs_url_is_validated() {
+    let mut config = RuntimeStampConfig {
+        docs_url: Some("https://example.com/\nmalicious".to_string()),
+        ..RuntimeStampConfig::default()
+    };
+
+    let err = apply_runtime_metadata_overrides(&mut config, None, None, None)
+        .expect_err("manifest docs URL should be validated");
+
+    assert!(
+        err.to_string()
+            .contains("docs URL must not contain whitespace"),
+        "{err}"
+    );
 }
 
 #[test]

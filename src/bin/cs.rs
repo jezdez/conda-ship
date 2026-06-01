@@ -26,7 +26,15 @@ use artifact::{build_artifact, dry_run_build_artifact, inspect_artifact, run_art
 #[derive(Clone, Default, serde::Deserialize)]
 struct ProjectManifest {
     #[serde(default)]
+    project: ProjectSection,
+    #[serde(default)]
     tool: ToolSection,
+}
+
+#[derive(Clone, Default, serde::Deserialize)]
+struct ProjectSection {
+    #[serde(default)]
+    version: Option<String>,
 }
 
 #[derive(Clone, Default, serde::Deserialize)]
@@ -40,6 +48,8 @@ struct ToolSection {
 struct ShipConfig {
     #[serde(default)]
     runtime: Option<String>,
+    #[serde(default, rename = "runtime-version")]
+    runtime_version: Option<String>,
     #[serde(default)]
     delegate: Option<String>,
     #[serde(default)]
@@ -64,6 +74,7 @@ struct RuntimeStampConfig {
     packages: Vec<String>,
     exclude: Vec<String>,
     delegate: Option<String>,
+    runtime_version: Option<String>,
     docs_url: Option<String>,
     install_scheme: Option<runtime_data::InstallScheme>,
     install_name: Option<String>,
@@ -92,6 +103,10 @@ enum Command {
         /// Delegate executable inside the managed prefix
         #[arg(long)]
         delegate: Option<String>,
+
+        /// Version shown by the generated runtime
+        #[arg(long)]
+        runtime_version: Option<String>,
 
         /// Optional target label appended to staged artifact names
         #[arg(long)]
@@ -151,6 +166,10 @@ enum Command {
         /// Delegate executable inside the managed prefix
         #[arg(long)]
         delegate: Option<String>,
+
+        /// Version shown by the generated runtime
+        #[arg(long)]
+        runtime_version: Option<String>,
 
         /// Conda platform to bundle/describe (default: current)
         #[arg(long)]
@@ -270,6 +289,7 @@ fn run(cli: Cli) -> miette::Result<()> {
             layout,
             runtime,
             delegate,
+            runtime_version,
             target_label,
             platform,
             target,
@@ -287,6 +307,7 @@ fn run(cli: Cli) -> miette::Result<()> {
                     layout,
                     runtime,
                     delegate,
+                    runtime_version,
                     target_label,
                     platform,
                     target,
@@ -304,6 +325,7 @@ fn run(cli: Cli) -> miette::Result<()> {
                 layout,
                 runtime,
                 delegate,
+                runtime_version,
                 target_label,
                 platform,
                 target,
@@ -327,6 +349,7 @@ fn run(cli: Cli) -> miette::Result<()> {
             layout,
             runtime,
             delegate,
+            runtime_version,
             platform,
             out_dir,
             template,
@@ -340,6 +363,7 @@ fn run(cli: Cli) -> miette::Result<()> {
             layout,
             runtime,
             delegate,
+            runtime_version,
             platform,
             out_dir,
             template,

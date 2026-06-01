@@ -17,7 +17,7 @@ then checks SHA256 sums before running `cs`.
 Use a tag:
 
 ```yaml
-- uses: jezdez/conda-ship@v0.1.0
+- uses: jezdez/conda-ship@0.1.0
 ```
 
 Do not use a branch ref for release builds. Branch refs do not have matching
@@ -118,7 +118,7 @@ permissions:
   artifact-metadata: write
 
 steps:
-  - uses: jezdez/conda-ship@v0.1.0
+  - uses: jezdez/conda-ship@0.1.0
     id: cs
 
   - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0

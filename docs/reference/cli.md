@@ -35,7 +35,8 @@ Build and stage a runtime artifact.
 ```bash
 cs build [--runtime RUNTIME] [--delegate EXECUTABLE] [--layout LAYOUT] [--target-label LABEL] \
   [--platform PLATFORM] [--target TRIPLE] [--template PATH] \
-  [--docs-url URL] [--install-scheme SCHEME] [--install-name NAME] [--install-method METHOD] \
+  [--runtime-version VERSION] [--docs-url URL] [--install-scheme SCHEME] \
+  [--install-name NAME] [--install-method METHOD] \
   [--out-dir PATH] [--dry-run] [--root PATH]
 ```
 
@@ -49,6 +50,8 @@ Options:
 
 - `--runtime RUNTIME`: override `[tool.conda-ship].runtime`.
 - `--delegate EXECUTABLE`: override `[tool.conda-ship].delegate`.
+- `--runtime-version VERSION`: version shown by the generated runtime. Overrides
+  `[tool.conda-ship].runtime-version` and `[project].version`.
 - `--layout online`: stage a runtime that downloads packages during bootstrap.
 - `--layout external`: stage a runtime plus compressed bundle.
 - `--layout embedded`: stage a runtime with the compressed bundle embedded.
@@ -60,7 +63,9 @@ Options:
   Path-like custom target specifications are not supported here.
 - `--template PATH`: prebuilt generic runtime template binary to copy and
   stamp. When omitted, packaged builds use the template installed next to `cs`.
-- `--docs-url URL`: documentation URL stamped into runtime help output.
+- `--docs-url URL`: documentation URL stamped into runtime help output. Must
+  start with `https://` or `http://` and must not contain whitespace or control
+  characters.
 - `--install-scheme SCHEME`: install scheme stamped into the runtime. Currently
   supported: `conda-home`, which installs below `~/.conda/INSTALL_NAME`, and
   `user-data`, which installs below the platform user data directory.
@@ -80,8 +85,8 @@ Build a runtime artifact and execute it immediately.
 
 ```bash
 cs run [--runtime RUNTIME] [--delegate EXECUTABLE] [--layout LAYOUT] [--platform PLATFORM] \
-  [--template PATH] [--docs-url URL] [--install-scheme SCHEME] [--install-name NAME] \
-  [--install-method METHOD] \
+  [--template PATH] [--runtime-version VERSION] [--docs-url URL] \
+  [--install-scheme SCHEME] [--install-name NAME] [--install-method METHOD] \
   [--out-dir PATH] [--root PATH] \
   -- RUNTIME_ARGS...
 ```
@@ -92,6 +97,8 @@ Options:
 
 - `--runtime RUNTIME`: override `[tool.conda-ship].runtime`.
 - `--delegate EXECUTABLE`: override `[tool.conda-ship].delegate`.
+- `--runtime-version VERSION`: version shown by the generated runtime. Overrides
+  `[tool.conda-ship].runtime-version` and `[project].version`.
 - `--layout online`: stage a runtime that downloads packages during bootstrap.
 - `--layout external`: stage a runtime plus compressed bundle.
 - `--layout embedded`: stage a runtime with the compressed bundle embedded.
@@ -99,7 +106,9 @@ Options:
 - `--platform PLATFORM`: choose the conda platform for metadata and bundles.
 - `--template PATH`: prebuilt generic runtime template binary to copy and
   stamp. When omitted, packaged builds use the template installed next to `cs`.
-- `--docs-url URL`: documentation URL stamped into runtime help output.
+- `--docs-url URL`: documentation URL stamped into runtime help output. Must
+  start with `https://` or `http://` and must not contain whitespace or control
+  characters.
 - `--install-scheme SCHEME`: install scheme stamped into the runtime. Currently
   supported: `conda-home` and `user-data`.
 - `--install-name NAME`: name used inside the install scheme. Defaults to

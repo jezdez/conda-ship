@@ -184,6 +184,7 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
             packages: runtime_packages,
             exclude: input.config.exclude,
             delegate: input.config.delegate,
+            runtime_version: input.config.runtime_version,
             docs_url: input.config.docs_url,
             install_scheme: input.config.install_scheme,
             install_name: input.config.install_name,
@@ -250,15 +251,19 @@ pub(crate) fn discover_project_input(root: &Path) -> miette::Result<ProjectInput
     let manifest = std::fs::read_to_string(&manifest_path)
         .into_diagnostic()
         .with_context(|| format!("failed to read {}", manifest_path.display()))?;
-    let config: ProjectManifest = toml::from_str(&manifest)
+    let manifest: ProjectManifest = toml::from_str(&manifest)
         .into_diagnostic()
         .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
+    let mut config = manifest.tool.conda_ship;
+    if config.runtime_version.is_none() {
+        config.runtime_version = manifest.project.version;
+    }
 
     Ok(ProjectInput {
         manifest_path,
         manifest_kind: kind,
         lock_path,
-        config: config.tool.conda_ship,
+        config,
     })
 }
 

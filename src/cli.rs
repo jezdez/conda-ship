@@ -17,10 +17,14 @@ pub enum Verbosity {
 #[derive(Debug, Parser)]
 #[clap(
     disable_help_subcommand = true,
-    version,
+    disable_version_flag = true,
     allow_external_subcommands = true
 )]
 pub struct Cli {
+    /// Show the runtime version
+    #[clap(long, short = 'V', global = true)]
+    pub version: bool,
+
     /// Increase output detail
     #[clap(long, short, global = true)]
     pub verbose: bool,
@@ -169,6 +173,7 @@ mod tests {
     #[test]
     fn test_parse_bootstrap_defaults() {
         let cli = Cli::parse_from(["cs-template", "bootstrap"]);
+        assert!(!cli.version);
         assert!(cli.path.is_none());
         assert_matches!(
             cli.command,
@@ -310,6 +315,18 @@ mod tests {
     fn test_parse_short_quiet_flag() {
         let cli = Cli::parse_from(["cs-template", "-q", "status"]);
         assert_eq!(cli.verbosity(), Verbosity::Quiet);
+    }
+
+    #[test]
+    fn test_parse_version_flag() {
+        let cli = Cli::parse_from(["cs-template", "--version"]);
+        assert!(cli.version);
+    }
+
+    #[test]
+    fn test_parse_short_version_flag() {
+        let cli = Cli::parse_from(["cs-template", "-V"]);
+        assert!(cli.version);
     }
 
     #[test]

@@ -43,6 +43,10 @@ async fn async_main() -> miette::Result<()> {
     ensure_stamped_runtime()?;
 
     let cli = Cli::parse_runtime();
+    if cli.version {
+        println!("{} {}", policy::runtime_name(), policy::runtime_version());
+        return Ok(());
+    }
     let verbosity = cli.verbosity();
     let path = cli.path.as_ref();
 

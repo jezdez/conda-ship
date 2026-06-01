@@ -1,6 +1,6 @@
 ---
 source: tests/cli_integration.rs
-assertion_line: 44
+assertion_line: 40
 expression: stdout
 ---
 This runtime installs a conda environment from a stamped lockfile.
@@ -17,6 +17,9 @@ Commands:
   help       Show this help message
 
 Options:
+  -V, --version
+          Show the runtime version
+
   -v, --verbose
           Increase output detail
 
@@ -28,9 +31,6 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
-
-  -V, --version
-          Print version
 
 Quick start:
 
