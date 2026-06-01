@@ -17,8 +17,9 @@ The project is currently alpha and pre-1.0. The split from
 [`conda-express`](https://jezdez.github.io/conda-express/) is now explicit:
 conda-ship owns the reusable build/runtime machinery, while downstream
 distributions own their package sets, runtime names, release channels, installer
-wrappers, and user documentation. conda-express is one downstream distribution;
-it uses conda-ship to publish the official `cx` and `cxz` runtimes.
+wrappers, and user documentation. conda-express is one downstream distribution
+maintained by Jannis Leidel; it uses conda-ship to publish the `cx` and `cxz`
+runtimes.
 
 ## What It Builds
 

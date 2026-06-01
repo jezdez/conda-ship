@@ -7,9 +7,10 @@ installs the `cs` CLI, but it does not ship a first-party distribution.
 Downstream projects choose the runtime name, delegate executable, package set,
 channels, documentation URL, and release channel.
 
-`conda-express` is one downstream distribution: it uses conda-ship to build the
-official `cx` and `cxz` runtimes. conda-ship owns the reusable builder;
-conda-express owns the product defaults and release channels for `cx`.
+`conda-express` is one downstream distribution maintained by Jannis Leidel: it
+uses conda-ship to build the `cx` and `cxz` runtimes. conda-ship owns the
+reusable builder; conda-express owns the product defaults and release channels
+for `cx`.
 
 ## Start Here
 
@@ -24,6 +25,34 @@ cs --version
 ```
 
 Then use the documentation by the kind of help you need.
+
+## Common Workflows
+
+::::{grid} 1 1 3 3
+:gutter: 3
+
+:::{grid-item-card} First Runtime
+:link: tutorials/first-runtime
+:link-type: doc
+
+Build a small conda runtime and smoke-test the generated binary.
+:::
+
+:::{grid-item-card} GitHub Actions Runtime
+:link: tutorials/github-action-runtime
+:link-type: doc
+
+Build release artifacts from CI with a platform matrix.
+:::
+
+:::{grid-item-card} Custom Delegate Runtime
+:link: tutorials/custom-delegate-runtime
+:link-type: doc
+
+Expose a command other than `conda` through the generated runtime.
+:::
+
+::::
 
 ## Documentation By Need
 

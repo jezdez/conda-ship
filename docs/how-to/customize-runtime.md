@@ -38,7 +38,8 @@ layout = "online"
 ```
 
 Avoid publishing downstream builds as `cx` or `cxz`. In the conda ecosystem,
-those names identify the official conda-express artifacts.
+those names identify the conda-express artifacts maintained in the
+`jezdez/conda-express` repository.
 
 ## Choose An Install Location
 
