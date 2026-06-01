@@ -52,3 +52,14 @@ conda ship -- --help
 ```
 
 Running `conda ship` without arguments shows `cs --help`.
+
+## Error Handling
+
+`conda ship` asks `cs` for structured builder diagnostics and translates them
+back into regular command-line errors. That keeps common failures predictable
+for the conda plugin while preserving the richer terminal output for direct
+`cs` use.
+
+For example, when a source lockfile is missing, `cs` reports a stable diagnostic
+kind to the adapter, and `conda ship` shows the message and hint without
+printing raw JSON.

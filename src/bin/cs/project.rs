@@ -5,6 +5,7 @@ use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{PackageName, PackageRecord, Platform};
 use rattler_lock::{CondaPackageData, LockFile, LockFileBuilder, PlatformData};
 
+use super::diagnostic::{DiagnosticKind, ship_error};
 use super::{ProjectManifest, REQUIRED_RUNTIME_PACKAGES, RuntimeStampConfig, ShipConfig};
 
 pub(crate) fn project_root(override_root: Option<&Path>) -> miette::Result<PathBuf> {
@@ -16,8 +17,10 @@ pub(crate) fn project_root(override_root: Option<&Path>) -> miette::Result<PathB
         .into_diagnostic()
         .context("failed to read current directory")?;
     find_project_root(&current_dir).ok_or_else(|| {
-        miette::miette!(
-            "could not find project root containing conda.toml, pixi.toml, or supported pyproject.toml\n  Run from a project directory or pass --root."
+        ship_error(
+            DiagnosticKind::MissingProjectRoot,
+            "could not find project root containing conda.toml, pixi.toml, or supported pyproject.toml",
+            Some("Run from a project directory or pass --root PATH.".to_string()),
         )
     })
 }
@@ -91,14 +94,20 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
     let lock_file = parse_lock(&lock_content, &input.lock_path)?;
 
     let source_environment = input.config.source_environment.as_deref().ok_or_else(|| {
-        miette::miette!(
+        ship_error(
+            DiagnosticKind::MissingSourceEnvironment,
             "source environment is required; set [tool.conda-ship].source-environment to the solved environment to ship",
+            Some("Add source-environment to [tool.conda-ship] and point it at the solved conda-workspaces or pixi environment to package.".to_string()),
         )
     })?;
     let runtime_env = lock_file.environment(source_environment).ok_or_else(|| {
-        miette::miette!(
-            "source environment {source_environment:?} not found in {}",
-            input.lock_path.display()
+        ship_error(
+            DiagnosticKind::SourceEnvironmentNotFound,
+            format!(
+                "source environment {source_environment:?} not found in {}",
+                input.lock_path.display()
+            ),
+            Some("Add the environment to the source manifest, or update source-environment to an environment that exists in the lockfile.".to_string()),
         )
     })?;
 
@@ -202,9 +211,16 @@ pub(crate) fn validate_required_runtime_packages(
         .collect();
 
     if !missing.is_empty() {
-        return Err(miette::miette!(
-            "selected source environment for {platform} is missing required package(s): {}\n  Add them to source-environment or choose another source-environment.",
-            missing.join(", ")
+        return Err(ship_error(
+            DiagnosticKind::MissingRuntimePackages,
+            format!(
+                "selected source environment for {platform} is missing required package(s): {}",
+                missing.join(", ")
+            ),
+            Some(
+                "Add the missing packages to source-environment or choose another source-environment."
+                    .to_string(),
+            ),
         ));
     }
     Ok(())
@@ -216,10 +232,18 @@ pub(crate) fn discover_project_input(root: &Path) -> miette::Result<ProjectInput
 
     let lock_path = root.join(kind.lockfile_name());
     if !lock_path.exists() {
-        return Err(miette::miette!(
-            "lockfile not found at {}; run `{}` first",
-            lock_path.display(),
-            kind.lock_command()
+        return Err(ship_error(
+            DiagnosticKind::MissingLockfile,
+            format!(
+                "lockfile not found at {}; run `{}` first",
+                lock_path.display(),
+                kind.lock_command()
+            ),
+            Some(format!(
+                "Run `{}` and commit the resulting {} before building.",
+                kind.lock_command(),
+                kind.lockfile_name()
+            )),
         ));
     }
 
@@ -246,9 +270,16 @@ pub(crate) fn discover_manifest_path(root: &Path) -> miette::Result<PathBuf> {
     } else if is_supported_pyproject_manifest(&root.join("pyproject.toml")) {
         Ok(root.join("pyproject.toml"))
     } else {
-        Err(miette::miette!(
-            "could not find conda.toml, pixi.toml, or supported pyproject.toml in {}",
-            root.display()
+        Err(ship_error(
+            DiagnosticKind::MissingManifest,
+            format!(
+                "could not find conda.toml, pixi.toml, or supported pyproject.toml in {}",
+                root.display()
+            ),
+            Some(
+                "Create a conda-workspaces or pixi manifest in the selected project root."
+                    .to_string(),
+            ),
         ))
     }
 }

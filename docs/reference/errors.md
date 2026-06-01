@@ -2,6 +2,10 @@
 
 This page lists common conda-ship errors and the usual fix.
 
+`cs` prints human-readable diagnostics by default. The `conda ship` adapter uses
+an internal structured diagnostic mode so it can show the same errors through
+conda without depending on terminal formatting.
+
 ## Project Input
 
 `could not find project root containing conda.toml, pixi.toml, or supported pyproject.toml`
@@ -87,4 +91,3 @@ This page lists common conda-ship errors and the usual fix.
 
 `refusing to remove dangerous path`
 : The resolved path is too broad, such as a home directory or filesystem root.
-

@@ -21,7 +21,8 @@ conda runtimes from solved conda environments.
 - Platform PyPI wheels that install `cs`, `cs-template`, and the Python adapter
   together.
 - A Python adapter that exposes `conda ship` as a conda-style shortcut for
-  `cs`.
+  `cs`, including structured builder diagnostics so common failures can be
+  reported predictably through conda.
 - Build input from committed source manifests and lockfiles:
   - `conda.toml` with `conda.lock`
   - `pyproject.toml` with `[tool.conda]` and `conda.lock`

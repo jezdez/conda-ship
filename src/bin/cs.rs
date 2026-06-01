@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -12,6 +13,8 @@ mod tls;
 mod artifact;
 #[path = "cs/bundle.rs"]
 mod bundle;
+#[path = "cs/diagnostic.rs"]
+mod diagnostic;
 #[path = "cs/project.rs"]
 mod project;
 #[cfg(test)]
@@ -202,6 +205,16 @@ enum Command {
     },
 }
 
+impl Command {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Build { .. } => "build",
+            Self::Run { .. } => "run",
+            Self::Inspect { .. } => "inspect",
+        }
+    }
+}
+
 const SHIP_STATE_DIR: &str = "target/conda-ship";
 const RUNTIME_LOCK_FILE: &str = "runtime.lock";
 const BUNDLE_ARCHIVE_FILE: &str = "bundle.tar.zst";
@@ -233,10 +246,25 @@ impl BundleLayout {
     }
 }
 
-fn main() -> miette::Result<()> {
+fn main() -> ExitCode {
     tls::install_default_provider();
 
     let cli = Cli::parse();
+    let command = cli.command.name();
+    match run(cli) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            if diagnostic::structured_errors_requested() {
+                diagnostic::print_structured_error(&error, Some(command), 1);
+            } else {
+                eprintln!("{error:?}");
+            }
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run(cli: Cli) -> miette::Result<()> {
     match cli.command {
         Command::Build {
             layout,

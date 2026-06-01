@@ -15,6 +15,12 @@ runtimes.
   set, it must point to an executable file. The adapter does not fall back to
   another `cs` when this value is invalid.
 
+`CONDA_SHIP_ERROR_FORMAT`
+: Internal diagnostic format used by the Python `conda ship` adapter. When set
+  to `json`, `cs` writes a single structured JSON diagnostic line for builder
+  failures. The adapter parses that line and renders a normal conda-facing
+  error. Users normally do not need to set this themselves.
+
 ## Runtime Variables
 
 `RUNTIME_BUNDLE`

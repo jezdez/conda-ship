@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -12,11 +13,13 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from typing import TextIO
 
 
 EXIT_NOT_FOUND = 127
 EXIT_NOT_EXECUTABLE = 126
 EXIT_INTERRUPTED = 130
+ERROR_FORMAT_ENV = "CONDA_SHIP_ERROR_FORMAT"
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,15 @@ class AdapterError(Exception):
     def __init__(self, message: str, exit_code: int) -> None:
         super().__init__(message)
         self.exit_code = exit_code
+
+
+@dataclass(frozen=True)
+class BuilderDiagnostic:
+    """Structured diagnostic emitted by the ``cs`` executable."""
+
+    kind: str
+    message: str
+    hint: str | None = None
 
 
 def configure_parser(parser: argparse.ArgumentParser) -> None:
@@ -69,8 +81,20 @@ def run_cs(argv: Sequence[str], *, executable: str | None = None) -> int:
     if not ship_args:
         ship_args = ["--help"]
 
+    env = os.environ.copy()
+    env[ERROR_FORMAT_ENV] = "json"
+
     try:
-        status = subprocess.run([str(cs.path), *ship_args]).returncode
+        process = subprocess.Popen(
+            [str(cs.path), *ship_args],
+            env=env,
+            stderr=subprocess.PIPE,
+            text=True,
+            errors="replace",
+            bufsize=1,
+        )
+        pending_stderr = forward_stderr(process.stderr)
+        status = process.wait()
     except FileNotFoundError:
         print(
             f"conda-ship: {cs.path} was resolved from {cs.source}, but it no longer exists.",
@@ -88,6 +112,14 @@ def run_cs(argv: Sequence[str], *, executable: str | None = None) -> int:
     except OSError as error:
         print(f"conda-ship: could not execute {cs.path}: {error}", file=sys.stderr)
         return EXIT_NOT_EXECUTABLE
+
+    if status != 0 and pending_stderr is not None:
+        if diagnostic := parse_builder_diagnostic(pending_stderr):
+            print(format_builder_diagnostic(diagnostic), file=sys.stderr)
+        else:
+            print(pending_stderr, end="", file=sys.stderr)
+    elif pending_stderr is not None:
+        print(pending_stderr, end="", file=sys.stderr)
 
     if status < 0:
         return 128 + abs(status)
@@ -157,6 +189,49 @@ def installed_cs() -> str | None:
     if env_binary.is_file():
         return str(env_binary)
     return None
+
+
+def forward_stderr(stream: TextIO | None) -> str | None:
+    """Forward stderr while keeping the final line available for parsing."""
+    if stream is None:
+        return None
+
+    pending: str | None = None
+    for line in stream:
+        if pending is not None:
+            print(pending, end="", file=sys.stderr, flush=True)
+        pending = line
+    return pending
+
+
+def parse_builder_diagnostic(line: str) -> BuilderDiagnostic | None:
+    """Parse a structured ``cs`` diagnostic line."""
+    try:
+        payload = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("schema_version") != 1 or payload.get("tool") != "cs":
+        return None
+
+    kind = payload.get("kind")
+    message = payload.get("message")
+    hint = payload.get("hint")
+    if not isinstance(kind, str) or not isinstance(message, str):
+        return None
+    if hint is not None and not isinstance(hint, str):
+        return None
+    return BuilderDiagnostic(kind=kind, message=message, hint=hint)
+
+
+def format_builder_diagnostic(diagnostic: BuilderDiagnostic) -> str:
+    """Format a builder diagnostic for conda users."""
+    message = f"conda-ship: {diagnostic.message}"
+    if diagnostic.hint:
+        message = f"{message}\nhint: {diagnostic.hint}"
+    return message
 
 
 if __name__ == "__main__":

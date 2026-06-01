@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from types import SimpleNamespace
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -10,6 +10,15 @@ from conda_ship.cli import configure_parser, execute, run_cs
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+
+class FakeProcess:
+    def __init__(self, returncode: int, stderr: Sequence[str] = ()) -> None:
+        self.returncode = returncode
+        self.stderr = iter(stderr)
+
+    def wait(self) -> int:
+        return self.returncode
 
 
 def test_configure_parser_collects_ship_args() -> None:
@@ -43,18 +52,20 @@ def test_run_cs_delegates_to_executable(
     cs.write_text("")
     cs.chmod(0o755)
     expected_command = [str(cs), *expected]
-    calls: list[list[str]] = []
+    calls: list[tuple[list[str], dict]] = []
 
-    def fake_run(args: list[str]) -> SimpleNamespace:
-        calls.append(args)
-        return SimpleNamespace(returncode=17)
+    def fake_popen(args: list[str], **kwargs) -> FakeProcess:
+        calls.append((args, kwargs))
+        return FakeProcess(17)
 
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
     status = run_cs(argv, executable=str(cs))
 
     assert status == 17
-    assert calls == [expected_command]
+    assert calls[0][0] == expected_command
+    assert calls[0][1]["stderr"] == cli.subprocess.PIPE
+    assert calls[0][1]["env"][cli.ERROR_FORMAT_ENV] == "json"
 
 
 def test_run_cs_reports_missing_executable(
@@ -87,12 +98,12 @@ def test_run_cs_prefers_current_environment_binary(
     cs.chmod(0o755)
     calls: list[list[str]] = []
 
-    def fake_run(args: list[str]) -> SimpleNamespace:
+    def fake_popen(args: list[str], **_kwargs) -> FakeProcess:
         calls.append(args)
-        return SimpleNamespace(returncode=0)
+        return FakeProcess(0)
 
     monkeypatch.setattr(cli.sys, "executable", str(python))
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
     assert run_cs(["inspect"]) == 0
     assert calls == [[str(cs), "inspect"]]
@@ -145,7 +156,20 @@ def test_run_cs_rejects_empty_env_executable(
     assert "set but empty" in capsys.readouterr().err
 
 
-def test_run_cs_normalizes_spawn_file_not_found(
+@pytest.mark.parametrize(
+    ("failure", "returncode", "expected_status", "expected_stderr"),
+    [
+        pytest.param(FileNotFoundError, None, 127, "no longer exists", id="file-not-found"),
+        pytest.param(PermissionError, None, 126, "not executable", id="permission-error"),
+        pytest.param(OSError, None, 126, "spawn failed", id="os-error"),
+        pytest.param(None, -15, 143, None, id="signal-exit"),
+    ],
+)
+def test_run_cs_normalizes_spawn_failures(
+    failure: type[Exception] | None,
+    returncode: int | None,
+    expected_status: int,
+    expected_stderr: str | None,
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -154,16 +178,22 @@ def test_run_cs_normalizes_spawn_file_not_found(
     cs.write_text("")
     cs.chmod(0o755)
 
-    def fake_run(_args: list[str]) -> SimpleNamespace:
-        raise FileNotFoundError
+    def fake_popen(_args: list[str], **_kwargs) -> FakeProcess:
+        if failure is None:
+            assert returncode is not None
+            return FakeProcess(returncode)
+        if failure is OSError:
+            raise failure("spawn failed")
+        raise failure
 
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
-    assert run_cs([], executable=str(cs)) == 127
-    assert "no longer exists" in capsys.readouterr().err
+    assert run_cs([], executable=str(cs)) == expected_status
+    if expected_stderr is not None:
+        assert expected_stderr in capsys.readouterr().err
 
 
-def test_run_cs_normalizes_spawn_permission_error(
+def test_run_cs_formats_structured_diagnostic(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -172,16 +202,38 @@ def test_run_cs_normalizes_spawn_permission_error(
     cs.write_text("")
     cs.chmod(0o755)
 
-    def fake_run(_args: list[str]) -> SimpleNamespace:
-        raise PermissionError
+    def fake_popen(_args: list[str], **_kwargs) -> FakeProcess:
+        return FakeProcess(
+            1,
+            [
+                "checking project\n",
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "tool": "cs",
+                        "command": "build",
+                        "kind": "missing_lockfile",
+                        "message": "lockfile not found",
+                        "hint": "run pixi lock",
+                        "exit_code": 1,
+                        "causes": [],
+                    }
+                )
+                + "\n",
+            ],
+        )
 
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
-    assert run_cs([], executable=str(cs)) == 126
-    assert "not executable" in capsys.readouterr().err
+    assert run_cs(["build"], executable=str(cs)) == 1
+    stderr = capsys.readouterr().err
+    assert "checking project" in stderr
+    assert "conda-ship: lockfile not found" in stderr
+    assert "hint: run pixi lock" in stderr
+    assert '"schema_version"' not in stderr
 
 
-def test_run_cs_normalizes_spawn_os_error(
+def test_run_cs_forwards_plain_failure_stderr(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -190,29 +242,13 @@ def test_run_cs_normalizes_spawn_os_error(
     cs.write_text("")
     cs.chmod(0o755)
 
-    def fake_run(_args: list[str]) -> SimpleNamespace:
-        raise OSError("spawn failed")
+    def fake_popen(_args: list[str], **_kwargs) -> FakeProcess:
+        return FakeProcess(1, ["plain failure\n"])
 
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
 
-    assert run_cs([], executable=str(cs)) == 126
-    assert "spawn failed" in capsys.readouterr().err
-
-
-def test_run_cs_normalizes_signal_exit(
-    tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    cs = tmp_path / ("cs.exe" if cli.os.name == "nt" else "cs")
-    cs.write_text("")
-    cs.chmod(0o755)
-
-    def fake_run(_args: list[str]) -> SimpleNamespace:
-        return SimpleNamespace(returncode=-15)
-
-    monkeypatch.setattr(cli.subprocess, "run", fake_run)
-
-    assert run_cs([], executable=str(cs)) == 143
+    assert run_cs(["build"], executable=str(cs)) == 1
+    assert "plain failure" in capsys.readouterr().err
 
 
 def test_execute_returns_cs_status(monkeypatch: pytest.MonkeyPatch) -> None:

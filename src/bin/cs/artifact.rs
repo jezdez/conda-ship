@@ -9,6 +9,7 @@ use rattler_lock::{CondaPackageData, LockFile};
 use sha2::{Digest, Sha256};
 
 use super::bundle::gen_bundle_from_lock;
+use super::diagnostic::{DiagnosticKind, ship_error};
 use super::project::{
     DerivedRuntimeLock, derive_runtime_lock, package_record, project_root,
     write_generated_runtime_lock,
@@ -307,7 +308,14 @@ pub(crate) fn resolve_runtime_name(
     config: &ShipConfig,
 ) -> miette::Result<String> {
     runtime.or_else(|| config.runtime.clone()).ok_or_else(|| {
-        miette::miette!("runtime is required; pass --runtime or set [tool.conda-ship].runtime",)
+        ship_error(
+            DiagnosticKind::MissingRuntime,
+            "runtime is required; pass --runtime or set [tool.conda-ship].runtime",
+            Some(
+                "Pass --runtime to this command or set [tool.conda-ship].runtime in the source manifest."
+                    .to_string(),
+            ),
+        )
     })
 }
 
@@ -316,7 +324,14 @@ pub(crate) fn resolve_delegate(
     config: &ShipConfig,
 ) -> miette::Result<String> {
     delegate.or_else(|| config.delegate.clone()).ok_or_else(|| {
-        miette::miette!("delegate is required; pass --delegate or set [tool.conda-ship].delegate",)
+        ship_error(
+            DiagnosticKind::MissingDelegate,
+            "delegate is required; pass --delegate or set [tool.conda-ship].delegate",
+            Some(
+                "Pass --delegate to this command or set [tool.conda-ship].delegate in the source manifest."
+                    .to_string(),
+            ),
+        )
     })
 }
 
@@ -537,9 +552,16 @@ pub(crate) fn validate_bundle_package_hashes(packages: &[&CondaPackageData]) -> 
     missing.sort();
     missing.dedup();
     if !missing.is_empty() {
-        return Err(miette::miette!(
-            "cannot bundle packages without SHA256 hashes in the source lockfile: {}",
-            missing.join(", ")
+        return Err(ship_error(
+            DiagnosticKind::MissingSha256,
+            format!(
+                "cannot bundle packages without SHA256 hashes in the source lockfile: {}",
+                missing.join(", ")
+            ),
+            Some(
+                "Refresh the source lockfile with package hash metadata before building an external or embedded layout."
+                    .to_string(),
+            ),
         ));
     }
     Ok(())
@@ -786,9 +808,13 @@ pub(crate) fn validate_package_archive_name(name: &str) -> Result<(), &'static s
 
 pub(crate) fn parse_platform(platform_str: Option<String>) -> miette::Result<Platform> {
     if let Some(ref platform) = platform_str {
-        platform
-            .parse::<Platform>()
-            .map_err(|_| miette::miette!("invalid platform: {platform}"))
+        platform.parse::<Platform>().map_err(|_| {
+            ship_error(
+                DiagnosticKind::InvalidPlatform,
+                format!("invalid platform: {platform}"),
+                Some("Use a conda platform such as linux-64, osx-arm64, or win-64.".to_string()),
+            )
+        })
     } else {
         Ok(Platform::current())
     }
@@ -865,26 +891,40 @@ pub(crate) fn validate_install_name(install_name: &str) -> miette::Result<()> {
 
 fn validate_artifact_component(kind: &str, value: &str) -> miette::Result<()> {
     if value.is_empty() {
-        return Err(miette::miette!("{kind} must not be empty"));
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            format!("{kind} must not be empty"),
+            Some(format!("Use a non-empty {kind} value.")),
+        ));
     }
     if value == "." || value == ".." {
-        return Err(miette::miette!("{kind} must not be . or .."));
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            format!("{kind} must not be . or .."),
+            Some(format!("Use a filename-safe {kind} such as demo-runtime.")),
+        ));
     }
     if !value
         .chars()
         .next()
         .is_some_and(|c| c.is_ascii_alphanumeric())
     {
-        return Err(miette::miette!(
-            "{kind} must start with an ASCII letter or digit"
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            format!("{kind} must start with an ASCII letter or digit"),
+            Some(format!("Use a filename-safe {kind} such as demo-runtime.")),
         ));
     }
     if !value
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
     {
-        return Err(miette::miette!(
-            "{kind} may only contain ASCII letters, digits, dots, dashes, and underscores"
+        return Err(ship_error(
+            DiagnosticKind::InvalidArtifactName,
+            format!("{kind} may only contain ASCII letters, digits, dots, dashes, and underscores"),
+            Some(format!(
+                "Remove path separators, spaces, and shell metacharacters from the {kind}."
+            )),
         ));
     }
     Ok(())
@@ -960,13 +1000,23 @@ pub(crate) fn source_binary_plan(
     }
 
     if target.is_some() {
-        return Err(miette::miette!(
-            "cross-builds require --template with a prebuilt runtime template for the requested target"
+        return Err(ship_error(
+            DiagnosticKind::CrossBuildRequiresTemplate,
+            "cross-builds require --template with a prebuilt runtime template for the requested target",
+            Some(
+                "Pass --template PATH for the target runtime template you want to stamp."
+                    .to_string(),
+            ),
         ));
     }
 
-    Err(miette::miette!(
-        "runtime template not found; install conda-ship with its runtime template or pass --template"
+    Err(ship_error(
+        DiagnosticKind::MissingRuntimeTemplate,
+        "runtime template not found; install conda-ship with its runtime template or pass --template",
+        Some(
+            "Install a packaged conda-ship build that includes cs-template, set CONDA_SHIP_TEMPLATE, or pass --template PATH."
+                .to_string(),
+        ),
     ))
 }
 
@@ -1015,9 +1065,13 @@ fn resolve_runtime_template(path: &Path) -> miette::Result<PathBuf> {
             .join(path)
     };
     if !template.is_file() {
-        return Err(miette::miette!(
-            "runtime template not found at {}",
-            template.display()
+        return Err(ship_error(
+            DiagnosticKind::MissingRuntimeTemplate,
+            format!("runtime template not found at {}", template.display()),
+            Some(
+                "Check the --template path or set CONDA_SHIP_TEMPLATE to a generic cs-template binary."
+                    .to_string(),
+            ),
         ));
     }
     if runtime_data::read_from_path(&template)
@@ -1025,9 +1079,13 @@ fn resolve_runtime_template(path: &Path) -> miette::Result<PathBuf> {
         .with_context(|| format!("failed to inspect runtime template {}", template.display()))?
         .is_some_and(|data| data.stamped)
     {
-        return Err(miette::miette!(
-            "runtime template is already stamped: {}",
-            template.display()
+        return Err(ship_error(
+            DiagnosticKind::RuntimeTemplateStamped,
+            format!("runtime template is already stamped: {}", template.display()),
+            Some(
+                "Use the generic cs-template binary as the template, not a runtime already produced by cs build."
+                    .to_string(),
+            ),
         ));
     }
     Ok(template)
