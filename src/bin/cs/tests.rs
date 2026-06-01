@@ -629,9 +629,15 @@ fn test_run_accepts_install_method() {
 #[rstest]
 #[case::windows_target(Some("x86_64-pc-windows-msvc"), "demo.exe")]
 #[case::unix_target(Some("x86_64-unknown-linux-gnu"), "demo")]
-#[case::current_target(None, "demo")]
 fn test_binary_filename(#[case] target: Option<&str>, #[case] expected: &str) {
     assert_eq!(binary_filename("demo", target), expected);
+}
+
+#[test]
+fn test_binary_filename_for_current_target() {
+    let expected = if cfg!(windows) { "demo.exe" } else { "demo" };
+
+    assert_eq!(binary_filename("demo", None), expected);
 }
 
 #[rstest]
