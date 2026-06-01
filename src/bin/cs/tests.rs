@@ -4,6 +4,7 @@ use std::str::FromStr;
 use clap::Parser;
 use rattler_conda_types::{PackageName, PackageRecord, Platform, VersionWithSource};
 use rattler_lock::{CondaPackageData, LockFileBuilder, PlatformData};
+use rstest::rstest;
 use tempfile::TempDir;
 
 use super::artifact::{
@@ -191,21 +192,16 @@ fn test_source_binary_prefers_explicit_template() {
     assert_eq!(source_binary(Some(&template), None).unwrap(), template);
 }
 
-#[test]
-fn test_source_binary_plan_requires_template_for_cross_builds() {
+#[rstest]
+#[case::cross_build(Some("x86_64-unknown-linux-gnu"), "cross-builds require --template")]
+#[case::installed_template(None, "runtime template not found")]
+fn test_source_binary_plan_reports_missing_template(
+    #[case] target: Option<&str>,
+    #[case] expected: &str,
+) {
     temp_env::with_var(RUNTIME_TEMPLATE_ENV, None::<&str>, || {
-        let err = source_binary_plan(None, Some("x86_64-unknown-linux-gnu"))
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("cross-builds require --template"));
-    });
-}
-
-#[test]
-fn test_source_binary_plan_requires_installed_template() {
-    temp_env::with_var(RUNTIME_TEMPLATE_ENV, None::<&str>, || {
-        let err = source_binary_plan(None, None).unwrap_err().to_string();
-        assert!(err.contains("runtime template not found"));
+        let err = source_binary_plan(None, target).unwrap_err().to_string();
+        assert!(err.contains(expected));
     });
 }
 
@@ -314,20 +310,16 @@ fn test_validate_required_runtime_packages_rejects_missing_runtime_package() {
     assert!(err.contains("missing required package(s): conda-spawn"));
 }
 
-#[test]
-fn test_artifact_stem_embedded_adds_z_before_target_label() {
-    assert_eq!(
-        artifact_stem("demo", BundleLayout::Embedded, Some("linux-64")),
-        "demoz-linux-64"
-    );
-}
-
-#[test]
-fn test_artifact_stem_external_keeps_base_name() {
-    assert_eq!(
-        artifact_stem("demo", BundleLayout::External, Some("linux-64")),
-        "demo-linux-64"
-    );
+#[rstest]
+#[case::embedded_with_label(BundleLayout::Embedded, Some("linux-64"), "demoz-linux-64")]
+#[case::external_with_label(BundleLayout::External, Some("linux-64"), "demo-linux-64")]
+#[case::online_without_label(BundleLayout::Online, None, "demo")]
+fn test_artifact_stem(
+    #[case] layout: BundleLayout,
+    #[case] target_label: Option<&str>,
+    #[case] expected: &str,
+) {
+    assert_eq!(artifact_stem("demo", layout, target_label), expected);
 }
 
 #[test]
@@ -417,65 +409,68 @@ fn test_stage_artifacts_external_outputs_bundle_and_metadata() {
     assert!(checksums.contains("demo-linux-64.bundle.tar.zst"));
 }
 
-#[test]
-fn test_runtime_name_allows_filename_safe_components() {
-    validate_runtime_name("conda-ship_1.0").unwrap();
+#[rstest]
+#[case::runtime_name("runtime name", validate_runtime_name, "conda-ship_1.0")]
+#[case::delegate("delegate", validate_delegate, "python3.12")]
+#[case::install_name("install name", validate_install_name, "conda-express_1.0")]
+fn test_artifact_component_allows_filename_safe_values(
+    #[case] _kind: &str,
+    #[case] validate: fn(&str) -> miette::Result<()>,
+    #[case] value: &str,
+) {
+    validate(value).unwrap();
 }
 
-#[test]
-fn test_runtime_name_rejects_dot_component() {
-    let err = validate_runtime_name(".").unwrap_err().to_string();
-    assert!(err.contains("runtime name must not be . or .."));
-}
-
-#[test]
-fn test_runtime_name_rejects_leading_dash() {
-    let err = validate_runtime_name("-demo").unwrap_err().to_string();
-    assert!(err.contains("runtime name must start with an ASCII letter or digit"));
-}
-
-#[test]
-fn test_runtime_name_rejects_path_separator() {
-    let err = validate_runtime_name("demo/tool").unwrap_err().to_string();
-    assert!(err.contains(
-        "runtime name may only contain ASCII letters, digits, dots, dashes, and underscores"
-    ));
-}
-
-#[test]
-fn test_runtime_name_rejects_newline() {
-    let err = validate_runtime_name("demo\ntool").unwrap_err().to_string();
-    assert!(err.contains(
-        "runtime name may only contain ASCII letters, digits, dots, dashes, and underscores"
-    ));
-}
-
-#[test]
-fn test_delegate_allows_filename_safe_components() {
-    validate_delegate("python3.12").unwrap();
-}
-
-#[test]
-fn test_target_label_rejects_path_separator() {
-    let err = validate_target_label("linux/64").unwrap_err().to_string();
-    assert!(err.contains(
-        "target label may only contain ASCII letters, digits, dots, dashes, and underscores"
-    ));
-}
-
-#[test]
-fn test_target_triple_rejects_path_like_value() {
-    let err = validate_target_triple("custom/target.json")
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains(
-        "target triple may only contain ASCII letters, digits, dots, dashes, and underscores"
-    ));
-}
-
-#[test]
-fn test_install_name_allows_filename_safe_components() {
-    validate_install_name("conda-express_1.0").unwrap();
+#[rstest]
+#[case::runtime_name_dot(validate_runtime_name, ".", "runtime name must not be . or ..")]
+#[case::runtime_name_leading_dash(
+    validate_runtime_name,
+    "-demo",
+    "runtime name must start with an ASCII letter or digit"
+)]
+#[case::runtime_name_path(
+    validate_runtime_name,
+    "demo/tool",
+    "runtime name may only contain ASCII letters, digits, dots, dashes, and underscores"
+)]
+#[case::runtime_name_newline(
+    validate_runtime_name,
+    "demo\ntool",
+    "runtime name may only contain ASCII letters, digits, dots, dashes, and underscores"
+)]
+#[case::target_label_path(
+    validate_target_label,
+    "linux/64",
+    "target label may only contain ASCII letters, digits, dots, dashes, and underscores"
+)]
+#[case::target_triple_path(
+    validate_target_triple,
+    "custom/target.json",
+    "target triple may only contain ASCII letters, digits, dots, dashes, and underscores"
+)]
+#[case::install_name_dot(validate_install_name, ".", "install name must not be . or ..")]
+#[case::install_name_path(
+    validate_install_name,
+    "conda/express",
+    "install name may only contain ASCII letters, digits, dots, dashes, and underscores"
+)]
+#[case::install_name_newline(
+    validate_install_name,
+    "express\n",
+    "install name may only contain ASCII letters, digits, dots, dashes, and underscores"
+)]
+#[case::install_method_path(
+    validate_install_method,
+    "home/brew",
+    "install method may only contain ASCII letters, digits, dots, dashes, and underscores"
+)]
+fn test_artifact_component_rejects_unsafe_values(
+    #[case] validate: fn(&str) -> miette::Result<()>,
+    #[case] value: &str,
+    #[case] expected: &str,
+) {
+    let err = validate(value).unwrap_err().to_string();
+    assert!(err.contains(expected));
 }
 
 #[test]
@@ -621,30 +616,6 @@ fn test_run_rejects_path_option_before_runtime_args() {
 }
 
 #[test]
-fn test_install_name_rejects_dot_component() {
-    let err = validate_install_name(".").unwrap_err().to_string();
-    assert!(err.contains("install name must not be . or .."));
-}
-
-#[test]
-fn test_install_name_rejects_path_separator() {
-    let err = validate_install_name("conda/express")
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains(
-        "install name may only contain ASCII letters, digits, dots, dashes, and underscores"
-    ));
-}
-
-#[test]
-fn test_install_name_rejects_newline() {
-    let err = validate_install_name("express\n").unwrap_err().to_string();
-    assert!(err.contains(
-        "install name may only contain ASCII letters, digits, dots, dashes, and underscores"
-    ));
-}
-
-#[test]
 fn test_run_accepts_install_method() {
     let cli = Cli::try_parse_from(["cs", "run", "--install-method", "conda-forge", "--"]).unwrap();
 
@@ -655,39 +626,27 @@ fn test_run_accepts_install_method() {
     assert_eq!(install_method.as_deref(), Some("conda-forge"));
 }
 
-#[test]
-fn test_install_method_rejects_path_separator() {
-    let err = validate_install_method("home/brew")
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains(
-        "install method may only contain ASCII letters, digits, dots, dashes, and underscores"
-    ));
+#[rstest]
+#[case::windows_target(Some("x86_64-pc-windows-msvc"), "demo.exe")]
+#[case::unix_target(Some("x86_64-unknown-linux-gnu"), "demo")]
+#[case::current_target(None, "demo")]
+fn test_binary_filename(#[case] target: Option<&str>, #[case] expected: &str) {
+    assert_eq!(binary_filename("demo", target), expected);
 }
 
-#[test]
-fn test_binary_filename_uses_windows_extension_for_target() {
-    assert_eq!(
-        binary_filename("demo", Some("x86_64-pc-windows-msvc")),
-        "demo.exe"
-    );
+#[rstest]
+#[case::conda("python-3.12-h123_0.conda")]
+#[case::tar_bz2("python-3.12-h123_0.tar.bz2")]
+fn test_package_archive_name_accepts_conda_archives(#[case] name: &str) {
+    assert!(validate_package_archive_name(name).is_ok());
 }
 
-#[test]
-fn test_package_archive_name_accepts_conda_archives() {
-    assert!(validate_package_archive_name("python-3.12-h123_0.conda").is_ok());
-    assert!(validate_package_archive_name("python-3.12-h123_0.tar.bz2").is_ok());
-}
-
-#[test]
-fn test_package_archive_name_rejects_path_components() {
-    assert!(validate_package_archive_name("../python-3.12-h123_0.conda").is_err());
-    assert!(validate_package_archive_name("nested/python-3.12-h123_0.conda").is_err());
-}
-
-#[test]
-fn test_package_archive_name_rejects_non_package_suffix() {
-    assert!(validate_package_archive_name("python-3.12-h123_0.zip").is_err());
+#[rstest]
+#[case::parent_dir("../python-3.12-h123_0.conda")]
+#[case::nested("nested/python-3.12-h123_0.conda")]
+#[case::wrong_suffix("python-3.12-h123_0.zip")]
+fn test_package_archive_name_rejects_invalid_archives(#[case] name: &str) {
+    assert!(validate_package_archive_name(name).is_err());
 }
 
 #[test]
