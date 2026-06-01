@@ -18,8 +18,10 @@ conda runtimes from solved conda environments.
   - `cs run` builds a runtime and immediately runs it for local smoke tests.
 - The generic `cs-template` runtime template used to produce downstream runtime
   binaries.
-- An optional Python adapter that exposes `conda ship` as a conda-style
-  shortcut for `cs`.
+- Platform PyPI wheels that install `cs`, `cs-template`, and the Python adapter
+  together.
+- A Python adapter that exposes `conda ship` as a conda-style shortcut for
+  `cs`.
 - Build input from committed source manifests and lockfiles:
   - `conda.toml` with `conda.lock`
   - `pyproject.toml` with `[tool.conda]` and `conda.lock`

@@ -16,6 +16,10 @@ Tagged conda-ship releases publish builder assets:
 `SHA256SUMS`
 : Checksums for release assets.
 
+The PyPI release for the same tag publishes platform wheels that install the
+`cs` and `cs-template` executables into the Python environment's scripts
+directory, plus a source distribution for packaging systems.
+
 Published release assets are immutable. A tag represents one complete asset set;
 fixes use a new tag rather than replacing files under an existing tag.
 

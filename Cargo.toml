@@ -19,6 +19,8 @@ include = [
   "/CHANGELOG.md",
   "/LICENSE",
   "/pixi.toml",
+  "/pyproject.toml",
+  "/python/conda_ship/*.py",
   "/README.md",
   "/src/*.rs",
   "/src/bin/*.rs",

@@ -53,9 +53,16 @@ def test_run_cs_delegates_to_executable(
 
 
 def test_run_cs_reports_missing_executable(
+    tmp_path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    python = bin_dir / "python"
+    python.write_text("")
+
+    monkeypatch.setattr(cli.sys, "executable", str(python))
     monkeypatch.setattr(cli.shutil, "which", lambda _name: None)
 
     status = run_cs([])

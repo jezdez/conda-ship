@@ -115,10 +115,10 @@ or `.msi` output directly. It produces runtimes that can be distributed as
 GitHub Release assets or wrapped by Homebrew, constructor, Docker, enterprise
 packaging systems, and other release tooling.
 
-A conda package can install the `cs` builder, the `cs-template` runtime
-template, and the optional Python adapter together. The adapter makes
-`conda ship` a shortcut for the same builder; it does not make conda-ship part
-of conda itself.
+The PyPI package and conda package install the `cs` builder, the `cs-template`
+runtime template, and the Python adapter together. The adapter makes
+`conda ship` a shortcut for the same builder when installed in a conda
+environment; it does not make conda-ship part of conda itself.
 
 ## What Belongs Downstream
 
