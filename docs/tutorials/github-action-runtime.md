@@ -62,7 +62,10 @@ jobs:
           - os: ubuntu-latest
             layout: online
             install-method: standalone
-          - os: macos-latest
+          - os: macos-15-intel
+            layout: embedded
+            install-method: homebrew
+          - os: macos-15
             layout: embedded
             install-method: homebrew
           - os: windows-latest

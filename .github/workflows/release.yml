@@ -87,9 +87,9 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-24.04-arm
           - target: x86_64-apple-darwin
-            os: macos-15
+            os: macos-15-intel
           - target: aarch64-apple-darwin
-            os: macos-latest
+            os: macos-15
           - target: x86_64-pc-windows-msvc
             os: windows-latest
 
@@ -228,12 +228,12 @@ jobs:
             os: ubuntu-latest
             manylinux: "2_17"
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             manylinux: "2_17"
           - target: x86_64-apple-darwin
-            os: macos-15
+            os: macos-15-intel
           - target: aarch64-apple-darwin
-            os: macos-latest
+            os: macos-15
           - target: x86_64-pc-windows-msvc
             os: windows-latest
 

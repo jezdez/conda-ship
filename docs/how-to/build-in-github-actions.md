@@ -113,7 +113,11 @@ strategy:
         layout: online
         runtime: demo
         install-method: standalone
-      - os: macos-latest
+      - os: macos-15-intel
+        layout: embedded
+        runtime: demo
+        install-method: homebrew
+      - os: macos-15
         layout: embedded
         runtime: demo
         install-method: homebrew
