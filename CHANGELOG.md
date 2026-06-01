@@ -29,9 +29,9 @@ conda runtimes from solved conda environments.
   - `pixi.toml` with `pixi.lock`
   - `pyproject.toml` with `[tool.pixi]` and `pixi.lock`
 - `[tool.conda-ship]` build policy for generated runtimes, including the
-  runtime name, delegate executable, source environment, artifact layout, package
-  exclusions, install scheme, install name, install method, and documentation
-  URL.
+  runtime name, runtime version, delegate executable, source environment,
+  artifact layout, package exclusions, install scheme, install name, install
+  method, and documentation URL.
 - Three artifact layouts:
   - `online`, for small runtime artifacts that download packages during
     bootstrap
@@ -40,6 +40,9 @@ conda runtimes from solved conda environments.
     bundle inside the binary
 - Generated runtime commands for `bootstrap`, `status`, `shell`, and
   `uninstall`, plus pass-through support to the configured delegate executable.
+- Generated runtime version output, so downstream binaries such as `cx` can
+  report their own distribution version instead of the generic conda-ship
+  builder version.
 - Runtime install ownership metadata so generated runtimes can protect managed
   prefixes from accidental use or removal by the wrong runtime.
 - Install schemes for `~/.conda/INSTALL_NAME` and platform user data
@@ -59,7 +62,10 @@ conda runtimes from solved conda environments.
 - A composite GitHub Action for downstream release jobs. The action uses
   committed manifest and lockfile input, verifies downloaded conda-ship release
   assets, runs `cs build --dry-run`, and exposes `dist-path` for publishing the
-  complete generated artifact directory.
+  complete generated artifact directory. Release jobs can override runtime
+  metadata such as runtime name, runtime version, delegate, layout, install
+  scheme, install name, install method, and documentation URL from workflow
+  inputs or matrices.
 - Tagged release assets for `cs`, `cs-template`, and `SHA256SUMS`.
 
 ### Security And Provenance
@@ -69,6 +75,9 @@ conda runtimes from solved conda environments.
   verified before they are staged or installed.
 - Runtime templates refuse to run directly; `cs build` must stamp a template
   before it becomes a downstream runtime.
+- Runtime names, runtime versions, delegates, install names, install methods,
+  target labels, and documentation URLs are validated before they are stamped
+  into runtime binaries or artifact names.
 - The GitHub Action verifies artifact attestations for downloaded `cs`,
   `cs-template`, and `SHA256SUMS` assets before running them.
 - The `conda ship` adapter only runs the `cs` executable installed in the same
@@ -79,6 +88,7 @@ conda runtimes from solved conda environments.
 - GitHub workflows and the composite action use pinned actions, minimal
   permissions, explicit artifact verification, and no shell `eval` for user
   input.
+- Release workflows use unprefixed version tags such as `0.1.0`.
 - Release checks include Rust advisory, license, dependency-ban, and source
   policy checks.
 
@@ -91,6 +101,7 @@ conda runtimes from solved conda environments.
   package sets, channels, runtime names, delegates, install methods, release
   channels, signing policy, and user documentation.
 - The GitHub Action should be used from a release tag. Branch refs do not have
-  matching `cs` and `cs-template` release assets.
+  matching `cs` and `cs-template` release assets. Use tags such as `0.1.0`,
+  without a leading `v`.
 - Downstream release workflows should sign or attest the full `dist-path`
   output after `cs build`.

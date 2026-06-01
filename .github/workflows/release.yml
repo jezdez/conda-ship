@@ -4,15 +4,9 @@ on:
   push:
     tags:
       - "*.*.*"
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Existing tag to build into a new immutable release."
-        required: true
-        type: string
 
 concurrency:
-  group: release-${{ inputs.tag || github.ref_name }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -30,7 +24,7 @@ jobs:
         id: release
         shell: bash
         env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
 
