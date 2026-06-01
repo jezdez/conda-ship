@@ -22,8 +22,9 @@ automatically. Source checkouts need an installed template, a
 ## Packaging Details
 
 The PyPI and conda packages install the Python adapter and the Rust-built
-`cs` executable together. `conda-ship` first looks for `cs` next to the current
-Python interpreter, then falls back to `PATH`.
+`cs` executable together. `conda-ship` looks for `cs` next to the current
+Python interpreter. It does not search `PATH`, so `conda ship` cannot
+accidentally run an unrelated `cs` executable from another environment.
 
 Packages must install these pieces into the same environment:
 
@@ -32,7 +33,8 @@ Packages must install these pieces into the same environment:
 - the Python `conda_ship` adapter package
 
 For custom packaging or tests, set `CONDA_SHIP_EXECUTABLE` to an explicit
-executable path.
+executable path. If that variable is set, it must point to a valid executable;
+the adapter fails instead of falling back to the packaged `cs`.
 
 ## Argument Forwarding
 

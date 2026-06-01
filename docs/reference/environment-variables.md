@@ -11,7 +11,9 @@ runtimes.
 
 `CONDA_SHIP_EXECUTABLE`
 : Path used by the Python `conda ship` adapter to find the `cs` executable.
-  This is mainly useful for tests and custom packaging.
+  This is mainly useful for source checkouts, tests, and custom packaging. If
+  set, it must point to an executable file. The adapter does not fall back to
+  another `cs` when this value is invalid.
 
 ## Runtime Variables
 

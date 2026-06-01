@@ -70,6 +70,9 @@ conda runtimes from solved conda environments.
   before it becomes a downstream runtime.
 - The GitHub Action verifies artifact attestations for downloaded `cs`,
   `cs-template`, and `SHA256SUMS` assets before running them.
+- The `conda ship` adapter only runs the `cs` executable installed in the same
+  Python environment, unless `CONDA_SHIP_EXECUTABLE` explicitly selects another
+  executable.
 - Tagged GitHub releases publish immutable asset sets. If a release is wrong,
   publish a new version instead of replacing files under an existing tag.
 - GitHub workflows and the composite action use pinned actions, minimal
