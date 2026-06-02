@@ -1,6 +1,8 @@
 //! Integration tests verifying the derived runtime lock has been pre-filtered.
 #![cfg(feature = "runtime-template")]
 
+use std::process::{Command, Stdio};
+
 fn package_names_from_inspect() -> Vec<String> {
     let root = env!("CARGO_MANIFEST_DIR");
     let assert = assert_cmd::cargo::cargo_bin_cmd!("cs")
@@ -48,5 +50,31 @@ fn test_derived_lockfile_package_composition() {
     assert!(
         names.iter().any(|n| n.starts_with("python")),
         "derived runtime lock should contain python"
+    );
+}
+
+#[test]
+fn test_inspect_json_treats_closed_stdout_as_success() {
+    let root = env!("CARGO_MANIFEST_DIR");
+    let mut child = Command::new(assert_cmd::cargo::cargo_bin("cs"))
+        .args(["inspect", "--json", "--root", root])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn cs inspect");
+
+    drop(child.stdout.take());
+    let output = child
+        .wait_with_output()
+        .expect("failed to wait for cs inspect");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        output.status.success(),
+        "closed stdout should not fail; stderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("panicked"),
+        "closed stdout should not emit a Rust panic; stderr:\n{stderr}"
     );
 }
