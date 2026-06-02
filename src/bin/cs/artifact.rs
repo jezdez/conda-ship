@@ -1,6 +1,6 @@
 use std::env;
 use std::ffi::OsString;
-use std::io::Read;
+use std::io::{self, Read, Write as _};
 use std::path::{Path, PathBuf};
 
 use miette::{Context, IntoDiagnostic};
@@ -372,17 +372,39 @@ pub(crate) fn inspect_artifact(
 
     if json {
         let inspect = inspect_report(&root, &derived, platform, summaries, package_infos);
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&inspect)
-                .into_diagnostic()
-                .context("failed to render inspect JSON")?
-        );
+        let mut output = serde_json::to_string_pretty(&inspect)
+            .into_diagnostic()
+            .context("failed to render inspect JSON")?;
+        output.push('\n');
+        write_stdout(|stdout| stdout.write_all(output.as_bytes()))?;
         return Ok(());
     }
 
-    print_inspect_report(&root, &derived, platform, &summaries, &package_infos);
+    write_stdout(|stdout| {
+        print_inspect_report(
+            stdout,
+            &root,
+            &derived,
+            platform,
+            &summaries,
+            &package_infos,
+        )
+    })?;
     Ok(())
+}
+
+fn write_stdout<F>(write: F) -> miette::Result<()>
+where
+    F: FnOnce(&mut dyn io::Write) -> io::Result<()>,
+{
+    let mut stdout = io::stdout().lock();
+    match write(&mut stdout).and_then(|()| stdout.flush()) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::BrokenPipe => Ok(()),
+        Err(error) => Err(error)
+            .into_diagnostic()
+            .context("failed to write output to stdout"),
+    }
 }
 
 fn inspect_report(
@@ -427,50 +449,75 @@ fn inspect_report(
 }
 
 fn print_inspect_report(
+    writer: &mut dyn io::Write,
     root: &Path,
     derived: &DerivedRuntimeLock,
     platform: Platform,
     summaries: &[PlatformSummary],
     package_infos: &[PackageInfo],
-) {
-    println!("Project");
-    print_project_summary(root, derived);
-    println!();
-    println!("Runtime input");
-    println!("  source environment: {}", derived.source_environment);
-    println!("  platforms: {}", platform_list(&derived.platforms));
-    println!(
+) -> io::Result<()> {
+    writeln!(writer, "Project")?;
+    print_project_summary(writer, root, derived)?;
+    writeln!(writer)?;
+    writeln!(writer, "Runtime input")?;
+    writeln!(
+        writer,
+        "  source environment: {}",
+        derived.source_environment
+    )?;
+    writeln!(writer, "  platforms: {}", platform_list(&derived.platforms))?;
+    writeln!(
+        writer,
         "  channels: {}",
         string_list(&derived.runtime_config.channels)
-    );
-    println!("  packages: {}", derived.total_packages);
-    println!();
-    println!("Validation");
-    println!("  source lockfile: ok");
-    println!("  runtime lock derivation: ok");
-    println!(
+    )?;
+    writeln!(writer, "  packages: {}", derived.total_packages)?;
+    writeln!(writer)?;
+    writeln!(writer, "Validation")?;
+    writeln!(writer, "  source lockfile: ok")?;
+    writeln!(writer, "  runtime lock derivation: ok")?;
+    writeln!(
+        writer,
         "  required packages: {}",
         REQUIRED_RUNTIME_PACKAGES.join(", ")
-    );
-    println!();
-    println!("Exclusions");
-    println!(
+    )?;
+    writeln!(writer)?;
+    writeln!(writer, "Exclusions")?;
+    writeln!(
+        writer,
         "  configured: {}",
         string_list(&derived.runtime_config.exclude)
-    );
-    println!("  removed: {}", string_list(&derived.removed_excludes));
-    println!("  removed package entries: {}", derived.total_excluded);
-    println!();
-    println!("Platforms");
+    )?;
+    writeln!(
+        writer,
+        "  removed: {}",
+        string_list(&derived.removed_excludes)
+    )?;
+    writeln!(
+        writer,
+        "  removed package entries: {}",
+        derived.total_excluded
+    )?;
+    writeln!(writer)?;
+    writeln!(writer, "Platforms")?;
     for summary in summaries {
-        println!("  {}: {} packages", summary.platform, summary.packages);
+        writeln!(
+            writer,
+            "  {}: {} packages",
+            summary.platform, summary.packages
+        )?;
     }
-    println!();
-    println!("Selected platform: {platform}");
-    println!("Packages: {}", package_infos.len());
+    writeln!(writer)?;
+    writeln!(writer, "Selected platform: {platform}")?;
+    writeln!(writer, "Packages: {}", package_infos.len())?;
     for package in package_infos {
-        println!("  {} {} {}", package.name, package.version, package.build);
+        writeln!(
+            writer,
+            "  {} {} {}",
+            package.name, package.version, package.build
+        )?;
     }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -507,58 +554,90 @@ fn print_build_dry_run(
         .as_deref()
         .unwrap_or(env!("CARGO_PKG_VERSION"));
 
-    println!("Build dry run");
-    println!("Project");
-    print_project_summary(root, derived);
-    println!();
-    println!("Runtime");
-    println!("  runtime: {runtime}");
-    println!("  version: {runtime_version}");
-    println!("  delegate: {delegate}");
-    println!("  layout: {}", layout.as_str());
-    println!("  platform: {platform}");
-    println!("  target: {}", target.unwrap_or("current"));
-    println!("  install scheme: {}", install_scheme_name(install_scheme));
-    println!("  install name: {install_name}");
-    if let Some(method) = derived.runtime_config.install_method.as_deref() {
-        println!("  install method: {method}");
-    }
-    println!("  docs URL: {docs_url}");
-    println!("  packages: {selected_package_count}");
-    println!();
-    println!("Template");
-    println!("  source: {}", template_source.label());
-    println!("  path: {}", display_path(root, template_source.path()));
-    println!();
-    println!("Artifacts");
-    println!("  output directory: {}", display_path(root, out_dir));
-    println!("  binary: {}", display_path(root, &paths.binary));
-    if let Some(bundle) = &paths.bundle {
-        println!("  bundle: {}", display_path(root, bundle));
-    }
-    println!("  info: {}", display_path(root, &paths.info));
-    println!("  runtime lock: {}", display_path(root, &paths.lock));
-    println!("  packages: {}", display_path(root, &paths.package_list));
-    println!("  checksums: {}", display_path(root, &paths.checksums));
-    println!();
-    println!("No files written.");
-    Ok(())
+    write_stdout(|writer| {
+        writeln!(writer, "Build dry run")?;
+        writeln!(writer, "Project")?;
+        print_project_summary(writer, root, derived)?;
+        writeln!(writer)?;
+        writeln!(writer, "Runtime")?;
+        writeln!(writer, "  runtime: {runtime}")?;
+        writeln!(writer, "  version: {runtime_version}")?;
+        writeln!(writer, "  delegate: {delegate}")?;
+        writeln!(writer, "  layout: {}", layout.as_str())?;
+        writeln!(writer, "  platform: {platform}")?;
+        writeln!(writer, "  target: {}", target.unwrap_or("current"))?;
+        writeln!(
+            writer,
+            "  install scheme: {}",
+            install_scheme_name(install_scheme)
+        )?;
+        writeln!(writer, "  install name: {install_name}")?;
+        if let Some(method) = derived.runtime_config.install_method.as_deref() {
+            writeln!(writer, "  install method: {method}")?;
+        }
+        writeln!(writer, "  docs URL: {docs_url}")?;
+        writeln!(writer, "  packages: {selected_package_count}")?;
+        writeln!(writer)?;
+        writeln!(writer, "Template")?;
+        writeln!(writer, "  source: {}", template_source.label())?;
+        writeln!(
+            writer,
+            "  path: {}",
+            display_path(root, template_source.path())
+        )?;
+        writeln!(writer)?;
+        writeln!(writer, "Artifacts")?;
+        writeln!(
+            writer,
+            "  output directory: {}",
+            display_path(root, out_dir)
+        )?;
+        writeln!(writer, "  binary: {}", display_path(root, &paths.binary))?;
+        if let Some(bundle) = &paths.bundle {
+            writeln!(writer, "  bundle: {}", display_path(root, bundle))?;
+        }
+        writeln!(writer, "  info: {}", display_path(root, &paths.info))?;
+        writeln!(
+            writer,
+            "  runtime lock: {}",
+            display_path(root, &paths.lock)
+        )?;
+        writeln!(
+            writer,
+            "  packages: {}",
+            display_path(root, &paths.package_list)
+        )?;
+        writeln!(
+            writer,
+            "  checksums: {}",
+            display_path(root, &paths.checksums)
+        )?;
+        writeln!(writer)?;
+        writeln!(writer, "No files written.")
+    })
 }
 
-fn print_project_summary(root: &Path, derived: &DerivedRuntimeLock) {
-    println!("  root: {}", root.display());
-    println!(
+fn print_project_summary(
+    writer: &mut dyn io::Write,
+    root: &Path,
+    derived: &DerivedRuntimeLock,
+) -> io::Result<()> {
+    writeln!(writer, "  root: {}", root.display())?;
+    writeln!(
+        writer,
         "  manifest: {}",
         display_path(root, &derived.input.manifest_path)
-    );
-    println!(
+    )?;
+    writeln!(
+        writer,
         "  manifest kind: {}",
         derived.input.manifest_kind.manifest_label()
-    );
-    println!(
+    )?;
+    writeln!(
+        writer,
         "  source lockfile: {}",
         display_path(root, &derived.input.lock_path)
-    );
+    )
 }
 
 pub(crate) fn validate_bundle_package_hashes(packages: &[&CondaPackageData]) -> miette::Result<()> {
