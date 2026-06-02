@@ -89,6 +89,13 @@ cs run -- --path /tmp/demo-smoke bootstrap
 selected source environment, applies package exclusions, and prints the package
 set without writing artifacts.
 
+![Inspect a source environment before shipping it](demos/inspect.gif)
+
+Use `cs build --dry-run` to preview the runtime metadata and staged release
+asset paths before writing files.
+
+![Preview conda-ship runtime artifacts](demos/dry-run.gif)
+
 ## GitHub Actions
 
 The repository root is also a composite GitHub Action for downstream release
@@ -116,10 +123,11 @@ or `.msi` output directly. It produces runtimes that can be distributed as
 GitHub Release assets or wrapped by Homebrew, constructor, Docker, enterprise
 packaging systems, and other release tooling.
 
-The PyPI package and conda package install the `cs` builder, the `cs-template`
-runtime template, and the Python adapter together. The adapter makes
-`conda ship` a shortcut for the same builder when installed in a conda
-environment; it does not make conda-ship part of conda itself.
+The PyPI package installs the `cs` builder, the `cs-template` runtime template,
+and the Python adapter together. The adapter makes `conda ship` a shortcut for
+the same builder when installed in a conda environment; it does not make
+conda-ship part of conda itself. A future conda package should install the same
+pieces into one environment.
 
 ## What Belongs Downstream
 
@@ -158,6 +166,17 @@ pixi run lint
 pixi run -e test pytest
 pixi run docs
 ```
+
+The terminal demos are generated from `demos/*.tape` with
+[VHS](https://github.com/charmbracelet/vhs):
+
+```bash
+pixi run demos
+pixi run demos inspect
+```
+
+The tapes build local debug `cs` and `cs-template` binaries in hidden setup so
+the visible commands match the packaged workflow.
 
 Run `cargo generate-lockfile` after changing Cargo metadata and `pixi lock`
 after changing pixi metadata.

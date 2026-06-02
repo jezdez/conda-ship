@@ -19,8 +19,9 @@ a small conda workspace and gives you a working mental model for locks,
 artifacts, and the generated runtime:
 
 ```bash
-conda create -n cs-demo -c conda-forge conda-ship conda-workspaces
+conda create -n cs-demo -c conda-forge python pip conda-workspaces
 conda activate cs-demo
+python -m pip install conda-ship
 cs --version
 ```
 

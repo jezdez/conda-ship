@@ -22,8 +22,9 @@ Install the tools in an environment where you want to run the builder:
 :::{tab-item} conda-workspaces
 
 ```bash
-conda create -n cs-demo -c conda-forge conda-ship conda-workspaces
+conda create -n cs-demo -c conda-forge python pip conda-workspaces
 conda activate cs-demo
+python -m pip install conda-ship
 ```
 
 Check that both commands are available:
@@ -38,8 +39,9 @@ conda workspace --help
 :::{tab-item} Pixi
 
 ```bash
-conda create -n cs-demo -c conda-forge conda-ship pixi
+conda create -n cs-demo -c conda-forge python pip pixi
 conda activate cs-demo
+python -m pip install conda-ship
 ```
 
 Check that both commands are available:
