@@ -76,6 +76,7 @@ pub(crate) fn apply_delegate_environment(cmd: &mut Command, prefix: &Path) -> mi
     cmd.env("CONDA_PREFIX", prefix);
     cmd.env("CONDA_DEFAULT_ENV", "base");
     cmd.env("CONDA_SHLVL", "1");
+    cmd.env("CONDA_COMPLETION_COMMAND_NAME", policy::runtime_name());
     cmd.env("PATH", delegate_path_env(prefix)?);
     Ok(())
 }
@@ -351,6 +352,11 @@ mod tests {
             .find(|(k, _)| *k == "CONDA_DEFAULT_ENV")
             .expect("CONDA_DEFAULT_ENV should be set");
         assert_eq!(default_env.1.unwrap(), "base");
+        let completion_command_name = envs
+            .iter()
+            .find(|(k, _)| *k == "CONDA_COMPLETION_COMMAND_NAME")
+            .expect("CONDA_COMPLETION_COMMAND_NAME should be set");
+        assert_eq!(completion_command_name.1.unwrap(), policy::runtime_name());
         let path_env = envs
             .iter()
             .find(|(k, _)| *k == "PATH")

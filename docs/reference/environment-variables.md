@@ -50,6 +50,11 @@ When a runtime runs its delegate, it sets a conda-like base environment:
 `CONDA_SHLVL`
 : `1`.
 
+`CONDA_COMPLETION_COMMAND_NAME`
+: Runtime executable name. Shell completion integrations can use this to
+  register the wrapper command instead of the delegate executable. For a
+  runtime named `cx`, this is `cx`.
+
 `PATH`
 : Managed prefix executable directories first, followed by the existing `PATH`.
 
