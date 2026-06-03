@@ -35,6 +35,8 @@ struct ProjectManifest {
 struct ProjectSection {
     #[serde(default)]
     version: Option<String>,
+    #[serde(default)]
+    dynamic: Vec<String>,
 }
 
 #[derive(Clone, Default, serde::Deserialize)]
@@ -49,7 +51,7 @@ struct ShipConfig {
     #[serde(default)]
     runtime: Option<String>,
     #[serde(default, rename = "runtime-version")]
-    runtime_version: Option<String>,
+    runtime_version: Option<RuntimeVersionConfig>,
     #[serde(default)]
     delegate: Option<String>,
     #[serde(default)]
@@ -68,6 +70,25 @@ struct ShipConfig {
     install_method: Option<String>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+enum RuntimeVersionConfig {
+    Value(String),
+    Source(RuntimeVersionSourceConfig),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct RuntimeVersionSourceConfig {
+    from: RuntimeVersionSource,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum RuntimeVersionSource {
+    ProjectMetadata,
+}
+
 #[derive(Clone, Default)]
 struct RuntimeStampConfig {
     channels: Vec<String>,
@@ -75,6 +96,8 @@ struct RuntimeStampConfig {
     exclude: Vec<String>,
     delegate: Option<String>,
     runtime_version: Option<String>,
+    runtime_version_source: Option<RuntimeVersionSource>,
+    project_dynamic_version: bool,
     docs_url: Option<String>,
     install_scheme: Option<runtime_data::InstallScheme>,
     install_name: Option<String>,

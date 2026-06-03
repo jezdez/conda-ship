@@ -51,7 +51,8 @@ Options:
 - `--runtime RUNTIME`: override `[tool.conda-ship].runtime`.
 - `--delegate EXECUTABLE`: override `[tool.conda-ship].delegate`.
 - `--runtime-version VERSION`: version shown by the generated runtime. Overrides
-  `[tool.conda-ship].runtime-version` and `[project].version`.
+  `[tool.conda-ship].runtime-version`, `[project].version`, and project
+  metadata resolution.
 - `--layout online`: stage a runtime that downloads packages during bootstrap.
 - `--layout external`: stage a runtime plus compressed bundle.
 - `--layout embedded`: stage a runtime with the compressed bundle embedded.
@@ -98,7 +99,8 @@ Options:
 - `--runtime RUNTIME`: override `[tool.conda-ship].runtime`.
 - `--delegate EXECUTABLE`: override `[tool.conda-ship].delegate`.
 - `--runtime-version VERSION`: version shown by the generated runtime. Overrides
-  `[tool.conda-ship].runtime-version` and `[project].version`.
+  `[tool.conda-ship].runtime-version`, `[project].version`, and project
+  metadata resolution.
 - `--layout online`: stage a runtime that downloads packages during bootstrap.
 - `--layout external`: stage a runtime plus compressed bundle.
 - `--layout embedded`: stage a runtime with the compressed bundle embedded.

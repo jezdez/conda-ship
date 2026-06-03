@@ -21,7 +21,8 @@ use super::project::{
     validate_required_runtime_packages,
 };
 use super::{
-    BundleLayout, Cli, Command, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, ShipConfig, runtime_data,
+    BundleLayout, Cli, Command, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionConfig,
+    RuntimeVersionSource, ShipConfig, runtime_data,
 };
 
 fn make_pkg(name: &str, depends: &[&str]) -> CondaPackageData {
@@ -106,7 +107,8 @@ source-environment = "ship"
     assert_eq!(input.config.delegate.as_deref(), Some("conda"));
     assert_eq!(input.config.layout, Some(BundleLayout::External));
     assert_eq!(input.config.source_environment.as_deref(), Some("ship"));
-    assert_eq!(input.config.runtime_version.as_deref(), Some("1.2.3"));
+    assert_eq!(input.runtime_version.as_deref(), Some("1.2.3"));
+    assert_eq!(input.runtime_version_source, None);
 }
 
 #[test]
@@ -136,6 +138,81 @@ source-environment = "ship"
     assert_eq!(input.config.delegate.as_deref(), Some("conda"));
     assert_eq!(input.config.layout, Some(BundleLayout::Embedded));
     assert_eq!(input.config.source_environment.as_deref(), Some("ship"));
+}
+
+#[test]
+fn test_discover_project_input_accepts_project_metadata_runtime_version_source() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join("pyproject.toml"),
+        r#"
+[project]
+name = "demo"
+dynamic = ["version"]
+
+[build-system]
+requires = []
+build-backend = "demo_backend"
+
+[tool.conda.workspace]
+name = "demo"
+channels = ["conda-forge"]
+
+[tool.conda-ship]
+runtime = "demo"
+runtime-version = { from = "project-metadata" }
+delegate = "conda"
+layout = "embedded"
+source-environment = "ship"
+"#,
+    )
+    .unwrap();
+    std::fs::write(tmp.path().join("conda.lock"), "").unwrap();
+
+    let input = discover_project_input(tmp.path()).unwrap();
+
+    assert_eq!(input.runtime_version, None);
+    assert_eq!(
+        input.runtime_version_source,
+        Some(RuntimeVersionSource::ProjectMetadata)
+    );
+    assert!(input.project_dynamic_version);
+}
+
+#[test]
+fn test_runtime_version_config_deserializes_string_and_source() {
+    let manifest: super::ProjectManifest = toml::from_str(
+        r#"
+[tool.conda-ship]
+runtime-version = { from = "project-metadata" }
+"#,
+    )
+    .unwrap();
+    let runtime_version = manifest
+        .tool
+        .conda_ship
+        .runtime_version
+        .expect("runtime-version should deserialize");
+
+    assert_eq!(
+        runtime_version,
+        RuntimeVersionConfig::Source(super::RuntimeVersionSourceConfig {
+            from: RuntimeVersionSource::ProjectMetadata,
+        })
+    );
+
+    let manifest: super::ProjectManifest = toml::from_str(
+        r#"
+[tool.conda-ship]
+runtime-version = "1.2.3"
+"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        manifest.tool.conda_ship.runtime_version,
+        Some(RuntimeVersionConfig::Value("1.2.3".to_string()))
+    );
 }
 
 #[test]
@@ -355,6 +432,9 @@ fn test_stage_artifacts_external_outputs_bundle_and_metadata() {
             manifest_kind: ManifestKind::CondaToml,
             lock_path: tmp.path().join("conda.lock"),
             config: ShipConfig::default(),
+            runtime_version: None,
+            runtime_version_source: None,
+            project_dynamic_version: false,
         },
         lock_file,
         content,
@@ -571,6 +651,7 @@ fn test_manifest_runtime_version_is_validated() {
 #[test]
 fn test_manifest_docs_url_is_validated() {
     let mut config = RuntimeStampConfig {
+        runtime_version: Some("1.0.0".to_string()),
         docs_url: Some("https://example.com/\nmalicious".to_string()),
         ..RuntimeStampConfig::default()
     };
@@ -583,6 +664,67 @@ fn test_manifest_docs_url_is_validated() {
             .contains("docs URL must not contain whitespace"),
         "{err}"
     );
+}
+
+#[test]
+fn test_runtime_version_is_required_for_build_metadata() {
+    let mut config = RuntimeStampConfig::default();
+
+    let err = apply_runtime_metadata_overrides(&mut config, None, None, None)
+        .expect_err("missing runtime version should fail");
+
+    assert!(
+        err.to_string().contains("runtime version is required"),
+        "{err}"
+    );
+}
+
+#[test]
+fn test_dynamic_project_version_mentions_project_metadata_source() {
+    let mut config = RuntimeStampConfig {
+        project_dynamic_version: true,
+        ..RuntimeStampConfig::default()
+    };
+
+    let err = apply_runtime_metadata_overrides(&mut config, None, None, None)
+        .expect_err("dynamic project version should require an explicit source");
+
+    assert!(
+        err.to_string().contains("project metadata resolution"),
+        "{err}"
+    );
+}
+
+#[test]
+fn test_project_metadata_runtime_version_source_requires_adapter() {
+    let mut config = RuntimeStampConfig {
+        runtime_version_source: Some(RuntimeVersionSource::ProjectMetadata),
+        project_dynamic_version: true,
+        ..RuntimeStampConfig::default()
+    };
+
+    let err = apply_runtime_metadata_overrides(&mut config, None, None, None)
+        .expect_err("project metadata source should require adapter resolution");
+
+    assert!(
+        err.to_string()
+            .contains("must be resolved before invoking cs"),
+        "{err}"
+    );
+}
+
+#[test]
+fn test_cli_runtime_version_overrides_project_metadata_source() {
+    let mut config = RuntimeStampConfig {
+        runtime_version_source: Some(RuntimeVersionSource::ProjectMetadata),
+        project_dynamic_version: true,
+        ..RuntimeStampConfig::default()
+    };
+
+    apply_runtime_metadata_overrides(&mut config, Some("4.5.6".to_string()), None, None).unwrap();
+
+    assert_eq!(config.runtime_version.as_deref(), Some("4.5.6"));
+    assert_eq!(config.runtime_version_source, None);
 }
 
 #[test]

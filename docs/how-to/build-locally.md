@@ -75,10 +75,12 @@ cs build --dry-run
 
 ## Build A Runtime
 
-`[tool.conda-ship].runtime`, `[tool.conda-ship].delegate`, and
-`[tool.conda-ship].source-environment` are required unless you pass the runtime
-and delegate through CLI flags. conda-ship does not provide default values for
-them.
+`[tool.conda-ship].runtime`, `[tool.conda-ship].delegate`,
+`[tool.conda-ship].source-environment`, and a downstream runtime version are
+required unless you pass the runtime, delegate, and version through CLI flags.
+conda-ship does not provide default values for them. The version can come from
+`[tool.conda-ship].runtime-version`, static `[project].version`, or explicit
+project metadata resolution.
 
 ```bash
 cs build

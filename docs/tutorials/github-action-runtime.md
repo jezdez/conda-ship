@@ -22,6 +22,7 @@ The manifest must contain `[tool.conda-ship]` with at least:
 ```toml
 [tool.conda-ship]
 runtime = "demo"
+runtime-version = "0.1.0"
 delegate = "conda"
 source-environment = "ship"
 ```

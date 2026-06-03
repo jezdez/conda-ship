@@ -53,6 +53,17 @@ conda ship -- --help
 
 Running `conda ship` without arguments shows `cs --help`.
 
+## Project Metadata Versions
+
+When `[tool.conda-ship]` contains
+`runtime-version = { from = "project-metadata" }`, the Python adapter resolves
+the version before invoking `cs build` or `cs run`. It calls the project's PEP
+517 `prepare_metadata_for_build_wheel` hook, reads `Version` from the generated
+wheel metadata, and forwards the concrete value as `--runtime-version`.
+
+Direct `cs build` invocations do not run Python packaging hooks. Use
+`conda ship build` for this source, or pass `cs build --runtime-version VERSION`.
+
 ## Error Handling
 
 `conda ship` asks `cs` for structured builder diagnostics and translates them

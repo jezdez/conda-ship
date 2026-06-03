@@ -6,7 +6,10 @@ use rattler_conda_types::{PackageName, PackageRecord, Platform};
 use rattler_lock::{CondaPackageData, LockFile, LockFileBuilder, PlatformData};
 
 use super::diagnostic::{DiagnosticKind, ship_error};
-use super::{ProjectManifest, REQUIRED_RUNTIME_PACKAGES, RuntimeStampConfig, ShipConfig};
+use super::{
+    ProjectManifest, REQUIRED_RUNTIME_PACKAGES, RuntimeStampConfig, RuntimeVersionConfig,
+    RuntimeVersionSource, ShipConfig,
+};
 
 pub(crate) fn project_root(override_root: Option<&Path>) -> miette::Result<PathBuf> {
     if let Some(root) = override_root {
@@ -50,6 +53,9 @@ pub(crate) struct ProjectInput {
     pub(crate) manifest_kind: ManifestKind,
     pub(crate) lock_path: PathBuf,
     pub(crate) config: ShipConfig,
+    pub(crate) runtime_version: Option<String>,
+    pub(crate) runtime_version_source: Option<RuntimeVersionSource>,
+    pub(crate) project_dynamic_version: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -184,7 +190,9 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
             packages: runtime_packages,
             exclude: input.config.exclude,
             delegate: input.config.delegate,
-            runtime_version: input.config.runtime_version,
+            runtime_version: input.runtime_version,
+            runtime_version_source: input.runtime_version_source,
+            project_dynamic_version: input.project_dynamic_version,
             docs_url: input.config.docs_url,
             install_scheme: input.config.install_scheme,
             install_name: input.config.install_name,
@@ -255,15 +263,22 @@ pub(crate) fn discover_project_input(root: &Path) -> miette::Result<ProjectInput
         .into_diagnostic()
         .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
     let mut config = manifest.tool.conda_ship;
-    if config.runtime_version.is_none() {
-        config.runtime_version = manifest.project.version;
-    }
+    let project_dynamic_version = manifest
+        .project
+        .dynamic
+        .iter()
+        .any(|field| field == "version");
+    let (runtime_version, runtime_version_source) =
+        resolve_manifest_runtime_version(config.runtime_version.take(), manifest.project.version);
 
     Ok(ProjectInput {
         manifest_path,
         manifest_kind: kind,
         lock_path,
         config,
+        runtime_version,
+        runtime_version_source,
+        project_dynamic_version,
     })
 }
 
@@ -341,6 +356,17 @@ fn has_toml_table(value: &toml::Value, path: &[&str]) -> bool {
     value
         .get(*head)
         .is_some_and(|nested| has_toml_table(nested, tail))
+}
+
+fn resolve_manifest_runtime_version(
+    configured: Option<RuntimeVersionConfig>,
+    project_version: Option<String>,
+) -> (Option<String>, Option<RuntimeVersionSource>) {
+    match configured {
+        Some(RuntimeVersionConfig::Value(version)) => (Some(version), None),
+        Some(RuntimeVersionConfig::Source(source)) => (None, Some(source.from)),
+        None => (project_version, None),
+    }
 }
 
 pub(crate) fn write_generated_runtime_lock(path: &Path, content: &str) -> miette::Result<()> {

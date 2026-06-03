@@ -93,10 +93,25 @@ install-method = "homebrew"
 
 `runtime-version`
 : Version shown by the generated runtime when users run `RUNTIME --version`.
-  When omitted from `[tool.conda-ship]`, conda-ship uses `[project].version`
-  from `pyproject.toml` if it exists. Release workflows can override this with
-  `cs build --runtime-version VERSION` or the GitHub Action
-  `runtime-version` input.
+  When omitted from `[tool.conda-ship]`, conda-ship uses static
+  `[project].version` from the selected `pyproject.toml` if it exists. Release
+  workflows can override this with `cs build --runtime-version VERSION` or the
+  GitHub Action `runtime-version` input.
+
+  Projects that declare `dynamic = ["version"]` can opt into standards-based
+  metadata resolution:
+
+  ```toml
+  [tool.conda-ship]
+  runtime-version = { from = "project-metadata" }
+  ```
+
+  The Python `conda ship` adapter resolves this source before invoking `cs`: it
+  calls the project's PEP 517 `prepare_metadata_for_build_wheel` hook, reads
+  `Version` from the generated `.dist-info/METADATA`, and passes the resolved
+  value to `cs --runtime-version`. It does not fall back to building a wheel.
+  The build backend must already be installed in the Python environment running
+  `conda ship`.
 
 `delegate`
 : Executable inside the managed prefix that receives pass-through arguments
@@ -163,8 +178,10 @@ URLs from the source lockfile environment into generated runtime metadata.
 
 - runtime name: `RUNTIME` for `online` and `external`, `RUNTIME` plus `z` for
   `embedded`
-- runtime version: the configured `runtime-version`, `[project].version` from
-  `pyproject.toml`, or the conda-ship package version when neither value exists
+- runtime version: the configured `runtime-version`, static
+  `[project].version` from the selected `pyproject.toml`, or the concrete
+  value resolved by `conda ship` from `{ from = "project-metadata" }`; builds
+  fail when no downstream version can be resolved
 - delegate executable: the configured `delegate`
 - display name: `RUNTIME`
 - install scheme: `conda-home`, or the configured `install-scheme`

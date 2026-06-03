@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .project_metadata import ProjectMetadataError, runtime_version_args
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from typing import TextIO
@@ -80,6 +82,11 @@ def run_cs(argv: Sequence[str], *, executable: str | None = None) -> int:
         ship_args = ship_args[1:]
     if not ship_args:
         ship_args = ["--help"]
+    try:
+        ship_args = runtime_version_args(ship_args)
+    except ProjectMetadataError as error:
+        print(f"conda-ship: {error}", file=sys.stderr)
+        return 1
 
     env = os.environ.copy()
     env[ERROR_FORMAT_ENV] = "json"

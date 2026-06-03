@@ -66,6 +66,33 @@ source-environment = "ship"
 conda-ship does not fall back to a default environment because that can
 accidentally ship development or test dependencies.
 
+## Runtime Version Is Missing
+
+Error shape:
+
+```text
+runtime version is required
+```
+
+Fix:
+
+```toml
+[tool.conda-ship]
+runtime-version = "1.0.0"
+```
+
+For Python projects with static metadata, conda-ship can use `[project].version`
+from the selected `pyproject.toml`. For projects with `dynamic = ["version"]`,
+the Python `conda ship` adapter can resolve PEP 517 project metadata:
+
+```toml
+[tool.conda-ship]
+runtime-version = { from = "project-metadata" }
+```
+
+When using the standalone `cs` binary directly, pass `--runtime-version` with a
+concrete value instead.
+
 ## Source Environment Not In The Lockfile
 
 Error shape:
@@ -157,4 +184,3 @@ safe.
 
 Generated runtimes refuse unmanaged prefixes to avoid deleting or mutating conda
 installations they did not create.
-
