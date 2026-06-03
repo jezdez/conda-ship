@@ -21,6 +21,45 @@ wrappers, and user documentation. conda-express is one downstream distribution
 maintained by Jannis Leidel; it uses conda-ship to publish the `cx` and `cxz`
 runtimes.
 
+## Quickstart
+
+This shortest path uses conda-workspaces to create a solved source environment,
+then builds an online runtime named `demo`:
+
+```bash
+conda create -n cs-demo -c conda-forge python pip conda-workspaces
+conda activate cs-demo
+python -m pip install conda-ship
+
+mkdir demo-runtime
+cd demo-runtime
+conda workspace init --format conda --name demo-runtime
+conda workspace add --feature ship --no-lockfile-update \
+  "python>=3.12" \
+  "conda>=25.1" \
+  conda-rattler-solver \
+  "conda-spawn>=0.1.0"
+cat >> conda.toml <<'TOML'
+
+[tool.conda-ship]
+runtime = "demo"
+delegate = "conda"
+layout = "online"
+source-environment = "ship"
+exclude = ["conda-libmamba-solver"]
+TOML
+
+conda workspace lock
+cs inspect
+cs build --dry-run
+cs build
+./dist/demo --version
+```
+
+For a guided walkthrough with Pixi, bootstrap, status, uninstall, and embedded
+runtime examples, see the
+[first runtime tutorial](https://jezdez.github.io/conda-ship/tutorials/first-runtime/).
+
 ## What It Builds
 
 conda-ship stages a runtime binary plus release metadata:
