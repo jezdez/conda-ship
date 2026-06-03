@@ -115,10 +115,10 @@ jobs:
           fi
 
       - name: Build cs CLI
-        run: pixi run -- cargo build --locked --release --bin cs
+        run: pixi run -- cargo rustc --locked --release --bin cs -- -D warnings
 
       - name: Build runtime template
-        run: pixi run -- cargo build --locked --release --bin cs-template --features runtime-template
+        run: pixi run -- cargo rustc --locked --release --bin cs-template --features runtime-template -- -D warnings
 
       - name: Stage release assets
         shell: bash

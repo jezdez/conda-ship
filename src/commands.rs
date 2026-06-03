@@ -386,25 +386,24 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
     Ok(())
 }
 
+#[cfg(windows)]
 fn remove_install_path(prefix: &Path) -> miette::Result<()> {
     match std::fs::remove_dir_all(prefix) {
         Ok(()) => Ok(()),
-        Err(err) => {
-            #[cfg(windows)]
-            {
-                clear_readonly_recursive(prefix)?;
-                std::fs::remove_dir_all(prefix)
-                    .into_diagnostic()
-                    .context("failed to remove install path")
-            }
-            #[cfg(not(windows))]
-            {
-                Err(err)
-                    .into_diagnostic()
-                    .context("failed to remove install path")
-            }
+        Err(_) => {
+            clear_readonly_recursive(prefix)?;
+            std::fs::remove_dir_all(prefix)
+                .into_diagnostic()
+                .context("failed to remove install path")
         }
     }
+}
+
+#[cfg(not(windows))]
+fn remove_install_path(prefix: &Path) -> miette::Result<()> {
+    std::fs::remove_dir_all(prefix)
+        .into_diagnostic()
+        .context("failed to remove install path")
 }
 
 #[cfg(windows)]
