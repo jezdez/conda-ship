@@ -62,6 +62,12 @@ cs build --dry-run
 cs build
 ```
 
+```{figure} ../../demos/quickstart.gif
+:alt: Terminal recording of the conda-ship quickstart inspect, dry-run, build, and version checks.
+
+Quickstart: inspect, preview, build, and run a stamped runtime.
+```
+
 The online runtime is staged at `dist/demo` on Unix and `dist/demo.exe` on
 Windows. Check the stamped runtime metadata:
 

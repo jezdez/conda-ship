@@ -33,6 +33,12 @@ When you want to check the selected source environment before building, run:
 cs inspect
 ```
 
+```{figure} ../../demos/inspect.gif
+:alt: Terminal recording of cs inspect deriving and printing the runtime package set.
+
+Inspect a source environment before shipping it.
+```
+
 If you changed the configured source environment, refresh the source lockfile
 with the tool that owns the manifest:
 
@@ -71,6 +77,12 @@ selection, install settings, and bundle suitability without writing files:
 
 ```bash
 cs build --dry-run
+```
+
+```{figure} ../../demos/dry-run.gif
+:alt: Terminal recording of cs build --dry-run previewing online and embedded runtime artifacts.
+
+Preview runtime metadata and artifact names without writing release files.
 ```
 
 ## Build A Runtime

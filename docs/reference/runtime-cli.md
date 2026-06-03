@@ -130,6 +130,12 @@ Show the runtime help text.
 RUNTIME help
 ```
 
+```{figure} ../../demos/runtime-cli.gif
+:alt: Terminal recording of a generated runtime printing its version and runtime-specific activation guidance.
+
+Generated runtimes expose their own command surface before pass-through to the delegate.
+```
+
 ## Pass-Through Commands
 
 Any command not listed above is passed through to the configured delegate

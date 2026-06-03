@@ -55,6 +55,12 @@ Open the `.info.json` file:
 python -m json.tool dist/demo.info.json
 ```
 
+```{figure} ../../demos/verify.gif
+:alt: Terminal recording of building release files, checking SHA256 sums, and inspecting artifact metadata.
+
+Verify staged files and release metadata before publishing.
+```
+
 Check:
 
 - `name`
