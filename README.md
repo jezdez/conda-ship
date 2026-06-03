@@ -96,6 +96,16 @@ asset paths before writing files.
 
 ![Preview conda-ship runtime artifacts](demos/dry-run.gif)
 
+After a real build, verify the staged artifacts and inspect the release metadata
+before handing them to downstream packaging or signing.
+
+![Verify staged conda-ship artifacts](demos/verify.gif)
+
+The staged runtime is a stamped copy of the generic runtime template with its
+own command surface before pass-through to the configured delegate.
+
+![Run a generated conda-ship runtime](demos/runtime-cli.gif)
+
 ## GitHub Actions
 
 The repository root is also a composite GitHub Action for downstream release
