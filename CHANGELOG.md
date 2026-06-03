@@ -2,6 +2,19 @@
 
 All notable user-facing changes to `conda-ship` are documented here.
 
+## 0.2.1 - 2026-06-03
+
+### Fixed
+
+- Fixed the GitHub Action path for
+  `runtime-version = { from = "project-metadata" }`. The action now detects
+  when the Rust `cs` binary needs project metadata resolution, sets up Python
+  with the official `actions/setup-python` action, resolves the downstream
+  version through `pypa/build`, and retries the build with an explicit
+  `--runtime-version`.
+- Fixed the Windows runtime template release build warning path so release
+  binary builds can deny compiler warnings across all targets.
+
 ## 0.2.0 - 2026-06-03
 
 ### Added
