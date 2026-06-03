@@ -23,9 +23,9 @@ verification. Self-hosted runners must provide `gh`.
 The checked-out repository must contain `conda.toml` plus `conda.lock`,
 `pyproject.toml` with `[tool.conda]` plus `conda.lock`, `pixi.toml` plus
 `pixi.lock`, or `pyproject.toml` with `[tool.pixi]` plus `pixi.lock`. These
-examples assume the manifest contains `[tool.conda-ship].runtime` and
-`[tool.conda-ship].delegate`, unless those values are supplied as action
-inputs.
+examples assume the manifest contains `[tool.conda-ship].runtime`,
+`[tool.conda-ship].delegate`, and a downstream runtime version, unless those
+values are supplied as action inputs.
 
 ```yaml
 jobs:

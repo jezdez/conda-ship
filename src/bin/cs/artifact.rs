@@ -16,7 +16,8 @@ use super::project::{
 };
 use super::{
     BUNDLE_ARCHIVE_FILE, BundleLayout, REQUIRED_RUNTIME_PACKAGES, RUNTIME_LOCK_FILE,
-    RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, SHIP_STATE_DIR, ShipConfig, runtime_data,
+    RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionSource, SHIP_STATE_DIR, ShipConfig,
+    runtime_data,
 };
 
 #[derive(Debug)]
@@ -552,7 +553,7 @@ fn print_build_dry_run(
         .runtime_config
         .runtime_version
         .as_deref()
-        .unwrap_or(env!("CARGO_PKG_VERSION"));
+        .ok_or_else(|| missing_runtime_version(derived.runtime_config.project_dynamic_version))?;
 
     write_stdout(|writer| {
         writeln!(writer, "Build dry run")?;
@@ -960,6 +961,14 @@ pub(crate) fn apply_runtime_metadata_overrides(
     if let Some(runtime_version) = runtime_version {
         validate_runtime_version(&runtime_version)?;
         config.runtime_version = Some(runtime_version);
+        config.runtime_version_source = None;
+    } else if config.runtime_version.is_none() {
+        match config.runtime_version_source.take() {
+            Some(RuntimeVersionSource::ProjectMetadata) => {
+                return Err(project_metadata_runtime_version_requires_adapter());
+            }
+            None => return Err(missing_runtime_version(config.project_dynamic_version)),
+        }
     }
     if let Some(runtime_version) = config.runtime_version.as_deref() {
         validate_runtime_version(runtime_version)?;
@@ -976,6 +985,39 @@ pub(crate) fn apply_runtime_metadata_overrides(
         config.install_method = Some(install_method);
     }
     validate_install_method_config(config)
+}
+
+fn project_metadata_runtime_version_requires_adapter() -> miette::Report {
+    ship_error(
+        DiagnosticKind::MissingRuntimeVersion,
+        "runtime version from project metadata must be resolved before invoking cs",
+        Some(
+            "Use `conda ship build` from the Python package so the adapter can call the PEP 517 metadata hook, or pass --runtime-version explicitly."
+                .to_string(),
+        ),
+    )
+}
+
+fn missing_runtime_version(project_dynamic_version: bool) -> miette::Report {
+    if project_dynamic_version {
+        ship_error(
+            DiagnosticKind::MissingRuntimeVersion,
+            "runtime version is required; [project] declares a dynamic version but project metadata resolution is not enabled",
+            Some(
+                "Pass --runtime-version, set [tool.conda-ship].runtime-version, or set runtime-version = { from = \"project-metadata\" }."
+                    .to_string(),
+            ),
+        )
+    } else {
+        ship_error(
+            DiagnosticKind::MissingRuntimeVersion,
+            "runtime version is required",
+            Some(
+                "Pass --runtime-version, set [tool.conda-ship].runtime-version, or define [project].version in pyproject.toml."
+                    .to_string(),
+            ),
+        )
+    }
 }
 
 fn validate_install_location_config(
@@ -1289,7 +1331,9 @@ fn stamp_runtime_data(
             .runtime_config
             .runtime_version
             .clone()
-            .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
+            .ok_or_else(|| {
+                missing_runtime_version(derived.runtime_config.project_dynamic_version)
+            })?,
         embedded_runtime_name: format!("{name}z"),
         delegate,
         display_name: name.to_string(),

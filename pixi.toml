@@ -70,4 +70,5 @@ test = ["test"]
 
 [tool.conda-ship]
 source-environment = "ship"
+runtime-version = "0.1.0"
 exclude = ["conda-libmamba-solver"]

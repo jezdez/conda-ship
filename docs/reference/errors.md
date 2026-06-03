@@ -24,6 +24,12 @@ conda without depending on terminal formatting.
 `source environment "NAME" not found`
 : Add the environment to the source manifest and refresh the source lockfile.
 
+`runtime version is required`
+: Pass `--runtime-version`, set `[tool.conda-ship].runtime-version`, define
+  static `[project].version` in the selected `pyproject.toml`, or opt into
+  `runtime-version = { from = "project-metadata" }` through the Python
+  `conda ship` adapter for dynamic Python project versions.
+
 ## Runtime Package Set
 
 `selected source environment ... is missing required package(s)`

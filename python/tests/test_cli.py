@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda_ship import cli
 from conda_ship.cli import configure_parser, execute, run_cs
+from conda_ship.project_metadata import ProjectMetadataError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -107,6 +108,48 @@ def test_run_cs_prefers_current_environment_binary(
 
     assert run_cs(["inspect"]) == 0
     assert calls == [[str(cs), "inspect"]]
+
+
+def test_run_cs_applies_runtime_version_args(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cs = tmp_path / ("cs.exe" if cli.os.name == "nt" else "cs")
+    cs.write_text("")
+    cs.chmod(0o755)
+    calls: list[list[str]] = []
+
+    def fake_runtime_version_args(args: list[str]) -> list[str]:
+        assert args == ["build"]
+        return ["build", "--runtime-version", "2.3.4"]
+
+    def fake_popen(args: list[str], **_kwargs) -> FakeProcess:
+        calls.append(args)
+        return FakeProcess(0)
+
+    monkeypatch.setattr(cli, "runtime_version_args", fake_runtime_version_args)
+    monkeypatch.setattr(cli.subprocess, "Popen", fake_popen)
+
+    assert run_cs(["build"], executable=str(cs)) == 0
+    assert calls == [[str(cs), "build", "--runtime-version", "2.3.4"]]
+
+
+def test_run_cs_reports_project_metadata_error(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    cs = tmp_path / ("cs.exe" if cli.os.name == "nt" else "cs")
+    cs.write_text("")
+    cs.chmod(0o755)
+
+    def fake_runtime_version_args(_args: list[str]) -> list[str]:
+        raise ProjectMetadataError("metadata unavailable")
+
+    monkeypatch.setattr(cli, "runtime_version_args", fake_runtime_version_args)
+
+    assert run_cs(["build"], executable=str(cs)) == 1
+    assert "metadata unavailable" in capsys.readouterr().err
 
 
 def test_run_cs_rejects_invalid_env_executable(

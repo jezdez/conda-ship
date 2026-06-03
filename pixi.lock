@@ -9259,4 +9259,6 @@ packages:
   name: conda-ship
   requires_dist:
   - conda>=25.1
+  - pyproject-hooks>=1.2
+  - tomli>=1.1 ; python_full_version < '3.11'
   requires_python: '>=3.10'

@@ -17,7 +17,8 @@ plus `conda.lock`, `pixi.toml` plus `pixi.lock`, or `pyproject.toml` with
 `[tool.pixi]` plus `pixi.lock`. When the manifest or matching lockfile is
 missing, the action fails instead of generating or solving project configuration
 in CI. This minimal example assumes the manifest contains
-`[tool.conda-ship].runtime` and `[tool.conda-ship].delegate`.
+`[tool.conda-ship].runtime`, `[tool.conda-ship].delegate`, and a downstream
+runtime version.
 
 ```yaml
 - uses: actions/checkout@v4
@@ -39,7 +40,8 @@ in CI. This minimal example assumes the manifest contains
 `runtime-version`
 : Runtime version override. Set this when the release job intentionally stamps
   a version different from `[tool.conda-ship].runtime-version` or
-  `[project].version`.
+  `[project].version`, or when the manifest does not provide a downstream
+  runtime version.
 
 `root`
 : Project root containing `conda.toml`/`conda.lock`, `pixi.toml`/`pixi.lock`,
