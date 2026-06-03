@@ -17,9 +17,13 @@ inputs:
     required: false
     default: ""
   runtime-version:
-    description: "Version shown by the generated runtime. Overrides [tool.conda-ship].runtime-version when set."
+    description: "Version shown by the generated runtime. Overrides [tool.conda-ship].runtime-version when set. When omitted, the action resolves runtime-version = { from = \"project-metadata\" } only if the build config requests it."
     required: false
     default: ""
+  python-version:
+    description: "Python version used only when resolving runtime-version = { from = \"project-metadata\" }."
+    required: false
+    default: "3.12"
   root:
     description: "Project root containing conda.toml/conda.lock, pixi.toml/pixi.lock, or pyproject.toml with the matching lockfile."
     required: false
@@ -216,7 +220,8 @@ runs:
         echo "cs_path=${TOOL_DIR}/${CS_ASSET}" >> "$GITHUB_OUTPUT"
         echo "template_path=${TOOL_DIR}/${TEMPLATE_ASSET}" >> "$GITHUB_OUTPUT"
 
-    - name: Build runtime
+    - name: Plan runtime build
+      id: plan
       shell: bash
       env:
         CONDA_SHIP_DELEGATE: ${{ inputs.delegate }}
@@ -270,7 +275,114 @@ runs:
         if [ -n "$CONDA_SHIP_INSTALL_METHOD" ]; then
           build_args+=(--install-method "$CONDA_SHIP_INSTALL_METHOD")
         fi
-        "$CS_PATH" "${build_args[@]}" --dry-run
+
+        dry_run_stderr="${RUNNER_TEMP}/conda-ship-dry-run.stderr"
+        needs_project_metadata=false
+        dry_run_ready=false
+        if ! CONDA_SHIP_ERROR_FORMAT=json "$CS_PATH" "${build_args[@]}" --dry-run 2>"$dry_run_stderr"; then
+          if [ -z "$CONDA_SHIP_RUNTIME_VERSION" ] && grep -q '"kind":"project_metadata_runtime_version"' "$dry_run_stderr"; then
+            needs_project_metadata=true
+          else
+            cat "$dry_run_stderr" >&2
+            exit 1
+          fi
+        else
+          if [ -s "$dry_run_stderr" ]; then
+            cat "$dry_run_stderr" >&2
+          fi
+          dry_run_ready=true
+        fi
+
+        echo "needs_project_metadata=${needs_project_metadata}" >> "$GITHUB_OUTPUT"
+        echo "dry_run_ready=${dry_run_ready}" >> "$GITHUB_OUTPUT"
+
+    - name: Set up Python
+      if: steps.plan.outputs.needs_project_metadata == 'true'
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Resolve project metadata version
+      id: project_metadata
+      if: steps.plan.outputs.needs_project_metadata == 'true'
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        CONDA_SHIP_ROOT: ${{ inputs.root }}
+      run: |
+        set -euo pipefail
+
+        python -m pip install --disable-pip-version-check \
+          "build>=1.2" \
+          "tomli; python_version < '3.11'"
+        runtime_version="$(
+          PYTHONPATH="${ACTION_PATH}/python" \
+            python -m conda_ship.github_action "$CONDA_SHIP_ROOT" | tail -n 1
+        )"
+        if [ -z "$runtime_version" ]; then
+          echo "Project metadata did not resolve to a runtime version." >&2
+          exit 1
+        fi
+        echo "runtime_version=${runtime_version}" >> "$GITHUB_OUTPUT"
+
+    - name: Build runtime
+      shell: bash
+      env:
+        CONDA_SHIP_DELEGATE: ${{ inputs.delegate }}
+        CONDA_SHIP_DOCS_URL: ${{ inputs.docs-url }}
+        CONDA_SHIP_DRY_RUN_READY: ${{ steps.plan.outputs.dry_run_ready }}
+        CONDA_SHIP_INSTALL_METHOD: ${{ inputs.install-method }}
+        CONDA_SHIP_INSTALL_NAME: ${{ inputs.install-name }}
+        CONDA_SHIP_INSTALL_SCHEME: ${{ inputs.install-scheme }}
+        CONDA_SHIP_LAYOUT: ${{ inputs.layout }}
+        CONDA_SHIP_RUNTIME: ${{ inputs.runtime }}
+        CONDA_SHIP_RUNTIME_VERSION: ${{ inputs.runtime-version || steps.project_metadata.outputs.runtime_version }}
+        CS_PATH: ${{ steps.download.outputs.cs_path }}
+        CONDA_SHIP_ROOT: ${{ inputs.root }}
+        CONDA_SHIP_TARGET: ${{ steps.resolve.outputs.target }}
+        TEMPLATE_PATH: ${{ steps.download.outputs.template_path }}
+      run: |
+        set -euo pipefail
+
+        dist_dir="${RUNNER_TEMP}/conda-ship-${CONDA_SHIP_TARGET}-dist"
+        mkdir -p "$dist_dir"
+
+        build_args=(
+          build
+          --target "$CONDA_SHIP_TARGET"
+          --target-label "$CONDA_SHIP_TARGET"
+          --template "$TEMPLATE_PATH"
+          --root "$CONDA_SHIP_ROOT"
+          --out-dir "$dist_dir"
+        )
+        if [ -n "$CONDA_SHIP_RUNTIME" ]; then
+          build_args+=(--runtime "$CONDA_SHIP_RUNTIME")
+        fi
+        if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
+          build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
+        fi
+        if [ -n "$CONDA_SHIP_DELEGATE" ]; then
+          build_args+=(--delegate "$CONDA_SHIP_DELEGATE")
+        fi
+        if [ -n "$CONDA_SHIP_LAYOUT" ]; then
+          build_args+=(--layout "$CONDA_SHIP_LAYOUT")
+        fi
+        if [ -n "$CONDA_SHIP_DOCS_URL" ]; then
+          build_args+=(--docs-url "$CONDA_SHIP_DOCS_URL")
+        fi
+        if [ -n "$CONDA_SHIP_INSTALL_SCHEME" ]; then
+          build_args+=(--install-scheme "$CONDA_SHIP_INSTALL_SCHEME")
+        fi
+        if [ -n "$CONDA_SHIP_INSTALL_NAME" ]; then
+          build_args+=(--install-name "$CONDA_SHIP_INSTALL_NAME")
+        fi
+        if [ -n "$CONDA_SHIP_INSTALL_METHOD" ]; then
+          build_args+=(--install-method "$CONDA_SHIP_INSTALL_METHOD")
+        fi
+
+        if [ "$CONDA_SHIP_DRY_RUN_READY" != "true" ]; then
+          "$CS_PATH" "${build_args[@]}" --dry-run
+        fi
         "$CS_PATH" "${build_args[@]}"
 
     - name: Stage runtime outputs
