@@ -82,13 +82,13 @@ jobs:
       - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
       - name: Build
-        run: pixi run build
+        run: pixi run -- cargo rustc --locked --release --bin cs -- -D warnings
 
       - name: Test
         run: pixi run test
 
       - name: Build runtime template
-        run: pixi run -- cargo build --locked --release --bin cs-template --features runtime-template
+        run: pixi run -- cargo rustc --locked --release --bin cs-template --features runtime-template -- -D warnings
 
       - name: Build smoke runtime
         shell: bash
