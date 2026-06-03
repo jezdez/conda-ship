@@ -20,10 +20,18 @@ in CI. This minimal example assumes the manifest contains
 `[tool.conda-ship].runtime`, `[tool.conda-ship].delegate`, and a downstream
 runtime version.
 
+When the selected conda-ship config sets
+`runtime-version = { from = "project-metadata" }`, the action first lets
+`cs build --dry-run` report that project metadata resolution is required. It
+then sets up Python with `actions/setup-python`, resolves the downstream
+project version through `pypa/build`, and retries the build with an explicit
+`--runtime-version`. Static runtime versions and explicit `runtime-version`
+inputs do not set up Python.
+
 ```yaml
 - uses: actions/checkout@v4
 
-- uses: jezdez/conda-ship@0.2.0
+- uses: jezdez/conda-ship@0.2.1
   id: cs
 ```
 
@@ -42,6 +50,10 @@ runtime version.
   a version different from `[tool.conda-ship].runtime-version` or
   `[project].version`, or when the manifest does not provide a downstream
   runtime version.
+
+`python-version`
+: Python version used only when the action must resolve
+  `runtime-version = { from = "project-metadata" }`. Defaults to `3.12`.
 
 `root`
 : Project root containing `conda.toml`/`conda.lock`, `pixi.toml`/`pixi.lock`,

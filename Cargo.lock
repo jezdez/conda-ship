@@ -503,7 +503,7 @@ checksum = "cc14f565cf027a105f7a44ccf9e5b424348421a1d8952a8fc9d499d313107789"
 
 [[package]]
 name = "conda-ship"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "assert_cmd",
  "assert_matches",
