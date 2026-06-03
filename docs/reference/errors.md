@@ -61,7 +61,7 @@ conda without depending on terminal formatting.
 : Use a target triple string, not a path to a custom target file.
 
 `install method may only contain ASCII letters, digits, dots, dashes, and underscores`
-: Use a short method name such as `homebrew`, `conda-forge`, or `standalone`.
+: Use a short method name such as `homebrew`, `conda-package`, or `standalone`.
 
 ## Runtime Bootstrap
 

@@ -14,22 +14,31 @@ for `cx`.
 
 ## Start Here
 
-If you are new to conda-ship, build the tutorial runtime first. It starts from
-a small conda workspace and gives you a working mental model for locks,
-artifacts, and the generated runtime:
+If you are new to conda-ship, start with the quickstart. It creates a small
+conda workspace, locks it, and stages a `demo` runtime:
 
 ```bash
-conda create -n cs-demo -c conda-forge conda-ship conda-workspaces
+conda create -n cs-demo -c conda-forge python pip conda-workspaces
 conda activate cs-demo
-cs --version
+python -m pip install conda-ship
+mkdir demo-runtime
+cd demo-runtime
 ```
 
-Then use the documentation by the kind of help you need.
+Then follow the [quickstart](tutorials/quickstart.md), or use the documentation
+by the kind of help you need.
 
 ## Common Workflows
 
-::::{grid} 1 1 3 3
+::::{grid} 1 1 2 4
 :gutter: 3
+
+:::{grid-item-card} Quickstart
+:link: tutorials/quickstart
+:link-type: doc
+
+Build an online runtime artifact from a small conda workspace.
+:::
 
 :::{grid-item-card} First Runtime
 :link: tutorials/first-runtime
@@ -114,6 +123,7 @@ See a concrete downstream distribution built with conda-ship.
 :caption: Tutorials
 :maxdepth: 1
 
+tutorials/quickstart
 tutorials/first-runtime
 tutorials/github-action-runtime
 tutorials/custom-delegate-runtime

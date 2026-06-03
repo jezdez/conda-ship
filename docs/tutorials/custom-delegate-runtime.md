@@ -17,8 +17,9 @@ Install conda-ship and either conda-workspaces or Pixi:
 :::{tab-item} conda-workspaces
 
 ```bash
-conda create -n cs-python-demo -c conda-forge conda-ship conda-workspaces
+conda create -n cs-python-demo -c conda-forge python pip conda-workspaces
 conda activate cs-python-demo
+python -m pip install conda-ship
 ```
 
 :::
@@ -26,8 +27,9 @@ conda activate cs-python-demo
 :::{tab-item} Pixi
 
 ```bash
-conda create -n cs-python-demo -c conda-forge conda-ship pixi
+conda create -n cs-python-demo -c conda-forge python pip pixi
 conda activate cs-python-demo
+python -m pip install conda-ship
 ```
 
 :::
@@ -168,4 +170,3 @@ The `delegate` is the executable that receives pass-through arguments after the
 runtime is bootstrapped. Use `delegate = "conda"` for conda-like distributions,
 and another executable when the runtime should present a smaller or different
 command surface.
-

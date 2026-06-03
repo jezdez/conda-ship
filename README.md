@@ -21,6 +21,47 @@ wrappers, and user documentation. conda-express is one downstream distribution
 maintained by Jannis Leidel; it uses conda-ship to publish the `cx` and `cxz`
 runtimes.
 
+## Quickstart
+
+This shortest path uses conda-workspaces to create a solved source environment,
+then builds an online runtime named `demo`:
+
+```bash
+conda create -n cs-demo -c conda-forge python pip conda-workspaces
+conda activate cs-demo
+python -m pip install conda-ship
+
+mkdir demo-runtime
+cd demo-runtime
+conda workspace init --format conda --name demo-runtime
+conda workspace add --feature ship --no-lockfile-update \
+  "python>=3.12" \
+  "conda>=25.1" \
+  conda-rattler-solver \
+  "conda-spawn>=0.1.0"
+cat >> conda.toml <<'TOML'
+
+[tool.conda-ship]
+runtime = "demo"
+delegate = "conda"
+layout = "online"
+source-environment = "ship"
+exclude = ["conda-libmamba-solver"]
+TOML
+
+conda workspace lock
+cs inspect
+cs build --dry-run
+cs build
+./dist/demo --version
+```
+
+![Quickstart: inspect, preview, build, and run a stamped runtime](demos/quickstart.gif)
+
+For a guided walkthrough with Pixi, bootstrap, status, uninstall, and embedded
+runtime examples, see the
+[first runtime tutorial](https://jezdez.github.io/conda-ship/tutorials/first-runtime/).
+
 ## What It Builds
 
 conda-ship stages a runtime binary plus release metadata:
@@ -89,6 +130,23 @@ cs run -- --path /tmp/demo-smoke bootstrap
 selected source environment, applies package exclusions, and prints the package
 set without writing artifacts.
 
+![Inspect a source environment before shipping it](demos/inspect.gif)
+
+Use `cs build --dry-run` to preview the runtime metadata and staged release
+asset paths before writing files.
+
+![Preview conda-ship runtime artifacts](demos/dry-run.gif)
+
+After a real build, verify the staged artifacts and inspect the release metadata
+before handing them to downstream packaging or signing.
+
+![Verify staged conda-ship artifacts](demos/verify.gif)
+
+The staged runtime is a stamped copy of the generic runtime template with its
+own command surface before pass-through to the configured delegate.
+
+![Run a generated conda-ship runtime](demos/runtime-cli.gif)
+
 ## GitHub Actions
 
 The repository root is also a composite GitHub Action for downstream release
@@ -116,10 +174,11 @@ or `.msi` output directly. It produces runtimes that can be distributed as
 GitHub Release assets or wrapped by Homebrew, constructor, Docker, enterprise
 packaging systems, and other release tooling.
 
-The PyPI package and conda package install the `cs` builder, the `cs-template`
-runtime template, and the Python adapter together. The adapter makes
-`conda ship` a shortcut for the same builder when installed in a conda
-environment; it does not make conda-ship part of conda itself.
+The PyPI package installs the `cs` builder, the `cs-template` runtime template,
+and the Python adapter together. The adapter makes `conda ship` a shortcut for
+the same builder when installed in a conda environment; it does not make
+conda-ship part of conda itself. A future conda package should install the same
+pieces into one environment.
 
 ## What Belongs Downstream
 
@@ -158,6 +217,17 @@ pixi run lint
 pixi run -e test pytest
 pixi run docs
 ```
+
+The terminal demos are generated from `demos/*.tape` with
+[VHS](https://github.com/charmbracelet/vhs):
+
+```bash
+pixi run demos
+pixi run demos inspect
+```
+
+The tapes build local debug `cs` and `cs-template` binaries in hidden setup so
+the visible commands match the packaged workflow.
 
 Run `cargo generate-lockfile` after changing Cargo metadata and `pixi lock`
 after changing pixi metadata.

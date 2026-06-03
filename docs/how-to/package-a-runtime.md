@@ -17,8 +17,8 @@ Upload the complete `dist/` contents to a release channel.
 
 :::{grid-item-card} Package Managers
 
-Install the runtime binary through Homebrew, conda packages, or another package
-manager.
+Install the runtime binary through Homebrew, a conda package, or another
+package manager.
 :::
 
 :::{grid-item-card} Installers And Images
@@ -88,8 +88,7 @@ and uninstall behavior.
 ## Wrap With A Conda Package
 
 A conda package can install the runtime binary into the package environment.
-This is useful for distributing the builder itself or a downstream runtime in a
-conda channel.
+This is useful for distributing a downstream runtime in a conda channel.
 
 Keep two boundaries clear:
 
@@ -99,7 +98,7 @@ Keep two boundaries clear:
 Use `install-method` to tell users where the runtime binary came from:
 
 ```bash
-cs build --install-method conda-forge
+cs build --install-method conda-package
 ```
 
 ## Wrap With constructor Or Another Installer
