@@ -15,6 +15,7 @@ use super::artifact::{
     validate_install_method, validate_install_name, validate_package_archive_name,
     validate_runtime_name, validate_runtime_version, validate_target_label, validate_target_triple,
 };
+use super::diagnostic::{DiagnosticKind, ShipDiagnostic};
 use super::project::{
     DerivedRuntimeLock, ManifestKind, ProjectInput, discover_manifest_path, discover_project_input,
     filter_excluded, find_project_root, is_supported_pyproject_manifest, manifest_kind,
@@ -710,6 +711,13 @@ fn test_project_metadata_runtime_version_source_requires_adapter() {
         err.to_string()
             .contains("must be resolved before invoking cs"),
         "{err}"
+    );
+    let diagnostic = err
+        .downcast_ref::<ShipDiagnostic>()
+        .expect("project metadata source should use a conda-ship diagnostic");
+    assert_eq!(
+        diagnostic.kind(),
+        DiagnosticKind::ProjectMetadataRuntimeVersion
     );
 }
 

@@ -989,7 +989,7 @@ pub(crate) fn apply_runtime_metadata_overrides(
 
 fn project_metadata_runtime_version_requires_adapter() -> miette::Report {
     ship_error(
-        DiagnosticKind::MissingRuntimeVersion,
+        DiagnosticKind::ProjectMetadataRuntimeVersion,
         "runtime version from project metadata must be resolved before invoking cs",
         Some(
             "Use `conda ship build` from the Python package so the adapter can call the PEP 517 metadata hook, or pass --runtime-version explicitly."
