@@ -56,6 +56,8 @@ cs build
 ./dist/demo --version
 ```
 
+![Quickstart: inspect, preview, build, and run a stamped runtime](demos/quickstart.gif)
+
 For a guided walkthrough with Pixi, bootstrap, status, uninstall, and embedded
 runtime examples, see the
 [first runtime tutorial](https://jezdez.github.io/conda-ship/tutorials/first-runtime/).
