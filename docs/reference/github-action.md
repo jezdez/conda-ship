@@ -23,7 +23,7 @@ runtime version.
 ```yaml
 - uses: actions/checkout@v4
 
-- uses: jezdez/conda-ship@0.1.0
+- uses: jezdez/conda-ship@0.2.0
   id: cs
 ```
 

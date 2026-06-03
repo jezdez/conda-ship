@@ -2,6 +2,39 @@
 
 All notable user-facing changes to `conda-ship` are documented here.
 
+## 0.2.0 - 2026-06-03
+
+### Added
+
+- Added standards-compliant dynamic Python project version resolution for
+  runtime stamping. Projects can set
+  `runtime-version = { from = "project-metadata" }` in `[tool.conda-ship]`,
+  and the Python `conda ship` adapter resolves the concrete version through the
+  PEP 517 `prepare_metadata_for_build_wheel` hook before invoking `cs`.
+- Added a quickstart tutorial and a compact README quickstart for the shortest
+  local path from a solved conda-workspaces environment to a staged runtime.
+- Added terminal demo recordings for quickstart, `cs inspect`,
+  `cs build --dry-run`, staged artifact verification, and generated runtime CLI
+  behavior. The recordings are embedded in the README and the relevant docs
+  pages.
+
+### Changed
+
+- Generated runtime metadata now requires a downstream runtime version. Builds
+  use `[tool.conda-ship].runtime-version`, static `[project].version`, an
+  explicit `--runtime-version` or GitHub Action input, or the Python adapter's
+  project metadata resolution. conda-ship no longer falls back to its own
+  package version for generated runtimes.
+- Documentation now describes the PyPI-first install flow, runtime version
+  requirements, local preflight commands, artifact verification, and generated
+  runtime CLI behavior in more detail.
+
+### Fixed
+
+- Fixed builder output handling for closed stdout pipes so commands such as
+  `cs inspect | head` or filtered demo commands do not report Rust panics when
+  the reader exits early.
+
 ## 0.1.0 - 2026-06-01
 
 Initial release of `conda-ship`, a generic builder for producing ready-to-run
