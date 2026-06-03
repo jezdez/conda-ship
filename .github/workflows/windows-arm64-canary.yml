@@ -1,0 +1,80 @@
+name: Windows ARM64 Canary
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/windows-arm64-canary.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "tests/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/windows-arm64-canary.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "tests/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-arm64-canary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build native Rust binaries
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      TARGET: aarch64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Prepare Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Verify native target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rustc -vV
+          cargo -vV
+
+          host="$(rustc -vV | sed -n 's/^host: //p')"
+          if [ "$host" != "$TARGET" ]; then
+            echo "Expected runner target ${TARGET}, got ${host}" >&2
+            exit 1
+          fi
+
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+
+      - name: Build cs CLI
+        run: cargo rustc --locked --release --bin cs -- -D warnings
+
+      - name: Build runtime template
+        run: cargo rustc --locked --release --bin cs-template --features runtime-template -- -D warnings
+
+      - name: Smoke built binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target/release/cs.exe --help >/dev/null
+          CONDA_SHIP_ALLOW_UNSTAMPED_TEMPLATE=1 target/release/cs-template.exe --version
