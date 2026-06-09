@@ -43,10 +43,20 @@ permissions:
 
 jobs:
   test:
-    name: Test and smoke runtime
-    runs-on: ubuntu-latest
+    name: Test and smoke runtime (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
     env:
-      TARGET: x86_64-unknown-linux-gnu
+      TARGET: ${{ matrix.target }}
       SCCACHE_GHA_ENABLED: "true"
 
     steps:
@@ -83,35 +93,58 @@ jobs:
       - name: Build smoke runtime
         shell: bash
         run: |
-          ./target/release/cs build \
+          cs="./target/release/cs"
+          template="./target/release/cs-template"
+          if [[ "$TARGET" == *"windows"* ]]; then
+            cs="${cs}.exe"
+            template="${template}.exe"
+          fi
+          "$cs" build \
             --layout online \
             --runtime demo \
             --delegate conda \
             --target "$TARGET" \
             --target-label "$TARGET" \
-            --template ./target/release/cs-template
+            --template "$template"
 
       - name: Smoke test built runtime
         shell: bash
         run: |
-          ./dist/demo-"$TARGET" --path "$RUNNER_TEMP/demo-smoke" bootstrap
-          ./dist/demo-"$TARGET" --path "$RUNNER_TEMP/demo-smoke" status
+          if [[ "$TARGET" == *"windows"* ]]; then
+            BIN="./dist/demo-${TARGET}.exe"
+          else
+            BIN="./dist/demo-${TARGET}"
+          fi
+          "$BIN" --path "$RUNNER_TEMP/demo-smoke" bootstrap
+          "$BIN" --path "$RUNNER_TEMP/demo-smoke" status
 
       - name: Build embedded bundle
+        shell: bash
         run: |
-          ./target/release/cs build \
+          cs="./target/release/cs"
+          template="./target/release/cs-template"
+          if [[ "$TARGET" == *"windows"* ]]; then
+            cs="${cs}.exe"
+            template="${template}.exe"
+          fi
+          "$cs" build \
             --layout embedded \
             --runtime demo \
             --delegate conda \
             --target "$TARGET" \
             --target-label "$TARGET" \
-            --template ./target/release/cs-template
+            --template "$template"
 
       - name: Smoke test embedded bundle
         shell: bash
         run: |
-          ./dist/demoz-"$TARGET" --path "$RUNNER_TEMP/demoz-smoke" bootstrap
-          ./dist/demoz-"$TARGET" --path "$RUNNER_TEMP/demoz-smoke" status
+          if [[ "$TARGET" == *"windows"* ]]; then
+            BIN="./dist/demoz-${TARGET}.exe"
+          else
+            BIN="./dist/demoz-${TARGET}"
+          fi
+          "$BIN" --path "$RUNNER_TEMP/demoz-smoke" bootstrap
+          "$BIN" --path "$RUNNER_TEMP/demoz-smoke" status
 
   coverage:
     name: Coverage
