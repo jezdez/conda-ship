@@ -17,9 +17,9 @@ use super::artifact::{
 };
 use super::diagnostic::{DiagnosticKind, ShipDiagnostic};
 use super::project::{
-    DerivedRuntimeLock, ManifestKind, ProjectInput, discover_manifest_path, discover_project_input,
-    filter_excluded, find_project_root, is_supported_pyproject_manifest, manifest_kind,
-    validate_required_runtime_packages,
+    DerivedRuntimeLock, ManifestKind, ProjectInput, derive_runtime_lock, discover_manifest_path,
+    discover_project_input, filter_excluded, find_project_root, is_supported_pyproject_manifest,
+    manifest_kind, validate_required_runtime_packages,
 };
 use super::{
     BundleLayout, Cli, Command, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionConfig,
@@ -139,6 +139,61 @@ source-environment = "ship"
     assert_eq!(input.config.delegate.as_deref(), Some("conda"));
     assert_eq!(input.config.layout, Some(BundleLayout::Embedded));
     assert_eq!(input.config.source_environment.as_deref(), Some("ship"));
+}
+
+#[test]
+fn test_derive_runtime_lock_accepts_conda_workspaces_lock_v1() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::write(
+        tmp.path().join("conda.toml"),
+        r#"
+[tool.conda-ship]
+source-environment = "ship"
+"#,
+    )
+    .unwrap();
+    let sha256 = "a".repeat(64);
+    std::fs::write(
+        tmp.path().join("conda.lock"),
+        format!(
+            r#"
+---
+# conda-workspaces writes version 1 on disk but reads it as rattler-lock v6.
+version: 1
+environments:
+  ship:
+    channels:
+      - url: https://conda.anaconda.org/conda-forge
+    packages:
+      linux-64:
+        - conda: https://conda.anaconda.org/conda-forge/linux-64/conda-1.0-0.conda
+        - conda: https://conda.anaconda.org/conda-forge/noarch/conda-rattler-solver-1.0-0.conda
+        - conda: https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda
+packages:
+  - conda: https://conda.anaconda.org/conda-forge/linux-64/conda-1.0-0.conda
+    sha256: {sha256}
+  - conda: https://conda.anaconda.org/conda-forge/noarch/conda-rattler-solver-1.0-0.conda
+    sha256: {sha256}
+  - conda: https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda
+    sha256: {sha256}
+"#
+        ),
+    )
+    .unwrap();
+
+    let derived = derive_runtime_lock(tmp.path()).unwrap();
+
+    assert_eq!(derived.source_environment, "ship");
+    assert_eq!(derived.platforms, vec![Platform::Linux64]);
+    assert_eq!(
+        derived.runtime_config.packages,
+        vec![
+            "conda".to_string(),
+            "conda-rattler-solver".to_string(),
+            "conda-spawn".to_string(),
+        ]
+    );
+    assert_eq!(derived.total_packages, 3);
 }
 
 #[test]
