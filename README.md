@@ -76,6 +76,14 @@ The runtime itself has a small management surface: `bootstrap`, `status`,
 `shell`, and `uninstall`. Other commands pass through to the configured
 delegate executable after bootstrap, usually `conda`.
 
+During bootstrap, generated runtimes also write constructor-compatible conda
+prefix metadata. The managed prefix gets `conda-meta/history` and
+`conda-meta/initial-state.explicit.txt` in addition to conda-ship's ownership
+metadata. Conda can recognize the prefix as an environment, and runtimes that
+include `conda-self` can use that initial-state snapshot for
+`conda self reset --snapshot installer-updated` or
+`conda self reset --snapshot installer-exact`.
+
 ## Artifact Layouts
 
 | Layout | Output | Bootstrap behavior |
@@ -111,6 +119,9 @@ exclude = ["conda-libmamba-solver"]
 
 The selected source environment must include the runtime contract packages:
 `conda`, `conda-rattler-solver`, and `conda-spawn`.
+Include `conda-self` in the same source environment when the runtime should
+expose `conda self reset` for restoring the bootstrapped base prefix to the
+initial package set shipped by the runtime.
 
 ## Local Workflow
 

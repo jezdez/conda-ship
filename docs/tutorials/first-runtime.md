@@ -254,6 +254,19 @@ This creates a conda installation managed by the `demo` runtime. This local
 bootstrap is only a smoke test; a real downstream distribution should document
 how its users install and update the runtime it publishes.
 
+The runtime also writes conda prefix metadata during bootstrap:
+
+```bash
+ls "$PWD/.tmp/demo/conda-meta/history"
+ls "$PWD/.tmp/demo/conda-meta/initial-state.explicit.txt"
+```
+
+`history` lets conda recognize the install path as an environment.
+`initial-state.explicit.txt` records the exact package URLs from the stamped
+runtime lock. If your runtime package set includes `conda-self`, that file is
+the installer snapshot used by `conda self reset --snapshot installer-updated`
+and `conda self reset --snapshot installer-exact`.
+
 ```{note}
 The explicit `--path` keeps this tutorial install inside the project directory.
 Published runtimes should document their normal install location and reserve

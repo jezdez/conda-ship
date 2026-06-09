@@ -63,6 +63,19 @@ It records:
 
 Later operations check that metadata before using or removing a prefix.
 
+This ownership file is conda-ship-specific. The runtime also writes standard
+conda prefix metadata:
+
+- `conda-meta/history`
+- `conda-meta/initial-state.explicit.txt`
+
+Those files serve a different purpose. `history` lets conda recognize the
+managed prefix as a conda environment. `initial-state.explicit.txt` records the
+exact packages that were installed from the runtime lock at bootstrap time.
+Tools that understand constructor-style installer snapshots, including
+`conda-self`, can use that explicit file to reset the managed base prefix back
+to the package set originally shipped by the runtime.
+
 ## Why Runtimes Refuse Unmanaged Prefixes
 
 A runtime can find an existing directory at its install path. That directory may
@@ -87,4 +100,3 @@ package, a constructor installer, Docker, or another channel.
 
 If `install-method` was stamped into the runtime, uninstall prints it as a hint
 for removing the runtime binary after the managed prefix is gone.
-

@@ -108,6 +108,24 @@ Additional plugins are a distribution decision. A downstream project records
 its own plugin set in its manifest and committed lockfile; conda-ship does
 not choose one for every runtime.
 
+Add `conda-self` when the generated runtime should let users reset the managed
+base prefix back to the packages shipped by the runtime:
+
+```toml
+[feature.ship.dependencies]
+python = ">=3.12"
+conda = ">=25.1"
+conda-rattler-solver = "*"
+conda-spawn = ">=0.1.0"
+conda-self = "*"
+```
+
+conda-ship writes `conda-meta/initial-state.explicit.txt` during bootstrap.
+`conda-self` treats that file as the installer snapshot for
+`conda self reset --snapshot installer-updated` and
+`conda self reset --snapshot installer-exact`, so reset removes packages added
+after bootstrap while preserving the runtime's initial package set.
+
 ## Configure Local Build Input
 
 Keep package and channel intent in the manifest format owned by your workspace
