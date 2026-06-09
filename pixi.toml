@@ -39,8 +39,16 @@ coverage = "cargo llvm-cov --features runtime-template --lcov --output-path lcov
 coverage-html = "cargo llvm-cov --features runtime-template --html"
 fmt-check = "cargo fmt --check"
 clippy = "cargo clippy --all-targets --features runtime-template -- -D warnings"
-lint = { depends-on = ["fmt-check", "clippy"] }
 demos = { cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}""", args = [{ arg = "name", default = "" }], description = "Record demo GIFs" }
+
+[feature.lint]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+
+[feature.lint.dependencies]
+prek = ">=0.4.4"
+
+[feature.lint.tasks]
+lint = "prek run --all-files"
 
 [feature.docs]
 platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
@@ -90,6 +98,7 @@ ruff-format-check = "ruff format --check python pyproject.toml"
 
 [environments]
 docs = ["docs"]
+lint = { features = ["lint"], no-default-feature = true }
 ship = { features = ["ship"], no-default-feature = true }
 test = ["test"]
 
