@@ -2,15 +2,31 @@
 name = "conda-ship"
 description = "Build ready-to-run conda runtimes"
 channels = ["conda-forge"]
-platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64", "win-arm64"]
 license = "BSD-3-Clause"
 
 [dependencies]
 rust = ">=1.85"
+
+[target.linux.dependencies]
 cargo-llvm-cov = ">=0.6"
 sccache = ">=0.10"
 
-[activation.env]
+[target.linux.activation.env]
+RUSTC_WRAPPER = "sccache"
+
+[target.osx.dependencies]
+cargo-llvm-cov = ">=0.6"
+sccache = ">=0.10"
+
+[target.osx.activation.env]
+RUSTC_WRAPPER = "sccache"
+
+[target.win-64.dependencies]
+cargo-llvm-cov = ">=0.6"
+sccache = ">=0.10"
+
+[target.win-64.activation.env]
 RUSTC_WRAPPER = "sccache"
 
 [tasks]
@@ -26,6 +42,9 @@ clippy = "cargo clippy --all-targets --features runtime-template -- -D warnings"
 lint = { depends-on = ["fmt-check", "clippy"] }
 demos = { cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}""", args = [{ arg = "name", default = "" }], description = "Record demo GIFs" }
 
+[feature.docs]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+
 [feature.docs.dependencies]
 sphinx = ">=7.0"
 conda-sphinx-theme = ">=0.2"
@@ -40,11 +59,17 @@ docs = { cmd = "sphinx-build -b dirhtml . _build/dirhtml", cwd = "docs" }
 docs-serve = { cmd = "python -m http.server", cwd = "docs/_build/dirhtml" }
 docs-clean = { cmd = "rm -rf _build", cwd = "docs" }
 
+[feature.ship]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+
 [feature.ship.dependencies]
 python = ">=3.12"
 conda = ">=25.1"
 conda-rattler-solver = "*"
 conda-spawn = ">=0.1.0"
+
+[feature.test]
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 
 [feature.test.dependencies]
 python = ">=3.12"

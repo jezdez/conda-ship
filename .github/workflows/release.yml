@@ -92,6 +92,8 @@ jobs:
             os: macos-15
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -237,6 +239,8 @@ jobs:
             os: macos-15
           - target: x86_64-pc-windows-msvc
             os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
 
     steps:
       - name: Verify runner target
@@ -254,6 +258,7 @@ jobs:
             macOS/X64) host="x86_64-apple-darwin" ;;
             macOS/ARM64) host="aarch64-apple-darwin" ;;
             Windows/X64) host="x86_64-pc-windows-msvc" ;;
+            Windows/ARM64) host="aarch64-pc-windows-msvc" ;;
             *)
               echo "Unsupported runner platform: ${RUNNER_OS_NAME}/${RUNNER_ARCH_NAME}" >&2
               exit 1
