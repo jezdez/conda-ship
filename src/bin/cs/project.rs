@@ -97,7 +97,7 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
         .into_diagnostic()
         .with_context(|| format!("failed to read {}", input.lock_path.display()))?;
 
-    let lock_file = parse_lock(&lock_content, &input.lock_path)?;
+    let lock_file = parse_lock(&lock_content, &input.lock_path, input.manifest_kind)?;
 
     let source_environment = input.config.source_environment.as_deref().ok_or_else(|| {
         ship_error(
@@ -381,10 +381,52 @@ pub(crate) fn write_generated_runtime_lock(path: &Path, content: &str) -> miette
     Ok(())
 }
 
-fn parse_lock(lock_content: &str, lock_path: &Path) -> miette::Result<LockFile> {
-    LockFile::from_str_with_base_directory(lock_content, lock_path.parent())
+fn parse_lock(
+    lock_content: &str,
+    lock_path: &Path,
+    manifest_kind: ManifestKind,
+) -> miette::Result<LockFile> {
+    let rewritten;
+    let parse_content = if matches!(
+        manifest_kind,
+        ManifestKind::CondaToml | ManifestKind::CondaPyproject
+    ) && let Some(content) =
+        conda_workspaces_lock_v1_as_rattler_v6(lock_content)?
+    {
+        rewritten = content;
+        &rewritten
+    } else {
+        lock_content
+    };
+
+    LockFile::from_str_with_base_directory(parse_content, lock_path.parent())
         .into_diagnostic()
         .with_context(|| format!("failed to parse {}", lock_path.display()))
+}
+
+fn conda_workspaces_lock_v1_as_rattler_v6(lock_content: &str) -> miette::Result<Option<String>> {
+    let mut document: serde_yaml::Value = serde_yaml::from_str(lock_content)
+        .into_diagnostic()
+        .context("failed to parse lockfile YAML")?;
+    let Some(mapping) = document.as_mapping_mut() else {
+        return Ok(None);
+    };
+
+    let version = serde_yaml::Value::String("version".to_string());
+    let environments = serde_yaml::Value::String("environments".to_string());
+    let packages = serde_yaml::Value::String("packages".to_string());
+    if mapping.get(&version).and_then(serde_yaml::Value::as_u64) != Some(1)
+        || !mapping.contains_key(&environments)
+        || !mapping.contains_key(&packages)
+    {
+        return Ok(None);
+    }
+
+    mapping.insert(version, serde_yaml::Value::Number(6.into()));
+    serde_yaml::to_string(&document)
+        .into_diagnostic()
+        .context("failed to render normalized lockfile YAML")
+        .map(Some)
 }
 
 pub(crate) fn package_record(package: &CondaPackageData) -> miette::Result<&PackageRecord> {

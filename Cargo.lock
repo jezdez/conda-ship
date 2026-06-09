@@ -526,6 +526,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "tar",
  "temp-env",
