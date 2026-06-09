@@ -68,6 +68,10 @@ prefix, write `solver: rattler` into the installed `.condarc`, and implement
 `RUNTIME shell` through conda-spawn. Pass-through commands go to the configured
 delegate executable inside that prefix.
 
+`conda-self` is optional. Include it in the selected source environment when
+the runtime should expose `conda self reset` for the managed base prefix.
+Generated runtimes always write the reset snapshot that `conda-self` expects.
+
 ## `[tool.conda-ship]`
 
 `[tool.conda-ship]` records conda-ship-specific build policy:
@@ -167,6 +171,15 @@ metadata filename expected by the runtime. `status`, `bootstrap --force`,
 prefix when that ownership metadata is missing, invalid, or belongs to another
 stamped runtime.
 
+Generated runtimes also write constructor-compatible prefix metadata into
+`conda-meta/history` and `conda-meta/initial-state.explicit.txt`. Conda uses
+the history file to recognize the prefix as an environment and to preserve the
+runtime's requested package specs for future conda operations. The explicit
+initial-state file records the exact package URLs and checksums from the
+stamped runtime lock. When `conda-self` is installed in the runtime, it uses
+that file as the installer snapshot for the `installer-updated` and
+`installer-exact` reset modes.
+
 Package and channel intent belongs in the selected source environment, not in
 `[tool.conda-ship]`. conda-ship records the resolved package names and channel
 URLs from the source lockfile environment into generated runtime metadata.
@@ -194,6 +207,14 @@ URLs from the source lockfile environment into generated runtime metadata.
 At bootstrap time, the generated runtime writes a separate prefix metadata file
 inside the managed prefix. That file is used for ownership checks before later
 operations touch the prefix.
+
+The bootstrap also writes standard conda prefix metadata:
+
+- `conda-meta/history`
+- `conda-meta/initial-state.explicit.txt`
+
+These files are not stamped into the runtime binary. They are rendered from the
+runtime lock when the prefix is bootstrapped.
 
 Non-alphanumeric characters in environment variable names become underscores.
 
