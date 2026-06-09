@@ -155,7 +155,7 @@ jobs:
           retention-days: 3
 
   windows-arm64-canary:
-    name: Windows ARM64 canary
+    name: Build canary (aarch64-pc-windows-msvc)
     runs-on: windows-11-arm
     timeout-minutes: 30
     env:
