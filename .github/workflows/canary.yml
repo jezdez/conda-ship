@@ -1,0 +1,280 @@
+name: Canary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/canary.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
+      - "action.yml"
+      - "src/**"
+      - "tests/**"
+      - "python/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "pixi.toml"
+      - "pixi.lock"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+concurrency:
+  group: canary-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    env:
+      TARGET: ${{ matrix.target }}
+      SCCACHE_GHA_ENABLED: "true"
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          cache: true
+
+      - name: Verify runner target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          host="$(pixi run -- rustc -vV | sed -n 's/^host: //p')"
+          if [ "$host" != "$TARGET" ]; then
+            echo "Expected runner target ${TARGET}, got ${host}" >&2
+            exit 1
+          fi
+
+      - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+
+      - name: Build cs CLI
+        run: pixi run -- cargo rustc --locked --release --bin cs -- -D warnings
+
+      - name: Test
+        run: pixi run --locked test
+
+      - name: Build runtime template
+        run: pixi run -- cargo rustc --locked --release --bin cs-template --features runtime-template -- -D warnings
+
+      - name: Build smoke runtime
+        shell: bash
+        run: |
+          cs="./target/release/cs"
+          template="./target/release/cs-template"
+          if [[ "$TARGET" == *"windows"* ]]; then
+            cs="${cs}.exe"
+            template="${template}.exe"
+          fi
+          "$cs" build \
+            --layout online \
+            --runtime demo \
+            --delegate conda \
+            --target "$TARGET" \
+            --target-label "$TARGET" \
+            --template "$template"
+
+      - name: Smoke test built runtime
+        shell: bash
+        run: |
+          if [[ "$TARGET" == *"windows"* ]]; then
+            BIN="./dist/demo-${TARGET}.exe"
+          else
+            BIN="./dist/demo-${TARGET}"
+          fi
+          "$BIN" --path "$RUNNER_TEMP/demo-smoke" bootstrap
+          "$BIN" --path "$RUNNER_TEMP/demo-smoke" status
+
+      - name: Build embedded bundle
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          ./target/release/cs build \
+            --layout embedded \
+            --runtime demo \
+            --delegate conda \
+            --target "$TARGET" \
+            --target-label "$TARGET" \
+            --template ./target/release/cs-template
+
+      - name: Smoke test embedded bundle
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        run: |
+          ./dist/demoz-"$TARGET" --path "$RUNNER_TEMP/demoz-smoke" bootstrap
+          ./dist/demoz-"$TARGET" --path "$RUNNER_TEMP/demoz-smoke" status
+
+      - name: Stage canary binary
+        shell: bash
+        run: |
+          if [[ "$TARGET" == *"windows"* ]]; then
+            ASSET_NAME="demo-${TARGET}.exe"
+          else
+            ASSET_NAME="demo-${TARGET}"
+          fi
+          cp "dist/${ASSET_NAME}" "${ASSET_NAME}"
+          echo "ASSET_NAME=${ASSET_NAME}" >> "$GITHUB_ENV"
+
+      - name: Upload canary binary
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: ${{ env.ASSET_NAME }}
+          retention-days: 3
+
+  windows-arm64-canary:
+    name: Build canary (aarch64-pc-windows-msvc)
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
+      TARGET: aarch64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Prepare Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Verify native target
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rustc -vV
+          cargo -vV
+
+          host="$(rustc -vV | sed -n 's/^host: //p')"
+          if [ "$host" != "$TARGET" ]; then
+            echo "Expected runner target ${TARGET}, got ${host}" >&2
+            exit 1
+          fi
+
+      - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+
+      # Keep this out of the main build matrix until win-arm64 conda package
+      # coverage is sufficient for runtime bootstrap smoke tests.
+      - name: Build cs CLI
+        run: cargo rustc --locked --release --bin cs -- -D warnings
+
+      - name: Build runtime template
+        run: cargo rustc --locked --release --bin cs-template --features runtime-template -- -D warnings
+
+      - name: Smoke built binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target/release/cs.exe --help >/dev/null
+          CONDA_SHIP_ALLOW_UNSTAMPED_TEMPLATE=1 target/release/cs-template.exe --version
+
+  package-wheels:
+    name: Package PyPI wheel (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            manylinux: "2_17"
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            manylinux: "2_17"
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+          - target: aarch64-pc-windows-msvc
+            os: windows-11-arm
+
+    steps:
+      - name: Verify runner target
+        shell: bash
+        env:
+          RUNNER_ARCH_NAME: ${{ runner.arch }}
+          RUNNER_OS_NAME: ${{ runner.os }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+
+          case "${RUNNER_OS_NAME}/${RUNNER_ARCH_NAME}" in
+            Linux/X64) host="x86_64-unknown-linux-gnu" ;;
+            Linux/ARM64) host="aarch64-unknown-linux-gnu" ;;
+            macOS/X64) host="x86_64-apple-darwin" ;;
+            macOS/ARM64) host="aarch64-apple-darwin" ;;
+            Windows/X64) host="x86_64-pc-windows-msvc" ;;
+            Windows/ARM64) host="aarch64-pc-windows-msvc" ;;
+            *)
+              echo "Unsupported runner platform: ${RUNNER_OS_NAME}/${RUNNER_ARCH_NAME}" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ "$host" != "$TARGET" ]; then
+            echo "Expected matrix target ${TARGET}, got ${host}" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          command: build
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux || 'auto' }}
+          sccache: true
+          args: --release --locked -o dist-pypi
+
+  package-sdist:
+    name: Package PyPI sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          command: sdist
+          args: -o dist-pypi

@@ -1,0 +1,20 @@
+minimum_prek_version = "0.4.4"
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "cargo-fmt"
+name = "cargo fmt"
+language = "system"
+entry = "pixi run --locked --environment default fmt-check"
+files = "\\.rs$"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "cargo-clippy"
+name = "cargo clippy"
+language = "system"
+entry = "pixi run --locked --environment default clippy"
+files = "^(Cargo\\.(toml|lock)|src/.*\\.rs|tests/.*\\.rs)$"
+pass_filenames = false

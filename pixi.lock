@@ -465,6 +465,30 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.44.35208-h818238b_34.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/yaml-0.2.5-h6a83c73_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/zstd-1.5.7-h534d264_6.conda
+  lint:
+    channels:
+    - url: https://conda.anaconda.org/conda-forge/
+    packages:
+      linux-64:
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libgcc-15.2.0-he0feb66_19.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_19.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/prek-0.4.4-hb17b654_0.conda
+      linux-aarch64:
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/_openmp_mutex-4.5-20_gnu.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libgcc-15.2.0-h8acb6b2_19.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libgomp-15.2.0-h8acb6b2_19.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/prek-0.4.4-h069e38c_0.conda
+      osx-64:
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/prek-0.4.4-h19f9e61_0.conda
+      osx-arm64:
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/prek-0.4.4-h6fdd925_0.conda
+      win-64:
+      - conda: https://conda.anaconda.org/conda-forge/win-64/prek-0.4.4-h18a1a76_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/ucrt-10.0.26100.0-h57928b3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-h1b7c187_38.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36231-h1b9f54f_38.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36231-h1b9f54f_38.conda
   ship:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
@@ -2844,6 +2868,18 @@ packages:
   purls: []
   size: 1222481
   timestamp: 1763655398280
+- conda: https://conda.anaconda.org/conda-forge/linux-64/prek-0.4.4-hb17b654_0.conda
+  sha256: bf7ff3ff97b09ce0af65a8ca4309d23fe4d6ed294ff790b95ec6d9b3880cf89c
+  md5: f1576a64b697e9fd2d92b74175cef62a
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=14
+  constrains:
+  - __glibc >=2.17
+  license: MIT
+  license_family: MIT
+  size: 5991507
+  timestamp: 1780574090659
 - conda: https://conda.anaconda.org/conda-forge/linux-64/py-rattler-0.23.2-py310h70157a2_1.conda
   noarch: python
   sha256: 9cad6385db44ffda7cf72ed808670b43a19a469fb851d98d09dbce5b5e164c3b
@@ -4109,6 +4145,17 @@ packages:
   purls: []
   size: 1166552
   timestamp: 1763655534263
+- conda: https://conda.anaconda.org/conda-forge/linux-aarch64/prek-0.4.4-h069e38c_0.conda
+  sha256: 63446ec9720e99591a8607d2438a19bdb355dc49a2b1f9f183b334bfd408933b
+  md5: 0e485aa5cd829410bd3019cc95b9bb1c
+  depends:
+  - libgcc >=14
+  constrains:
+  - __glibc >=2.17
+  license: MIT
+  license_family: MIT
+  size: 5803734
+  timestamp: 1780574098338
 - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/py-rattler-0.23.2-py310h45743d3_1.conda
   noarch: python
   sha256: e348ced9230250dbfd16945ca0cf7b40ee9fd08abf2166347c78ba9fcdc022c6
@@ -6924,6 +6971,17 @@ packages:
   purls: []
   size: 2776564
   timestamp: 1775589970694
+- conda: https://conda.anaconda.org/conda-forge/osx-64/prek-0.4.4-h19f9e61_0.conda
+  sha256: 6360528d6bd7f50a55bf715e2ae9f3e13373454959db6250037c46af040f335e
+  md5: f96ebde5b803bed8a570d10c64f0ab37
+  depends:
+  - __osx >=11.0
+  constrains:
+  - __osx >=11.0
+  license: MIT
+  license_family: MIT
+  size: 6001816
+  timestamp: 1780574246606
 - conda: https://conda.anaconda.org/conda-forge/osx-64/py-rattler-0.23.2-py310h21b85f7_1.conda
   noarch: python
   sha256: ad07a47394c85b7da405a907408c4a77289ad096847147569991d8a7e5563db1
@@ -7912,6 +7970,17 @@ packages:
   purls: []
   size: 3106008
   timestamp: 1775587972483
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/prek-0.4.4-h6fdd925_0.conda
+  sha256: b48f6b02aac8f814429686170e4329dd60e3b11f68391335cc5e8d6f23b88310
+  md5: d635d25984684211202c98d05a1fa1a1
+  depends:
+  - __osx >=11.0
+  constrains:
+  - __osx >=11.0
+  license: MIT
+  license_family: MIT
+  size: 5571662
+  timestamp: 1780574364292
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/py-rattler-0.23.2-py310hbaa5893_1.conda
   noarch: python
   sha256: 1190fc062297277a5aedfed5542c473e1cc531d6264f5274d827436af80f3182
@@ -8864,6 +8933,17 @@ packages:
   purls: []
   size: 9410183
   timestamp: 1775589779763
+- conda: https://conda.anaconda.org/conda-forge/win-64/prek-0.4.4-h18a1a76_0.conda
+  sha256: 791ee74e4492d58fe3722b38043016aedbb9f0211733eb1bf91b3c9839cd38e7
+  md5: ac23da97200f6dfea4635a41ca0fac34
+  depends:
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
+  - ucrt >=10.0.20348.0
+  license: MIT
+  license_family: MIT
+  size: 6348703
+  timestamp: 1780574143226
 - conda: https://conda.anaconda.org/conda-forge/win-64/py-rattler-0.23.2-py310hb39080a_1.conda
   noarch: python
   sha256: 1abe10d6e0a73bc97b8700cbe94474d916182c7ec118f82492ac616dd3aa12a1
