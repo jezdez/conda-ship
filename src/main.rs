@@ -7,6 +7,7 @@ use miette::IntoDiagnostic;
 mod cli;
 mod commands;
 mod config;
+mod constructor_metadata;
 mod exec;
 mod install;
 mod policy;

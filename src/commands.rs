@@ -10,7 +10,7 @@ use crate::config::{
     PrefixMetadata, embedded_config, embedded_lock, read_metadata, write_condarc, write_frozen,
     write_metadata,
 };
-use crate::{exec, install, policy};
+use crate::{constructor_metadata, exec, install, policy};
 
 pub(crate) fn is_bootstrapped(prefix: &Path) -> bool {
     prefix.join("conda-meta").is_dir()
@@ -180,32 +180,37 @@ pub(crate) async fn bootstrap(
 
     if let Some(ref bundle_dir) = bundle {
         let content = lock_content
+            .as_deref()
             .ok_or_else(|| miette::miette!("--bundle requires a stamped runtime lock"))?;
         if verbosity != Verbosity::Quiet {
             eprintln!("   Bundle:   {}", bundle_dir.display());
         }
-        install::from_lockfile_with_bundle(prefix, &content, bundle_dir, offline).await?;
+        install::from_lockfile_with_bundle(prefix, content, bundle_dir, offline).await?;
     } else if let Some(embedded_dir) = install::extract_embedded_bundle()? {
         let content = lock_content
+            .as_deref()
             .ok_or_else(|| miette::miette!("embedded bundle requires a stamped runtime lock"))?;
         if verbosity != Verbosity::Quiet {
             eprintln!("   Bundle:   embedded");
         }
-        let result =
-            install::from_lockfile_with_bundle(prefix, &content, &embedded_dir, true).await;
+        let result = install::from_lockfile_with_bundle(prefix, content, &embedded_dir, true).await;
         let _ = std::fs::remove_dir_all(&embedded_dir);
         result?;
     } else if offline {
         let content = lock_content
+            .as_deref()
             .ok_or_else(|| miette::miette!("--offline requires a stamped runtime lock"))?;
-        install::from_lockfile_offline(prefix, &content).await?;
+        install::from_lockfile_offline(prefix, content).await?;
     } else {
-        let content = lock_content.ok_or_else(|| {
+        let content = lock_content.as_deref().ok_or_else(|| {
             miette::miette!("runtime has no stamped lockfile; rebuild it with `cs build`")
         })?;
-        install::from_lockfile(prefix, &content).await?;
+        install::from_lockfile(prefix, content).await?;
     }
 
+    if let Some(content) = lock_content.as_deref() {
+        constructor_metadata::write_prefix_metadata(prefix, content, &specs)?;
+    }
     write_condarc(prefix, &channels)?;
     write_frozen(prefix)?;
     write_metadata(prefix, &channels, &specs)?;

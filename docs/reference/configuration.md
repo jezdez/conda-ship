@@ -167,6 +167,11 @@ metadata filename expected by the runtime. `status`, `bootstrap --force`,
 prefix when that ownership metadata is missing, invalid, or belongs to another
 stamped runtime.
 
+Generated runtimes also write constructor-compatible prefix metadata into
+`conda-meta/history` and `conda-meta/initial-state.explicit.txt`. Conda uses
+the history file to recognize the prefix as an environment and to preserve the
+runtime's requested package specs for future conda operations.
+
 Package and channel intent belongs in the selected source environment, not in
 `[tool.conda-ship]`. conda-ship records the resolved package names and channel
 URLs from the source lockfile environment into generated runtime metadata.

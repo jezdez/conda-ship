@@ -35,8 +35,10 @@ pub(crate) fn multi_progress() -> MultiProgress {
     GLOBAL_MP.clone()
 }
 
-/// Parse a lockfile and return the platform and records.
-fn lockfile_records(lock_content: &str) -> miette::Result<(Platform, Vec<RepoDataRecord>)> {
+/// Parse a lockfile and return the current platform and records.
+pub(crate) fn lockfile_records_for_current_platform(
+    lock_content: &str,
+) -> miette::Result<(Platform, Vec<RepoDataRecord>)> {
     let lock_file = LockFile::from_str_with_base_directory(lock_content, None)
         .into_diagnostic()
         .context("failed to parse lockfile")?;
@@ -55,6 +57,13 @@ fn lockfile_records(lock_content: &str) -> miette::Result<(Platform, Vec<RepoDat
         .into_diagnostic()
         .context("failed to extract records from lockfile")?
         .ok_or_else(|| miette::miette!("lockfile has no records for platform {}", platform))?;
+
+    Ok((platform, records))
+}
+
+/// Parse a lockfile and return the platform and records.
+fn lockfile_records(lock_content: &str) -> miette::Result<(Platform, Vec<RepoDataRecord>)> {
+    let (platform, records) = lockfile_records_for_current_platform(lock_content)?;
 
     eprintln!(
         "   Lockfile contains {} packages for {}",
