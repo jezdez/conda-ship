@@ -31,7 +31,7 @@ inputs do not set up Python.
 ```yaml
 - uses: actions/checkout@v4
 
-- uses: jezdez/conda-ship@0.2.1
+- uses: jezdez/conda-ship@0.3.0
   id: cs
 ```
 

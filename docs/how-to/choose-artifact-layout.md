@@ -127,7 +127,7 @@ strategy:
     layout: [online, embedded]
 
 steps:
-  - uses: jezdez/conda-ship@0.2.1
+  - uses: jezdez/conda-ship@0.3.0
     with:
       layout: ${{ matrix.layout }}
 ```
