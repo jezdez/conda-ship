@@ -50,6 +50,13 @@ Options:
 : Disable network access. Packages must be available from the local cache, an
   explicit `--bundle`, or an embedded bundle.
 
+After package installation, bootstrap writes conda-ship ownership metadata,
+`.condarc`, the CEP 22 frozen marker, and the prefix metadata that conda tools
+expect in `conda-meta/history` and `conda-meta/initial-state.explicit.txt`.
+The initial-state file records the package URLs and checksums from the stamped
+runtime lock so installer reset tools such as `conda-self` can return the
+managed base prefix to the shipped package set.
+
 Examples:
 
 ```bash

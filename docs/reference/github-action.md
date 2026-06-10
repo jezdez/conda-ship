@@ -88,6 +88,24 @@ The action does not duplicate `cs build` validation in shell. It passes
 non-empty inputs to `cs build --dry-run` and then to `cs build`; invalid values
 fail in the builder.
 
+## Supported Runner Platforms
+
+The action selects `cs-<target>` and `cs-template-<target>` from the current
+runner's operating system and architecture:
+
+| Runner OS | Runner arch | Target |
+| --- | --- | --- |
+| `Linux` | `X64` | `x86_64-unknown-linux-gnu` |
+| `Linux` | `ARM64` | `aarch64-unknown-linux-gnu` |
+| `macOS` | `X64` | `x86_64-apple-darwin` |
+| `macOS` | `ARM64` | `aarch64-apple-darwin` |
+| `Windows` | `X64` | `x86_64-pc-windows-msvc` |
+| `Windows` | `ARM64` | `aarch64-pc-windows-msvc` |
+
+Use GitHub-hosted or self-hosted runners that report one of those
+`runner.os`/`runner.arch` combinations. Branch refs do not have matching
+release assets, so release workflows should pin `jezdez/conda-ship@X.Y.Z`.
+
 ## Outputs
 
 `dist-path`
