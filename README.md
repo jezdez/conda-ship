@@ -229,6 +229,9 @@ pixi run -e test pytest
 pixi run docs
 ```
 
+`pixi run lint` runs the repository's `prek` hooks, including Rust formatting
+and clippy checks.
+
 The terminal demos are generated from `demos/*.tape` with
 [VHS](https://github.com/charmbracelet/vhs):
 

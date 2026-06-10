@@ -1,6 +1,31 @@
 # Changelog
 
-All notable user-facing changes to `conda-ship` are documented here.
+All notable changes to `conda-ship` are documented here.
+
+## Unreleased
+
+### Added
+
+- Added Windows ARM64 builder release assets and PyPI wheels for
+  `aarch64-pc-windows-msvc`. Full Windows ARM64 runtime bootstrap coverage
+  remains gated by the conda package ecosystem.
+- Generated runtimes now write constructor-compatible
+  `conda-meta/history` and `conda-meta/initial-state.explicit.txt` during
+  bootstrap. Conda tooling can recognize the managed prefix as an environment,
+  and runtimes that include `conda-self` can reset back to the shipped package
+  set.
+- Runtime delegate environments now set `CONDA_COMPLETION_COMMAND_NAME` to the
+  stamped runtime executable name for shell completion integrations.
+
+### Development
+
+- CI linting now runs through `prek`, with test, documentation, package, and
+  platform canary jobs split so common checks finish sooner.
+
+### Fixed
+
+- Fixed conda-workspaces `conda.lock` parsing for lockfiles that use the
+  `version: 1` schema.
 
 ## 0.2.1 - 2026-06-03
 

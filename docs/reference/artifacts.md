@@ -49,6 +49,11 @@ For an `embedded` build, the stem uses the `z` suffix, for example
 For an `external` build, conda-ship also stages `demo.bundle.tar.zst` or a
 target-qualified equivalent.
 
+These files describe the staged release output. During `bootstrap`, the
+generated runtime also writes managed-prefix metadata such as
+`conda-meta/history` and `conda-meta/initial-state.explicit.txt` inside the
+install path.
+
 ## Stamped Runtime Data
 
 conda-ship appends a runtime data block to every staged runtime. The block

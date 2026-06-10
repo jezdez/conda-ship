@@ -123,13 +123,15 @@ RUNTIMEz bootstrap
 ```
 
 The installer should not unpack the managed conda prefix by itself. Let the
-runtime bootstrap so ownership metadata, `.condarc`, frozen marker, and package
-verification are applied consistently.
+runtime bootstrap so ownership metadata, `.condarc`, the frozen marker,
+constructor-compatible prefix metadata, and package verification are applied
+consistently.
 
 ```{warning}
 Do not preinstall the managed prefix behind the runtime's back. Runtime
-bootstrap writes ownership metadata and verification state that later `status`,
-pass-through, and `uninstall` commands rely on.
+bootstrap writes ownership metadata, `conda-meta/history`,
+`conda-meta/initial-state.explicit.txt`, and verification state that later
+`status`, pass-through, reset, and `uninstall` commands rely on.
 ```
 
 ## Package For Docker Or Internal Images

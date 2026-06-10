@@ -53,6 +53,6 @@ Current follow-up work is mostly distribution hardening:
 - add richer provenance examples for package-manager specific release workflows
 - keep the GitHub Action intentionally lockfile-first, with package and channel
   changes made in committed project manifests rather than action inputs
-- publish Windows ARM64 builder assets and PyPI wheels, while keeping full
-  Windows ARM64 conda runtime bootstrap coverage behind the regular canary until
-  the conda package ecosystem has enough stable `win-arm64` runtime coverage
+- keep full Windows ARM64 conda runtime bootstrap coverage behind the regular
+  canary until the conda package ecosystem has enough stable `win-arm64`
+  runtime coverage

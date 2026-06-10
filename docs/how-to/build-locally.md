@@ -158,6 +158,10 @@ cargo deny check
 zizmor --persona auditor .
 ```
 
+`pixi run lint` runs the repository's `prek` hooks for Rust formatting and
+clippy checks. Python checks remain explicit release-check commands in the test
+environment.
+
 `cargo deny check` enforces the repository's Rust advisory, license, dependency
 ban, and source policies. Duplicate dependency versions are warnings for now
 because the rattler dependency graph still contains expected overlap.
