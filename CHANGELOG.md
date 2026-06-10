@@ -2,7 +2,7 @@
 
 All notable changes to `conda-ship` are documented here.
 
-## Unreleased
+## 0.3.0 - 2026-06-10
 
 ### Added
 
