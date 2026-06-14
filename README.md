@@ -43,6 +43,7 @@ cat >> conda.toml <<'TOML'
 
 [tool.conda-ship]
 runtime = "demo"
+runtime-version = "0.1.0"
 delegate = "conda"
 layout = "online"
 source-environment = "ship"
@@ -111,6 +112,7 @@ The package and channel intent lives in the selected source environment.
 ```toml
 [tool.conda-ship]
 runtime = "demo"
+runtime-version = "0.1.0"
 delegate = "conda"
 layout = "online"
 source-environment = "ship"

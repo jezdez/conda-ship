@@ -43,6 +43,7 @@ cat >> conda.toml <<'TOML'
 
 [tool.conda-ship]
 runtime = "demo"
+runtime-version = "0.1.0"
 delegate = "conda"
 layout = "online"
 source-environment = "ship"
