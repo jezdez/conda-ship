@@ -2,6 +2,14 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## 0.3.2 - 2026-06-15
+
+### Fixed
+
+- Set an explicit `conda-ship/<version>` user agent for package archive
+  downloads. This fixes 403 responses from `repo.anaconda.com` during embedded
+  bundle creation and online runtime bootstrap.
+
 ## 0.3.1 - 2026-06-15
 
 ### Added
