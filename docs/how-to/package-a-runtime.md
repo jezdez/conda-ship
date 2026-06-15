@@ -77,10 +77,10 @@ it needs an equivalent place for checksums, package metadata, and provenance.
 For an online runtime, a Homebrew formula usually installs the runtime binary
 and lets the runtime download packages at first bootstrap.
 
-Set an install method so uninstall guidance is useful:
+Set an installer so uninstall guidance is useful:
 
 ```bash
-cs build --install-method homebrew
+cs build --installer homebrew
 ```
 
 The formula should install the runtime onto `PATH`. It should not modify the
@@ -97,10 +97,10 @@ Keep two boundaries clear:
 - the conda package installs the runtime binary
 - the generated runtime bootstraps and owns its managed prefix
 
-Use `install-method` to tell users where the runtime binary came from:
+Use `installer` to tell users where the runtime binary came from:
 
 ```bash
-cs build --install-method conda-package
+cs build --installer conda-package
 ```
 
 ## Wrap With constructor Or Another Installer
@@ -121,7 +121,7 @@ RUNTIME bootstrap --bundle /path/to/bundle --offline
 For `embedded`, no extra bundle path is needed:
 
 ```bash
-RUNTIMEz bootstrap
+RUNTIME bootstrap
 ```
 
 The installer should not unpack the managed conda prefix by itself. Let the

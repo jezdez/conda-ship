@@ -24,8 +24,8 @@ verification. Self-hosted runners must provide `gh`.
 The checked-out repository must contain `conda.toml` plus `conda.lock`,
 `pyproject.toml` with `[tool.conda]` plus `conda.lock`, `pixi.toml` plus
 `pixi.lock`, or `pyproject.toml` with `[tool.pixi]` plus `pixi.lock`. These
-examples assume the manifest contains `[tool.conda-ship].runtime`,
-`[tool.conda-ship].delegate`, and a downstream runtime version, unless those
+examples assume the manifest contains `[tool.conda-ship].runtime-name`,
+`[tool.conda-ship].delegate-executable`, and a downstream runtime version, unless those
 values are supplied as action inputs.
 
 ```yaml
@@ -68,22 +68,23 @@ steps:
 
 The action does not run a solve, generate a manifest, or refresh a lockfile.
 Update and commit the lockfile before running release builds.
-Release-job metadata such as `runtime`, `runtime-version`, `delegate`,
-`docs-url`, `install-scheme`, `install-name`, and `install-method` can come
-from the manifest or from action inputs. The action passes those inputs to
-`cs build --dry-run`, so validation still happens in conda-ship.
+Release-job metadata such as `runtime-name`, `runtime-version`,
+`delegate-executable`, `docs-url`, `install-scheme`, `install-name`, and
+`installer` can come from the manifest or from action inputs. The action passes
+those inputs to `cs build --dry-run`, so validation still happens in
+conda-ship.
 
 ## External Bundle Example
 
-Set `layout` to `external` when you want to distribute the runtime and package
-bundle as separate files:
+Set `artifact-layout` to `external` when you want to distribute the runtime and
+package bundle as separate files:
 
 ```yaml
 - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
   with:
     conda-ship-version: "X.Y.Z"
-    layout: external
+    artifact-layout: external
 
 - uses: actions/upload-artifact@v4
   with:
@@ -93,7 +94,7 @@ bundle as separate files:
 
 ## Embedded Bundle Example
 
-Set `layout` to `embedded` when the runtime must bootstrap without network
+Set `artifact-layout` to `embedded` when the runtime must bootstrap without network
 access:
 
 ```yaml
@@ -101,11 +102,12 @@ access:
   id: cs
   with:
     conda-ship-version: "X.Y.Z"
-    layout: embedded
+    artifact-layout: embedded
 ```
 
-The output runtime uses the `z` suffix, for example `demoz` on Unix or
-`demoz.exe` on Windows.
+The output runtime uses the configured runtime name by default. Set the
+`artifact-name` input when the staged artifact should have a distinct command
+name.
 
 ## Matrix Builds
 
@@ -119,20 +121,20 @@ strategy:
     include:
       - os: ubuntu-latest
         layout: online
-        runtime: demo
-        install-method: standalone
+        runtime_name: demo
+        installer: standalone
       - os: macos-15-intel
         layout: embedded
-        runtime: demo
-        install-method: homebrew
+        runtime_name: demo
+        installer: homebrew
       - os: macos-15
         layout: embedded
-        runtime: demo
-        install-method: homebrew
+        runtime_name: demo
+        installer: homebrew
       - os: windows-latest
         layout: online
-        runtime: demo
-        install-method: standalone
+        runtime_name: demo
+        installer: standalone
 
 runs-on: ${{ matrix.os }}
 
@@ -143,14 +145,14 @@ steps:
     id: cs
     with:
       conda-ship-version: "X.Y.Z"
-      layout: ${{ matrix.layout }}
-      runtime: ${{ matrix.runtime }}
+      artifact-layout: ${{ matrix.layout }}
+      runtime-name: ${{ matrix.runtime_name }}
       runtime-version: ${{ github.ref_name }}
-      delegate: conda
+      delegate-executable: conda
       docs-url: https://example.com/demo/
       install-scheme: conda-home
       install-name: demo
-      install-method: ${{ matrix.install-method }}
+      installer: ${{ matrix.installer }}
 ```
 
 Each job emits an asset name qualified with the runner target triple.

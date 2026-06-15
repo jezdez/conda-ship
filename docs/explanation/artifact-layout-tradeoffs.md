@@ -55,7 +55,9 @@ Embedded is useful when:
 - a wrapper installer is not available
 - the runtime is intended for constrained or disconnected environments
 
-Embedded runtimes use the `z` suffix by convention.
+Embedded runtimes use the configured runtime name by default. A downstream
+distribution can set `artifact-name` when a release artifact should use a
+different command name.
 
 ## Choosing At Release Time
 
@@ -63,10 +65,10 @@ Layout is release metadata, not package intent. A project can solve one source
 environment and build multiple layouts from the same source lock:
 
 ```bash
-cs build --layout online
-cs build --layout external
-cs build --layout embedded
+cs build --artifact-layout online
+cs build --artifact-layout external
+cs build --artifact-layout embedded
 ```
 
-This is why the GitHub Action exposes `layout` as an input. A release matrix can
-choose layouts without changing package or channel input.
+This is why the GitHub Action exposes `artifact-layout` as an input. A release
+matrix can choose layouts without changing package or channel input.

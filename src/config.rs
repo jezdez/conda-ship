@@ -39,8 +39,8 @@ pub fn embedded_bundle_len() -> Option<u64> {
     embedded_bundle().map(runtime_data::EmbeddedBundle::len)
 }
 
-pub(crate) fn install_method() -> Option<&'static str> {
-    runtime_data::current().header.install_method.as_deref()
+pub(crate) fn installer() -> Option<&'static str> {
+    runtime_data::current().header.installer.as_deref()
 }
 
 // Prefix metadata.

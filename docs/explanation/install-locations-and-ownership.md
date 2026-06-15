@@ -28,7 +28,7 @@ a short executable name and a clearer install name:
 
 ```toml
 [tool.conda-ship]
-runtime = "cx"
+runtime-name = "cx"
 install-name = "express"
 ```
 
@@ -98,5 +98,5 @@ ownership checks before touching an existing prefix.
 runtime binary itself because that binary may be owned by Homebrew, a conda
 package, a constructor installer, Docker, or another channel.
 
-If `install-method` was stamped into the runtime, uninstall prints it as a hint
+If `installer` was stamped into the runtime, uninstall prints it as a hint
 for removing the runtime binary after the managed prefix is gone.

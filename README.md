@@ -42,12 +42,12 @@ conda workspace add --feature ship --no-lockfile-update \
 cat >> conda.toml <<'TOML'
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 
 conda workspace lock
@@ -89,9 +89,9 @@ include `conda-self` can use that initial-state snapshot for
 
 | Layout | Output | Bootstrap behavior |
 | --- | --- | --- |
-| `online` | `<runtime>` | Downloads packages from the stamped runtime lock. |
-| `external` | `<runtime>` plus `<runtime>.bundle.tar.zst` | Uses a separate package bundle for offline-capable installs. |
-| `embedded` | `<runtime>z` | Embeds the compressed package bundle in one binary. |
+| `online` | `<runtime-name>` or `<artifact-name>` | Downloads packages from the stamped runtime lock. |
+| `external` | `<runtime-name>` or `<artifact-name>` plus `<name>.bundle.tar.zst` | Uses a separate package bundle for offline-capable installs. |
+| `embedded` | `<runtime-name>` or `<artifact-name>` | Embeds the compressed package bundle in one binary. |
 
 ## Project Input
 
@@ -111,12 +111,12 @@ The package and channel intent lives in the selected source environment.
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 ```
 
 The selected source environment must include the runtime contract packages:
@@ -135,7 +135,7 @@ cross-builds.
 cs inspect
 cs build --dry-run
 cs build
-cs build --layout embedded
+cs build --artifact-layout embedded
 cs run -- --path /tmp/demo-smoke bootstrap
 ```
 
@@ -170,7 +170,7 @@ jobs:
   id: cs
   with:
     conda-ship-version: "X.Y.Z"
-    layout: embedded
+    artifact-layout: embedded
 ```
 
 The action expects a committed manifest and matching lockfile. It downloads the

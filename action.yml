@@ -12,12 +12,16 @@ inputs:
     description: "conda-ship release version to download, such as 0.3.0. Set this when the action is pinned by commit SHA. When omitted, the action uses the exact action tag if available."
     required: false
     default: ""
-  runtime:
-    description: "Runtime name to build. Overrides [tool.conda-ship].runtime when set."
+  runtime-name:
+    description: "Base runtime identity and default artifact name. Overrides [tool.conda-ship].runtime-name when set."
     required: false
     default: ""
-  delegate:
-    description: "Delegate executable inside the managed prefix. Overrides [tool.conda-ship].delegate when set."
+  artifact-name:
+    description: "Staged executable and artifact stem. Overrides [tool.conda-ship].artifact-name when set."
+    required: false
+    default: ""
+  delegate-executable:
+    description: "Delegate executable inside the managed prefix. Overrides [tool.conda-ship].delegate-executable when set."
     required: false
     default: ""
   runtime-version:
@@ -32,8 +36,8 @@ inputs:
     description: "Project root containing conda.toml/conda.lock, pixi.toml/pixi.lock, or pyproject.toml with the matching lockfile."
     required: false
     default: "."
-  layout:
-    description: "Artifact layout to build: online, external, or embedded. Overrides [tool.conda-ship].layout when set."
+  artifact-layout:
+    description: "Artifact layout to build: online, external, or embedded. Overrides [tool.conda-ship].artifact-layout when set."
     required: false
     default: ""
   docs-url:
@@ -45,11 +49,11 @@ inputs:
     required: false
     default: ""
   install-name:
-    description: "Name used inside the install scheme. Overrides [tool.conda-ship].install-name when set."
+    description: "Final directory name under the install scheme. Overrides [tool.conda-ship].install-name when set."
     required: false
     default: ""
-  install-method:
-    description: "Package-manager or installer method stamped into the runtime. Overrides [tool.conda-ship].install-method when set."
+  installer:
+    description: "Package manager or installer stamped into the runtime. Overrides [tool.conda-ship].installer when set."
     required: false
     default: ""
 
@@ -76,7 +80,7 @@ outputs:
     description: "Absolute path to the SHA256 checksum file."
     value: ${{ steps.stage.outputs.checksums_path }}
   bundle-path:
-    description: "Absolute path to the external bundle, when layout is external."
+    description: "Absolute path to the external bundle, when artifact-layout is external."
     value: ${{ steps.stage.outputs.bundle_path }}
 
 runs:
@@ -233,13 +237,14 @@ runs:
       id: plan
       shell: bash
       env:
-        CONDA_SHIP_DELEGATE: ${{ inputs.delegate }}
+        CONDA_SHIP_DELEGATE_EXECUTABLE: ${{ inputs.delegate-executable }}
         CONDA_SHIP_DOCS_URL: ${{ inputs.docs-url }}
-        CONDA_SHIP_INSTALL_METHOD: ${{ inputs.install-method }}
+        CONDA_SHIP_INSTALLER: ${{ inputs.installer }}
         CONDA_SHIP_INSTALL_NAME: ${{ inputs.install-name }}
         CONDA_SHIP_INSTALL_SCHEME: ${{ inputs.install-scheme }}
-        CONDA_SHIP_LAYOUT: ${{ inputs.layout }}
-        CONDA_SHIP_RUNTIME: ${{ inputs.runtime }}
+        CONDA_SHIP_ARTIFACT_LAYOUT: ${{ inputs.artifact-layout }}
+        CONDA_SHIP_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        CONDA_SHIP_RUNTIME_NAME: ${{ inputs.runtime-name }}
         CONDA_SHIP_RUNTIME_VERSION: ${{ inputs.runtime-version }}
         CS_PATH: ${{ steps.download.outputs.cs_path }}
         CONDA_SHIP_ROOT: ${{ inputs.root }}
@@ -260,17 +265,20 @@ runs:
           --root "$CONDA_SHIP_ROOT"
           --out-dir "$dist_dir"
         )
-        if [ -n "$CONDA_SHIP_RUNTIME" ]; then
-          build_args+=(--runtime "$CONDA_SHIP_RUNTIME")
+        if [ -n "$CONDA_SHIP_RUNTIME_NAME" ]; then
+          build_args+=(--runtime-name "$CONDA_SHIP_RUNTIME_NAME")
+        fi
+        if [ -n "$CONDA_SHIP_ARTIFACT_NAME" ]; then
+          build_args+=(--artifact-name "$CONDA_SHIP_ARTIFACT_NAME")
         fi
         if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
           build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
         fi
-        if [ -n "$CONDA_SHIP_DELEGATE" ]; then
-          build_args+=(--delegate "$CONDA_SHIP_DELEGATE")
+        if [ -n "$CONDA_SHIP_DELEGATE_EXECUTABLE" ]; then
+          build_args+=(--delegate-executable "$CONDA_SHIP_DELEGATE_EXECUTABLE")
         fi
-        if [ -n "$CONDA_SHIP_LAYOUT" ]; then
-          build_args+=(--layout "$CONDA_SHIP_LAYOUT")
+        if [ -n "$CONDA_SHIP_ARTIFACT_LAYOUT" ]; then
+          build_args+=(--artifact-layout "$CONDA_SHIP_ARTIFACT_LAYOUT")
         fi
         if [ -n "$CONDA_SHIP_DOCS_URL" ]; then
           build_args+=(--docs-url "$CONDA_SHIP_DOCS_URL")
@@ -281,8 +289,8 @@ runs:
         if [ -n "$CONDA_SHIP_INSTALL_NAME" ]; then
           build_args+=(--install-name "$CONDA_SHIP_INSTALL_NAME")
         fi
-        if [ -n "$CONDA_SHIP_INSTALL_METHOD" ]; then
-          build_args+=(--install-method "$CONDA_SHIP_INSTALL_METHOD")
+        if [ -n "$CONDA_SHIP_INSTALLER" ]; then
+          build_args+=(--installer "$CONDA_SHIP_INSTALLER")
         fi
 
         dry_run_stderr="${RUNNER_TEMP}/conda-ship-dry-run.stderr"
@@ -337,14 +345,15 @@ runs:
     - name: Build runtime
       shell: bash
       env:
-        CONDA_SHIP_DELEGATE: ${{ inputs.delegate }}
+        CONDA_SHIP_DELEGATE_EXECUTABLE: ${{ inputs.delegate-executable }}
         CONDA_SHIP_DOCS_URL: ${{ inputs.docs-url }}
         CONDA_SHIP_DRY_RUN_READY: ${{ steps.plan.outputs.dry_run_ready }}
-        CONDA_SHIP_INSTALL_METHOD: ${{ inputs.install-method }}
+        CONDA_SHIP_INSTALLER: ${{ inputs.installer }}
         CONDA_SHIP_INSTALL_NAME: ${{ inputs.install-name }}
         CONDA_SHIP_INSTALL_SCHEME: ${{ inputs.install-scheme }}
-        CONDA_SHIP_LAYOUT: ${{ inputs.layout }}
-        CONDA_SHIP_RUNTIME: ${{ inputs.runtime }}
+        CONDA_SHIP_ARTIFACT_LAYOUT: ${{ inputs.artifact-layout }}
+        CONDA_SHIP_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        CONDA_SHIP_RUNTIME_NAME: ${{ inputs.runtime-name }}
         CONDA_SHIP_RUNTIME_VERSION: ${{ inputs.runtime-version || steps.project_metadata.outputs.runtime_version }}
         CS_PATH: ${{ steps.download.outputs.cs_path }}
         CONDA_SHIP_ROOT: ${{ inputs.root }}
@@ -364,17 +373,20 @@ runs:
           --root "$CONDA_SHIP_ROOT"
           --out-dir "$dist_dir"
         )
-        if [ -n "$CONDA_SHIP_RUNTIME" ]; then
-          build_args+=(--runtime "$CONDA_SHIP_RUNTIME")
+        if [ -n "$CONDA_SHIP_RUNTIME_NAME" ]; then
+          build_args+=(--runtime-name "$CONDA_SHIP_RUNTIME_NAME")
+        fi
+        if [ -n "$CONDA_SHIP_ARTIFACT_NAME" ]; then
+          build_args+=(--artifact-name "$CONDA_SHIP_ARTIFACT_NAME")
         fi
         if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
           build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
         fi
-        if [ -n "$CONDA_SHIP_DELEGATE" ]; then
-          build_args+=(--delegate "$CONDA_SHIP_DELEGATE")
+        if [ -n "$CONDA_SHIP_DELEGATE_EXECUTABLE" ]; then
+          build_args+=(--delegate-executable "$CONDA_SHIP_DELEGATE_EXECUTABLE")
         fi
-        if [ -n "$CONDA_SHIP_LAYOUT" ]; then
-          build_args+=(--layout "$CONDA_SHIP_LAYOUT")
+        if [ -n "$CONDA_SHIP_ARTIFACT_LAYOUT" ]; then
+          build_args+=(--artifact-layout "$CONDA_SHIP_ARTIFACT_LAYOUT")
         fi
         if [ -n "$CONDA_SHIP_DOCS_URL" ]; then
           build_args+=(--docs-url "$CONDA_SHIP_DOCS_URL")
@@ -385,8 +397,8 @@ runs:
         if [ -n "$CONDA_SHIP_INSTALL_NAME" ]; then
           build_args+=(--install-name "$CONDA_SHIP_INSTALL_NAME")
         fi
-        if [ -n "$CONDA_SHIP_INSTALL_METHOD" ]; then
-          build_args+=(--install-method "$CONDA_SHIP_INSTALL_METHOD")
+        if [ -n "$CONDA_SHIP_INSTALLER" ]; then
+          build_args+=(--installer "$CONDA_SHIP_INSTALLER")
         fi
 
         if [ "$CONDA_SHIP_DRY_RUN_READY" != "true" ]; then

@@ -95,12 +95,12 @@ Add conda-ship's build policy:
 cat >> conda.toml <<'TOML'
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 ```
 
@@ -125,12 +125,12 @@ cat >> pixi.toml <<'TOML'
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 ```
 
@@ -299,7 +299,7 @@ to download package archives.
 :::{tab-item} conda-workspaces
 
 ```bash
-conda ship build --layout embedded
+conda ship build --artifact-layout embedded
 ```
 
 :::
@@ -307,22 +307,22 @@ conda ship build --layout embedded
 :::{tab-item} Pixi
 
 ```bash
-cs build --layout embedded
+cs build --artifact-layout embedded
 ```
 
 :::
 
 ::::
 
-Embedded runtimes use the `z` suffix, so this stages `dist/demoz` on Unix and
-`dist/demoz.exe` on Windows.
+Embedded runtimes use the configured runtime name by default, so this stages
+`dist/demo` on Unix and `dist/demo.exe` on Windows.
 
 Smoke-test it:
 
 ```bash
-./dist/demoz --path "$PWD/.tmp/demoz" bootstrap
-./dist/demoz --path "$PWD/.tmp/demoz" status
-./dist/demoz --path "$PWD/.tmp/demoz" uninstall --yes
+./dist/demo --path "$PWD/.tmp/demo-embedded" bootstrap
+./dist/demo --path "$PWD/.tmp/demo-embedded" status
+./dist/demo --path "$PWD/.tmp/demo-embedded" uninstall --yes
 ```
 
 ## What You Learned

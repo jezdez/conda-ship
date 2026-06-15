@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/ci.yml"
       - ".github/workflows/canary.yml"
+      - ".github/workflows/build.yml"
       - ".github/workflows/release.yml"
       - "prek.toml"
       - "action.yml"
@@ -22,6 +23,7 @@ on:
     paths:
       - ".github/workflows/ci.yml"
       - ".github/workflows/canary.yml"
+      - ".github/workflows/build.yml"
       - ".github/workflows/release.yml"
       - "prek.toml"
       - "action.yml"
@@ -100,9 +102,9 @@ jobs:
             template="${template}.exe"
           fi
           "$cs" build \
-            --layout online \
-            --runtime demo \
-            --delegate conda \
+            --artifact-layout online \
+            --runtime-name demo \
+            --delegate-executable conda \
             --target "$TARGET" \
             --target-label "$TARGET" \
             --template "$template"
@@ -128,9 +130,10 @@ jobs:
             template="${template}.exe"
           fi
           "$cs" build \
-            --layout embedded \
-            --runtime demo \
-            --delegate conda \
+            --artifact-layout embedded \
+            --runtime-name demo \
+            --artifact-name demoz \
+            --delegate-executable conda \
             --target "$TARGET" \
             --target-label "$TARGET" \
             --template "$template"

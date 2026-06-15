@@ -37,11 +37,11 @@ The solved environment used for the runtime is selected explicitly by
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
-delegate = "conda"
-layout = "online"
+runtime-name = "demo"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 docs-url = "https://example.com/demo/"
 ```
 
@@ -75,11 +75,11 @@ conda-spawn = ">=0.1.0"
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "demo"
-delegate = "conda"
-layout = "online"
+runtime-name = "demo"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 ```
 
 `[tool.conda-ship]` is for conda-ship build behavior: which source environment to

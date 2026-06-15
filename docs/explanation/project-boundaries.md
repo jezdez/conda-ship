@@ -72,9 +72,10 @@ Homebrew and shell-script installation, Docker images, Python or conda
 distribution wrappers, and release policy for those artifacts.
 
 When conda-express needs runtimes, its workflows call conda-ship from the
-conda-express project root. The conda-express manifest names the `cx` runtime;
-the `embedded` layout stages `cxz`. The package set remains conda-express
-project input; conda-ship does not hard-code those choices. Its own scope page is
+conda-express project root. The conda-express manifest names the `cx` runtime.
+Its release can explicitly set `artifact-name = "cxz"` when it wants that staged
+artifact name. The package set remains conda-express project input, and
+conda-ship does not hard-code those choices. Its own scope page is
 {external+conda-express:doc}`Project scope <scope>`.
 
 ## Relationship To Other Tools

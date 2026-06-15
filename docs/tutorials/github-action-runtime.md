@@ -21,9 +21,9 @@ The manifest must contain `[tool.conda-ship]` with at least:
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
+delegate-executable = "conda"
 source-environment = "ship"
 ```
 
@@ -62,16 +62,16 @@ jobs:
         include:
           - os: ubuntu-latest
             layout: online
-            install-method: standalone
+            installer: standalone
           - os: macos-15-intel
             layout: embedded
-            install-method: homebrew
+            installer: homebrew
           - os: macos-15
             layout: embedded
-            install-method: homebrew
+            installer: homebrew
           - os: windows-latest
             layout: online
-            install-method: standalone
+            installer: standalone
 
     steps:
       - uses: actions/checkout@v4
@@ -80,8 +80,8 @@ jobs:
         id: cs
         with:
           conda-ship-version: "X.Y.Z"
-          layout: ${{ matrix.layout }}
-          install-method: ${{ matrix.install-method }}
+          artifact-layout: ${{ matrix.layout }}
+          installer: ${{ matrix.installer }}
 
       - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
@@ -135,8 +135,9 @@ demo-x86_64-unknown-linux-gnu.sha256
 ```
 
 For an `external` build, the directory also contains
-`demo-<target>.bundle.tar.zst`. For an `embedded` build, the runtime name gets
-the `z` suffix, for example `demoz-aarch64-apple-darwin`.
+`demo-<target>.bundle.tar.zst`. For an `embedded` build, the runtime carries
+the bundle inside the binary and uses the configured runtime name unless
+`artifact-name` sets a distinct artifact name.
 
 ## Override Runtime Metadata
 
@@ -148,13 +149,13 @@ for release-job metadata that may vary across a matrix:
   id: cs
   with:
     conda-ship-version: "X.Y.Z"
-    runtime: demo
-    delegate: conda
-    layout: ${{ matrix.layout }}
+    runtime-name: demo
+    delegate-executable: conda
+    artifact-layout: ${{ matrix.layout }}
     docs-url: https://example.com/demo/
     install-scheme: conda-home
     install-name: demo
-    install-method: ${{ matrix.install-method }}
+    installer: ${{ matrix.installer }}
 ```
 
 The action does not validate those values itself. It passes them to

@@ -10,9 +10,14 @@ workflows run after conda-ship writes these files.
 | --- | --- | --- | --- |
 | `online` | `RUNTIME` | none | yes |
 | `external` | `RUNTIME` | `RUNTIME.bundle.tar.zst` | optional |
-| `embedded` | `RUNTIMEz` | embedded in binary | no |
+| `embedded` | `RUNTIME` | embedded in binary | no |
 
-On Windows, binary filenames also include `.exe`.
+When `[tool.conda-ship].artifact-name` or `--artifact-name` is set, all layouts use
+that value for the staged runtime and metadata stem. On Windows, binary
+filenames also include `.exe`.
+
+For the difference between `runtime-name` and `artifact-name`, see
+{doc}`names`.
 
 ## Bundle Contents
 
@@ -43,8 +48,9 @@ For an `online` build with runtime `demo`, conda-ship stages:
 When `--target-label` is used, the label is inserted into the stem, for example
 `demo-linux-64.info.json`.
 
-For an `embedded` build, the stem uses the `z` suffix, for example
-`demoz.info.json` or `demoz-linux-64.info.json`.
+If `artifact-name = "demo-cli"` or `--artifact-name demo-cli` is set, the artifact
+stem uses that explicit name for any layout, for example `demo-cli.info.json`
+or `demo-cli-linux-64.info.json`.
 
 For an `external` build, conda-ship also stages `demo.bundle.tar.zst` or a
 target-qualified equivalent.

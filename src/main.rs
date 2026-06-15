@@ -46,7 +46,7 @@ async fn async_main() -> miette::Result<()> {
 
     let cli = Cli::parse_runtime();
     if cli.version {
-        println!("{} {}", policy::runtime_name(), policy::runtime_version());
+        println!("{} {}", policy::command_name(), policy::runtime_version());
         return Ok(());
     }
     let verbosity = cli.verbosity();
@@ -99,7 +99,7 @@ async fn async_main() -> miette::Result<()> {
             return exec::replace_process_with_conda(&prefix, &conda_arg_refs);
         }
         Some(Command::Help) => {
-            Cli::parse_runtime_from([policy::runtime_name(), "--help"]);
+            Cli::parse_runtime_from([policy::command_name(), "--help"]);
         }
         Some(Command::Passthrough(args)) => {
             let prefix = resolve_install_path(path)?;
@@ -107,7 +107,7 @@ async fn async_main() -> miette::Result<()> {
                 .iter()
                 .map(|arg| arg.to_string_lossy().into_owned())
                 .collect();
-            if policy::delegate() == "conda" {
+            if policy::delegate_executable() == "conda" {
                 let first_arg = delegate_args.first().map(String::as_str);
                 match first_arg {
                     Some(command @ ("activate" | "deactivate")) => {
@@ -121,13 +121,14 @@ async fn async_main() -> miette::Result<()> {
             }
             ensure_bootstrapped(&prefix).await?;
             let delegate_arg_refs: Vec<&str> = delegate_args.iter().map(String::as_str).collect();
-            if policy::delegate() == "conda" && exec::should_filter_conda_output(&delegate_arg_refs)
+            if policy::delegate_executable() == "conda"
+                && exec::should_filter_conda_output(&delegate_arg_refs)
             {
                 return exec::run_conda_filtered(&prefix, &delegate_arg_refs);
             }
             return exec::replace_process_with_delegate(
                 &prefix,
-                policy::delegate(),
+                policy::delegate_executable(),
                 &delegate_arg_refs,
             );
         }
@@ -137,12 +138,16 @@ async fn async_main() -> miette::Result<()> {
                 eprintln!(
                     "{} No conda installation found. Run `{} bootstrap` first.",
                     console::style("!").yellow().bold(),
-                    policy::runtime_name()
+                    policy::command_name()
                 );
                 std::process::exit(1);
             }
             require_managed_prefix(&prefix, "use")?;
-            return exec::replace_process_with_delegate(&prefix, policy::delegate(), &["--help"]);
+            return exec::replace_process_with_delegate(
+                &prefix,
+                policy::delegate_executable(),
+                &["--help"],
+            );
         }
     }
     Ok(())

@@ -34,10 +34,10 @@ distribution builds:
   for downstream projects that use Pixi for the source solve.
 - `[tool.conda-ship].source-environment` chooses which solved environment becomes the
   runtime.
-- `[tool.conda-ship].runtime` names the generated runtime.
-- `[tool.conda-ship].delegate` chooses which executable receives pass-through
+- `[tool.conda-ship].runtime-name` names the generated runtime.
+- `[tool.conda-ship].delegate-executable` chooses which executable receives pass-through
   arguments after bootstrap.
-- `[tool.conda-ship].exclude` records post-solve pruning policy.
+- `[tool.conda-ship].exclude-packages` records post-solve pruning policy.
 - Package and channel intent comes from
   {external+conda-workspaces:doc}`conda workspace sections <reference/conda-toml-spec>`
   when `conda.toml` is available.

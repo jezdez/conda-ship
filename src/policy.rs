@@ -8,6 +8,10 @@ use std::path::{Path, PathBuf};
 
 use crate::runtime_data;
 
+pub(crate) fn command_name() -> &'static str {
+    &runtime_data::current().header.artifact_name
+}
+
 pub(crate) fn runtime_name() -> &'static str {
     &runtime_data::current().header.runtime_name
 }
@@ -16,16 +20,16 @@ pub(crate) fn runtime_version() -> &'static str {
     &runtime_data::current().header.runtime_version
 }
 
-pub(crate) fn embedded_runtime_name() -> &'static str {
-    &runtime_data::current().header.embedded_runtime_name
+pub(crate) fn embedded_artifact_name() -> &'static str {
+    &runtime_data::current().header.embedded_artifact_name
 }
 
-pub(crate) fn delegate() -> &'static str {
-    &runtime_data::current().header.delegate
+pub(crate) fn delegate_executable() -> &'static str {
+    &runtime_data::current().header.delegate_executable
 }
 
 pub(crate) fn display_name() -> &'static str {
-    &runtime_data::current().header.display_name
+    runtime_name()
 }
 
 pub(crate) fn install_scheme() -> runtime_data::InstallScheme {
@@ -219,9 +223,9 @@ fn expand_env_vars(path: &str) -> String {
 
 pub(crate) fn status_binary_name(has_embedded_bundle: bool) -> &'static str {
     if has_embedded_bundle {
-        embedded_runtime_name()
+        embedded_artifact_name()
     } else {
-        runtime_name()
+        command_name()
     }
 }
 
@@ -232,7 +236,7 @@ Create a new environment instead: conda create -n myenv\n\
 To re-bootstrap: {command} bootstrap --force\n\
 To override: pass --override-frozen-env",
         display = display_name(),
-        command = runtime_name()
+        command = command_name()
     )
 }
 

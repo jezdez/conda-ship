@@ -78,22 +78,32 @@ Generated runtimes always write the reset snapshot that `conda-self` expects.
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
+artifact-name = "demo-cli"
 runtime-version = "1.0.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 docs-url = "https://example.com/demo/"
 install-scheme = "conda-home"
 install-name = "demo"
-install-method = "homebrew"
+installer = "homebrew"
 ```
 
-`runtime`
-: Name for the generated runtime executable. `cs build` and `cs run` require
-  this value, either here or through `--runtime`. It is not a conda environment
-  name.
+For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
+`runtime-version`, see {doc}`names`.
+
+`runtime-name`
+: Base runtime identity and default artifact name. `cs build` and `cs run`
+  require this value, either here or through `--runtime-name`. It is not a
+  conda environment name.
+
+`artifact-name`
+: Optional staged executable and artifact stem for any layout. When omitted,
+  builds use `runtime-name` exactly. Set this when a release artifact should
+  have a distinct command name, such as `cxz` while keeping
+  `runtime-name = "cx"` for install metadata and environment variable names.
 
 `runtime-version`
 : Version shown by the generated runtime when users run `RUNTIME --version`.
@@ -117,13 +127,13 @@ install-method = "homebrew"
   The build backend must already be installed in the Python environment running
   `conda ship`.
 
-`delegate`
+`delegate-executable`
 : Executable inside the managed prefix that receives pass-through arguments
   after bootstrap. Use `conda` for conda-like runtimes such as `cx`. Other
   values, such as `python`, are supported when a runtime should expose a
   different command surface.
 
-`layout`
+`artifact-layout`
 : Artifact layout to build. Supported values are `online`, `external`, and
   `embedded`. When omitted, `cs build` defaults to `online`.
 
@@ -132,7 +142,7 @@ install-method = "homebrew"
   required; conda-ship does not fall back to a default environment because that
   can accidentally ship development or test dependencies.
 
-`exclude`
+`exclude-packages`
 : Package names removed from the derived runtime lock, including dependencies
   used only by excluded packages.
 
@@ -148,28 +158,28 @@ install-method = "homebrew"
   default when `install-scheme` is not configured.
 
 `install-name`
-: Name used inside the install scheme. When omitted, conda-ship uses the
-  generated runtime name. For example, `runtime = "cx"` can use
-  `install-name = "express"` so the `conda-home` install scheme resolves to
-  `~/.conda/express`.
+: Directory name for this runtime's managed base prefix under the install
+  scheme. When omitted, conda-ship uses the runtime name. For example,
+  `runtime-name = "cx"` can use `install-name = "express"` so the `conda-home`
+  install scheme resolves to `~/.conda/express`.
   Choose a product-specific install name. conda-ship does not reserve names
   under `~/.conda`; it relies on runtime metadata to avoid overwriting prefixes
   owned by other tools.
 
-`install-method`
-: Optional package-manager hint stamped into the generated runtime. `uninstall`
-  uses it to tell users how to remove the runtime binary after the managed
-  prefix has been removed. Known values such as `homebrew` get a concrete
-  command; other values are printed as informational text. Release workflows
-  can override this with `cs build --install-method METHOD` or the GitHub
-  Action `install-method` input.
+`installer`
+: Optional package manager or installer hint stamped into the generated runtime.
+  `uninstall` uses it to tell users how to remove the runtime binary after the
+  managed prefix has been removed. Known values such as `homebrew` get a
+  concrete command; other values are printed as informational text. Release
+  workflows can override this with `cs build --installer INSTALLER` or the
+  GitHub Action `installer` input.
 
 Generated runtimes write ownership metadata into every bootstrapped prefix.
-That metadata records the schema version, display name, install name, and
-metadata filename expected by the runtime. `status`, `bootstrap --force`,
-`uninstall`, and pass-through commands refuse to operate on an existing conda
-prefix when that ownership metadata is missing, invalid, or belongs to another
-stamped runtime.
+That metadata records the schema version, display name derived from
+`runtime-name`, install name, and metadata filename expected by the runtime.
+`status`, `bootstrap --force`, `uninstall`, and pass-through commands refuse to
+operate on an existing conda prefix when that ownership metadata is missing,
+invalid, or belongs to another stamped runtime.
 
 Generated runtimes also write constructor-compatible prefix metadata into
 `conda-meta/history` and `conda-meta/initial-state.explicit.txt`. Conda uses
@@ -186,23 +196,23 @@ URLs from the source lockfile environment into generated runtime metadata.
 
 ## Stamped Runtime Metadata
 
-`cs build` stamps these values onto the runtime after resolving `runtime` and
-`layout` from CLI flags or `[tool.conda-ship]`:
+`cs build` stamps these values onto the runtime after resolving `runtime-name`,
+`artifact-name`, and `artifact-layout` from CLI flags or `[tool.conda-ship]`:
 
-- runtime name: `RUNTIME` for `online` and `external`, `RUNTIME` plus `z` for
-  `embedded`
+- artifact name: `ARTIFACT_NAME`, or `RUNTIME_NAME` when
+  `artifact-name` is not configured
 - runtime version: the configured `runtime-version`, static
   `[project].version` from the selected `pyproject.toml`, or the concrete
-  value resolved by `conda ship` from `{ from = "project-metadata" }`; builds
+  value resolved by `conda ship` from `{ from = "project-metadata" }`. Builds
   fail when no downstream version can be resolved
-- delegate executable: the configured `delegate`
-- display name: `RUNTIME`
+- runtime name: `RUNTIME_NAME`
+- delegate executable: the configured `delegate-executable`
 - install scheme: `conda-home`, or the configured `install-scheme`
-- install name: `RUNTIME`, or the configured `install-name`
-- install method: the configured `install-method`, when present
-- metadata file: `.RUNTIME.json`
-- bundle environment variable: uppercased `RUNTIME` plus `_BUNDLE`
-- offline environment variable: uppercased `RUNTIME` plus `_OFFLINE`
+- install name: `RUNTIME_NAME`, or the configured `install-name`
+- installer: the configured `installer`, when present
+- metadata file: `.RUNTIME_NAME.json`
+- bundle environment variable: uppercased `RUNTIME_NAME` plus `_BUNDLE`
+- offline environment variable: uppercased `RUNTIME_NAME` plus `_OFFLINE`
 
 At bootstrap time, the generated runtime writes a separate prefix metadata file
 inside the managed prefix. That file is used for ownership checks before later
@@ -224,5 +234,6 @@ conda-ship's repository default package set exists so the builder and
 runtime behavior can be tested. A downstream distribution makes its own
 package choices in its project manifest before committing the matching lockfile.
 
-For example, conda-express owns the package set used when building `cx` and
-`cxz`; those package choices are conda-express policy, not conda-ship policy.
+For example, conda-express owns the package set and runtime names used when
+building `cx` and `cxz`. Those choices are conda-express policy, not
+conda-ship policy.

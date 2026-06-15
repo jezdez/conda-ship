@@ -64,12 +64,12 @@ Add conda-ship policy:
 cat >> conda.toml <<'TOML'
 
 [tool.conda-ship]
-runtime = "pydemo"
+runtime-name = "pydemo"
 runtime-version = "0.1.0"
-delegate = "python"
-layout = "online"
+delegate-executable = "python"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 ```
 
@@ -93,12 +93,12 @@ cat >> pixi.toml <<'TOML'
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "pydemo"
+runtime-name = "pydemo"
 runtime-version = "0.1.0"
-delegate = "python"
-layout = "online"
+delegate-executable = "python"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 pixi add --feature ship --no-install \
   "python>=3.12" \
@@ -168,7 +168,7 @@ Remove the tutorial install path:
 
 ## What You Learned
 
-The `delegate` is the executable that receives pass-through arguments after the
-runtime is bootstrapped. Use `delegate = "conda"` for conda-like distributions,
-and another executable when the runtime should present a smaller or different
-command surface.
+The `delegate-executable` is the executable that receives pass-through
+arguments after the runtime is bootstrapped. Use `delegate-executable = "conda"`
+for conda-like distributions, and another executable when the runtime should
+present a smaller or different command surface.

@@ -67,7 +67,7 @@ impl Cli {
 
     fn runtime_command() -> clap::Command {
         Self::command()
-            .name(policy::runtime_name())
+            .name(policy::command_name())
             .about("Single-binary conda runtime")
             .long_about(
                 "This runtime installs a conda environment from a stamped lockfile.\n\n\
@@ -78,8 +78,8 @@ impl Cli {
 }
 
 fn runtime_after_help() -> String {
-    let name = policy::runtime_name();
-    let delegate = policy::delegate();
+    let name = policy::command_name();
+    let delegate = policy::delegate_executable();
     let quick_start = if delegate == "conda" {
         format!(
             "{name} bootstrap                           Install conda into {path}\n  \

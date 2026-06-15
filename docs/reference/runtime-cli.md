@@ -1,12 +1,14 @@
 # Runtime CLI Reference
 
 Every conda-ship artifact includes a generated runtime. In this page,
-`RUNTIME` stands for the runtime name resolved by `cs build` from
-`[tool.conda-ship].runtime` or `--runtime`. `DELEGATE` stands for the
-executable inside the managed prefix that receives pass-through arguments.
+`RUNTIME` stands for the staged executable name resolved by `cs build` from
+`[tool.conda-ship].runtime-name`, `--runtime-name`, or an explicit
+`artifact-name`.
+`DELEGATE` stands for the executable inside the managed prefix that receives
+pass-through arguments.
 
-For conda-express, `RUNTIME` is `cx`. For an embedded conda-express artifact,
-the staged runtime is `cxz`.
+For conda-express, `RUNTIME` is `cx`. A release artifact can be staged as `cxz`
+by configuring `artifact-name`.
 
 ## Global Options
 
@@ -77,7 +79,7 @@ For an embedded runtime, conda-ship detects the built-in bundle
 automatically:
 
 ```bash
-RUNTIMEz bootstrap
+RUNTIME bootstrap
 ```
 
 An explicit `--bundle` still takes priority over the embedded bundle.
@@ -127,7 +129,7 @@ RUNTIME uninstall [OPTIONS]
 
 The command removes the managed install path, including named environments
 below it, and prints a hint for removing the runtime through the package manager
-or install method that provided the runtime binary.
+or installer that provided the runtime binary.
 
 ## `RUNTIME help`
 

@@ -150,10 +150,10 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
     for (platform, packages) in runtime_env.conda_packages_by_platform() {
         let pkgs: Vec<_> = packages.cloned().collect();
 
-        let filtered = if input.config.exclude.is_empty() {
+        let filtered = if input.config.exclude_packages.is_empty() {
             pkgs
         } else {
-            let (kept, removed) = filter_excluded(&pkgs, &input.config.exclude)?;
+            let (kept, removed) = filter_excluded(&pkgs, &input.config.exclude_packages)?;
             removed_excludes.extend(removed.iter().cloned());
             total_excluded += removed.len();
             kept
@@ -188,15 +188,15 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
         runtime_config: RuntimeStampConfig {
             channels: runtime_channels,
             packages: runtime_packages,
-            exclude: input.config.exclude,
-            delegate: input.config.delegate,
+            exclude_packages: input.config.exclude_packages,
+            delegate_executable: input.config.delegate_executable,
             runtime_version: input.runtime_version,
             runtime_version_source: input.runtime_version_source,
             project_dynamic_version: input.project_dynamic_version,
             docs_url: input.config.docs_url,
             install_scheme: input.config.install_scheme,
             install_name: input.config.install_name,
-            install_method: input.config.install_method,
+            installer: input.config.installer,
         },
         platforms,
         total_packages,

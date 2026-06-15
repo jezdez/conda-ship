@@ -34,7 +34,7 @@ Choose `online` when users can download conda package archives during
 bootstrap:
 
 ```bash
-cs build --layout online
+cs build --artifact-layout online
 ```
 
 An online runtime contains:
@@ -53,7 +53,7 @@ Choose `external` when you want the runtime and package archives as separate
 files:
 
 ```bash
-cs build --layout external
+cs build --artifact-layout external
 ```
 
 This stages:
@@ -77,20 +77,21 @@ and `.tar.bz2` archives named in the runtime lock.
 Choose `embedded` when a single runtime binary must carry the package archives:
 
 ```bash
-cs build --layout embedded
+cs build --artifact-layout embedded
 ```
 
-Embedded runtimes use the `z` suffix:
+Embedded runtimes use the configured runtime name unless you set
+`artifact-name`:
 
 ```text
-demo   -> online or external runtime
-demoz  -> embedded runtime
+demo          -> online, external, or embedded runtime
+demo-cli      -> staged runtime when configured explicitly
 ```
 
 Bootstrap detects the embedded bundle automatically:
 
 ```bash
-demoz bootstrap
+demo bootstrap
 ```
 
 This is useful when the runtime must install without network access and you do
@@ -115,8 +116,8 @@ and channel intent in the source manifest, commit the lockfile, and override
 layout at build time when needed:
 
 ```bash
-cs build --layout online
-cs build --layout embedded
+cs build --artifact-layout online
+cs build --artifact-layout embedded
 ```
 
 In GitHub Actions, matrix the layout:
@@ -130,5 +131,5 @@ steps:
   - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
     with:
       conda-ship-version: "X.Y.Z"
-      layout: ${{ matrix.layout }}
+      artifact-layout: ${{ matrix.layout }}
 ```
