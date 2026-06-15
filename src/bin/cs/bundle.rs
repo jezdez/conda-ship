@@ -55,6 +55,7 @@ async fn download_and_bundle(
 
     tls::install_default_provider();
     let client = reqwest::Client::builder()
+        .user_agent(crate::http::USER_AGENT)
         .no_gzip()
         .connect_timeout(Duration::from_secs(30))
         .timeout(Duration::from_secs(600))

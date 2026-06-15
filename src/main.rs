@@ -9,6 +9,7 @@ mod commands;
 mod config;
 mod constructor_metadata;
 mod exec;
+mod http;
 mod install;
 mod policy;
 mod runtime_data;
