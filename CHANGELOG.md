@@ -17,14 +17,31 @@ All notable changes to `conda-ship` are documented here.
   `cs run --runtime`, and the GitHub Action `runtime` input to
   `runtime-name`.
 - Embedded builds no longer append `z` to the runtime name automatically.
-  `layout = "embedded"` now stages the configured `runtime-name` unless an
+  `artifact-layout = "embedded"` now stages the configured `runtime-name` unless an
   explicit artifact name is provided.
+- Renamed public configuration keys, CLI flags, and GitHub Action inputs for a
+  clearer flat naming scheme.
 
 ### Migration
 
 - Inside `[tool.conda-ship]`, rename `runtime = "demo"` to
   `runtime-name = "demo"`. Replace `--runtime demo` with
   `--runtime-name demo`, and use `runtime-name: demo` in GitHub Actions.
+- Update the remaining renamed fields:
+
+  | Old | New |
+  | --- | --- |
+  | `delegate = "conda"` | `delegate-executable = "conda"` |
+  | `layout = "embedded"` | `artifact-layout = "embedded"` |
+  | `exclude = ["conda-libmamba-solver"]` | `exclude-packages = ["conda-libmamba-solver"]` |
+  | `install-method = "homebrew"` | `installer = "homebrew"` |
+  | `cs build --delegate conda` | `cs build --delegate-executable conda` |
+  | `cs build --layout embedded` | `cs build --artifact-layout embedded` |
+  | `cs build --install-method homebrew` | `cs build --installer homebrew` |
+  | GitHub Action `delegate: conda` | `delegate-executable: conda` |
+  | GitHub Action `layout: embedded` | `artifact-layout: embedded` |
+  | GitHub Action `install-method: homebrew` | `installer: homebrew` |
+
 - If you currently rely on the old `runtime = "demo"` setting producing
   `dist/demoz` for embedded builds, set `artifact-name = "demoz"` in
   `[tool.conda-ship]`, pass `cs build --artifact-name demoz`, or set the

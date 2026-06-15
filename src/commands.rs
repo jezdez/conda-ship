@@ -223,11 +223,11 @@ pub(crate) async fn bootstrap(
             console::style("✔").green().bold()
         );
         eprintln!("   Install path: {}", prefix.display());
-        eprintln!("   Run `{} status` for details.", policy::runtime_name());
+        eprintln!("   Run `{} status` for details.", policy::command_name());
         eprintln!(
             "   Use `{} <{}-args>` to run delegate commands.",
-            policy::runtime_name(),
-            policy::delegate()
+            policy::command_name(),
+            policy::delegate_executable()
         );
     }
 
@@ -284,7 +284,7 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     println!("  installed: {} packages", installed.len());
 
-    let delegate = policy::delegate();
+    let delegate = policy::delegate_executable();
     let delegate_bin = exec::executable_in_prefix(prefix, delegate);
     println!(
         "  delegate:  {} ({})",
@@ -367,16 +367,16 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
     remove_install_path(prefix)?;
 
     if let Some(ref bin) = runtime_binary {
-        let hint = match crate::config::install_method() {
+        let hint = match crate::config::installer() {
             Some("homebrew") => format!("   brew uninstall {}", policy::display_name()),
             Some("cargo") => format!("   cargo uninstall {}", policy::display_name()),
-            Some(method) => format!("   Installed via: {method}"),
+            Some(installer) => format!("   Installed via: {installer}"),
             None => format!("   {}", bin.display()),
         };
         eprintln!(
             "\n{} To complete removal, delete the {} binary:",
             console::style("i").blue().bold(),
-            policy::runtime_name()
+            policy::command_name()
         );
         eprintln!("{hint}");
     }
@@ -459,7 +459,7 @@ pub(crate) fn print_disabled_shell_command(command: &str) -> ! {
     eprintln!();
     eprintln!(
         "    {}",
-        console::style(format!("{} shell myenv", policy::runtime_name())).green()
+        console::style(format!("{} shell myenv", policy::command_name())).green()
     );
     eprintln!();
     eprintln!("  To leave the environment, exit the subshell (Ctrl+D or `exit`).");
@@ -502,7 +502,7 @@ pub(crate) fn print_disabled_init() -> ! {
     eprintln!();
     eprintln!(
         "    {}",
-        console::style(format!("{} shell myenv", policy::runtime_name())).green()
+        console::style(format!("{} shell myenv", policy::command_name())).green()
     );
     eprintln!();
     eprintln!("  Learn more: https://github.com/conda-incubator/conda-spawn");

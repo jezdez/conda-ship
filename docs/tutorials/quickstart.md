@@ -44,10 +44,10 @@ cat >> conda.toml <<'TOML'
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 ```
 

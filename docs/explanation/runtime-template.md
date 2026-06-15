@@ -16,9 +16,9 @@ like `cxz`.
 During a runtime build, conda-ship writes these details into the copied
 binary:
 
-- runtime name, display name, and delegate executable
+- runtime name, artifact name, and delegate executable
 - install scheme and install name
-- install method, when configured
+- installer, when configured
 - runtime lock
 - optional compressed package bundle
 - documentation URL

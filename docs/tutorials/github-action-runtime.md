@@ -23,7 +23,7 @@ The manifest must contain `[tool.conda-ship]` with at least:
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
+delegate-executable = "conda"
 source-environment = "ship"
 ```
 
@@ -62,16 +62,16 @@ jobs:
         include:
           - os: ubuntu-latest
             layout: online
-            install-method: standalone
+            installer: standalone
           - os: macos-15-intel
             layout: embedded
-            install-method: homebrew
+            installer: homebrew
           - os: macos-15
             layout: embedded
-            install-method: homebrew
+            installer: homebrew
           - os: windows-latest
             layout: online
-            install-method: standalone
+            installer: standalone
 
     steps:
       - uses: actions/checkout@v4
@@ -80,8 +80,8 @@ jobs:
         id: cs
         with:
           conda-ship-version: "X.Y.Z"
-          layout: ${{ matrix.layout }}
-          install-method: ${{ matrix.install-method }}
+          artifact-layout: ${{ matrix.layout }}
+          installer: ${{ matrix.installer }}
 
       - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
@@ -150,12 +150,12 @@ for release-job metadata that may vary across a matrix:
   with:
     conda-ship-version: "X.Y.Z"
     runtime-name: demo
-    delegate: conda
-    layout: ${{ matrix.layout }}
+    delegate-executable: conda
+    artifact-layout: ${{ matrix.layout }}
     docs-url: https://example.com/demo/
     install-scheme: conda-home
     install-name: demo
-    install-method: ${{ matrix.install-method }}
+    installer: ${{ matrix.installer }}
 ```
 
 The action does not validate those values itself. It passes them to

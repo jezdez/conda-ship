@@ -60,14 +60,14 @@ conda without depending on terminal formatting.
 `runtime name must start with an ASCII letter or digit`
 : Use a filename-safe runtime name such as `demo` or `demo-runtime`.
 
-`delegate may only contain ASCII letters, digits, dots, dashes, and underscores`
+`delegate executable may only contain ASCII letters, digits, dots, dashes, and underscores`
 : Use an executable name, not a path.
 
 `target triple may only contain ASCII letters, digits, dots, dashes, and underscores`
 : Use a target triple string, not a path to a custom target file.
 
-`install method may only contain ASCII letters, digits, dots, dashes, and underscores`
-: Use a short method name such as `homebrew`, `conda-package`, or `standalone`.
+`installer may only contain ASCII letters, digits, dots, dashes, and underscores`
+: Use a short installer name such as `homebrew`, `conda-package`, or `standalone`.
 
 ## Runtime Bootstrap
 

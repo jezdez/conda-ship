@@ -52,11 +52,11 @@ pub enum InstallScheme {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct RuntimeDataHeader {
     pub schema_version: u32,
+    pub artifact_name: String,
     pub runtime_name: String,
     pub runtime_version: String,
-    pub embedded_runtime_name: String,
-    pub delegate: String,
-    pub display_name: String,
+    pub embedded_artifact_name: String,
+    pub delegate_executable: String,
     #[serde(default)]
     pub install_scheme: InstallScheme,
     pub install_name: String,
@@ -65,7 +65,7 @@ pub struct RuntimeDataHeader {
     pub offline_env_var: String,
     pub docs_url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub install_method: Option<String>,
+    pub installer: Option<String>,
     #[serde(default)]
     pub runtime_config: RuntimeConfig,
     #[serde(default)]
@@ -76,18 +76,18 @@ impl RuntimeDataHeader {
     pub fn for_name(name: &str) -> Self {
         Self {
             schema_version: FORMAT_VERSION,
+            artifact_name: name.to_string(),
             runtime_name: name.to_string(),
             runtime_version: env!("CARGO_PKG_VERSION").to_string(),
-            embedded_runtime_name: name.to_string(),
-            delegate: "conda".to_string(),
-            display_name: name.to_string(),
+            embedded_artifact_name: name.to_string(),
+            delegate_executable: "conda".to_string(),
             install_scheme: InstallScheme::CondaHome,
             install_name: name.to_string(),
             metadata_file: format!(".{name}.json"),
             bundle_env_var: runtime_env_var(name, "BUNDLE"),
             offline_env_var: runtime_env_var(name, "OFFLINE"),
             docs_url: "https://jezdez.github.io/conda-ship/".to_string(),
-            install_method: None,
+            installer: None,
             runtime_config: RuntimeConfig::default(),
             runtime_lock: String::new(),
         }
@@ -394,8 +394,9 @@ mod tests {
         append_to_binary(tmp.path(), &header, None).unwrap();
         let data = read_from_path(tmp.path()).unwrap().unwrap();
 
+        assert_eq!(data.header.artifact_name, "snek");
         assert_eq!(data.header.runtime_name, "snek");
-        assert_eq!(data.header.delegate, "conda");
+        assert_eq!(data.header.delegate_executable, "conda");
         assert_eq!(data.header.install_scheme, InstallScheme::CondaHome);
         assert_eq!(data.header.install_name, "snek");
         assert_eq!(data.header.runtime_lock, "lock data");

@@ -403,7 +403,7 @@ fn test_stamped_runtime_status_uses_stamped_version() {
             root,
             "--runtime-name",
             "demo",
-            "--delegate",
+            "--delegate-executable",
             "conda",
             "--runtime-version",
             "9.8.7",

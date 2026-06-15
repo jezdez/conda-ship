@@ -16,7 +16,7 @@ files. This is useful when an installer or package manager already knows how to
 place supporting files next to the binary.
 
 ```bash
-cs build --layout external
+cs build --artifact-layout external
 ```
 :::
 
@@ -25,7 +25,7 @@ Use `embedded` when you want one larger runtime that can bootstrap without a
 separate bundle file.
 
 ```bash
-cs build --layout embedded
+cs build --artifact-layout embedded
 ```
 :::
 

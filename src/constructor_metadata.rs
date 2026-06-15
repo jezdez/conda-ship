@@ -65,7 +65,7 @@ fn render_history(
     dists.sort();
 
     let mut content = format!("==> {timestamp} <==\n");
-    content.push_str(&format!("# cmd: {} bootstrap\n", policy::runtime_name()));
+    content.push_str(&format!("# cmd: {} bootstrap\n", policy::command_name()));
     for dist in dists {
         content.push('+');
         content.push_str(&dist);

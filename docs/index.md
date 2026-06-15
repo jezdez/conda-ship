@@ -89,6 +89,14 @@ Build a downstream runtime with your own package set.
 Find exact commands, options, artifact names, and configuration keys.
 :::
 
+:::{grid-item-card} Naming Guide
+:link: reference/names
+:link-type: doc
+
+Choose between runtime names, artifact names, install names, and runtime
+versions.
+:::
+
 :::{grid-item-card} Understand
 :link: explanation/concepts
 :link-type: doc
@@ -150,6 +158,7 @@ how-to/troubleshoot-builds
 :maxdepth: 1
 
 reference/cli
+reference/names
 reference/conda-plugin
 reference/runtime-cli
 reference/github-action

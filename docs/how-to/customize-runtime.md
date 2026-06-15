@@ -33,8 +33,8 @@ Use a product-specific name:
 ```toml
 [tool.conda-ship]
 runtime-name = "demo"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 ```
 
 Avoid publishing downstream builds as `cx` or `cxz`. In the conda ecosystem,
@@ -51,8 +51,8 @@ operating-system-specific path:
 ```toml
 [tool.conda-ship]
 runtime-name = "cx"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 install-scheme = "conda-home"
 install-name = "express"
 ```
@@ -80,20 +80,20 @@ runtime below the platform user data directory, such as
 `%LOCALAPPDATA%\\conda\\INSTALL_NAME` on Windows.
 
 If a downstream package manager owns the runtime binary, set
-`install-method` in the manifest or pass it from the release job. The generated
+`installer` in the manifest or pass it from the release job. The generated
 runtime uses that value only after `uninstall`, when it tells users how to
 remove the runtime binary itself:
 
 ```toml
 [tool.conda-ship]
 runtime-name = "demo"
-delegate = "conda"
-install-method = "homebrew"
+delegate-executable = "conda"
+installer = "homebrew"
 ```
 
 For matrix builds that produce the same runtime for different distribution
-channels, use `cs build --install-method METHOD` or the GitHub Action
-`install-method` input.
+channels, use `cs build --installer METHOD` or the GitHub Action
+`installer` input.
 
 ## Choose Runtime Packages
 
@@ -159,14 +159,14 @@ ship = { features = ["ship"], no-default-feature = true }
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 docs-url = "https://example.com/demo/"
 install-scheme = "conda-home"
 install-name = "demo"
-install-method = "homebrew"
+installer = "homebrew"
 ```
 
 Refresh the source lockfile:
@@ -201,10 +201,10 @@ ship = { features = ["ship"], no-default-feature = true }
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 ```
 
 Refresh the source lockfile:
@@ -244,10 +244,10 @@ ship = { features = ["ship"], no-default-feature = true }
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 ```
 
 Refresh the source lockfile:
@@ -297,7 +297,7 @@ Use the `embedded` layout when you want a larger single binary that carries the
 package archives inside itself:
 
 ```bash
-cs build --layout embedded
+cs build --artifact-layout embedded
 ```
 
 The embedded runtime uses `runtime` by default, so the staged binary is

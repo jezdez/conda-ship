@@ -76,7 +76,7 @@ pub(crate) fn apply_delegate_environment(cmd: &mut Command, prefix: &Path) -> mi
     cmd.env("CONDA_PREFIX", prefix);
     cmd.env("CONDA_DEFAULT_ENV", "base");
     cmd.env("CONDA_SHLVL", "1");
-    cmd.env("CONDA_COMPLETION_COMMAND_NAME", policy::runtime_name());
+    cmd.env("CONDA_COMPLETION_COMMAND_NAME", policy::command_name());
     cmd.env("PATH", delegate_path_env(prefix)?);
     Ok(())
 }
@@ -173,7 +173,7 @@ pub fn run_conda_filtered(prefix: &Path, args: &[&str]) -> miette::Result<()> {
             println!("#");
             println!("# To activate this environment, use");
             println!("#");
-            println!("#     $ {} shell {name}", policy::runtime_name());
+            println!("#     $ {} shell {name}", policy::command_name());
             println!("#");
             println!("# To leave the environment, exit the subshell (Ctrl+D or `exit`).");
             println!("#");
@@ -356,7 +356,7 @@ mod tests {
             .iter()
             .find(|(k, _)| *k == "CONDA_COMPLETION_COMMAND_NAME")
             .expect("CONDA_COMPLETION_COMMAND_NAME should be set");
-        assert_eq!(completion_command_name.1.unwrap(), policy::runtime_name());
+        assert_eq!(completion_command_name.1.unwrap(), policy::command_name());
         let path_env = envs
             .iter()
             .find(|(k, _)| *k == "PATH")

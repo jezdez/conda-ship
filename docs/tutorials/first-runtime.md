@@ -97,10 +97,10 @@ cat >> conda.toml <<'TOML'
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 ```
 
@@ -127,10 +127,10 @@ ship = { features = ["ship"], no-default-feature = true }
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 ```
 
@@ -299,7 +299,7 @@ to download package archives.
 :::{tab-item} conda-workspaces
 
 ```bash
-conda ship build --layout embedded
+conda ship build --artifact-layout embedded
 ```
 
 :::
@@ -307,7 +307,7 @@ conda ship build --layout embedded
 :::{tab-item} Pixi
 
 ```bash
-cs build --layout embedded
+cs build --artifact-layout embedded
 ```
 
 :::

@@ -10,7 +10,7 @@ fn test_cs_emits_structured_builder_diagnostic_when_requested() {
         r#"
 [tool.conda-ship]
 runtime-name = "demo"
-delegate = "conda"
+delegate-executable = "conda"
 source-environment = "ship"
 "#,
     )

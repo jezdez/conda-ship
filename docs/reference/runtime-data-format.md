@@ -25,22 +25,23 @@ The stamped header records:
 `schema_version`
 : Runtime data schema version.
 
+`artifact_name`
+: Staged executable and artifact name.
+
 `runtime_name`
-: Name of the generated runtime executable.
+: Base runtime identity. This is the value from `runtime-name`, independent of
+  an optional `artifact-name`.
 
 `runtime_version`
 : Version shown by the generated runtime and written to prefix ownership
-  metadata.
+  metadata. This is independent from `runtime-name`; see {doc}`names`.
 
-`embedded_runtime_name`
-: Runtime executable name used when the artifact carries an embedded bundle.
+`embedded_artifact_name`
+: Artifact executable name used when the artifact carries an embedded bundle.
   This is explicit build metadata, not a derived suffix.
 
-`delegate`
+`delegate_executable`
 : Executable inside the managed prefix that receives pass-through arguments.
-
-`display_name`
-: User-facing runtime name.
 
 `install_scheme`
 : Stamped install scheme, such as `conda-home` or `user-data`.
@@ -60,8 +61,8 @@ The stamped header records:
 `docs_url`
 : Documentation URL shown in runtime help.
 
-`install_method`
-: Optional package-manager or installer hint used after `uninstall`.
+`installer`
+: Optional package manager or installer hint used after `uninstall`.
 
 `runtime_config`
 : Resolved runtime channels and package names used for metadata and status

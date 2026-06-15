@@ -44,10 +44,10 @@ cat >> conda.toml <<'TOML'
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 TOML
 
 conda workspace lock
@@ -113,10 +113,10 @@ The package and channel intent lives in the selected source environment.
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = "0.1.0"
-delegate = "conda"
-layout = "online"
+delegate-executable = "conda"
+artifact-layout = "online"
 source-environment = "ship"
-exclude = ["conda-libmamba-solver"]
+exclude-packages = ["conda-libmamba-solver"]
 ```
 
 The selected source environment must include the runtime contract packages:
@@ -135,7 +135,7 @@ cross-builds.
 cs inspect
 cs build --dry-run
 cs build
-cs build --layout embedded
+cs build --artifact-layout embedded
 cs run -- --path /tmp/demo-smoke bootstrap
 ```
 
@@ -170,7 +170,7 @@ jobs:
   id: cs
   with:
     conda-ship-version: "X.Y.Z"
-    layout: embedded
+    artifact-layout: embedded
 ```
 
 The action expects a committed manifest and matching lockfile. It downloads the

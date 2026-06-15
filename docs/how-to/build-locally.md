@@ -87,7 +87,7 @@ Preview runtime metadata and artifact names without writing release files.
 
 ## Build A Runtime
 
-`[tool.conda-ship].runtime-name`, `[tool.conda-ship].delegate`,
+`[tool.conda-ship].runtime-name`, `[tool.conda-ship].delegate-executable`,
 `[tool.conda-ship].source-environment`, and a downstream runtime version are
 required unless you pass the runtime, delegate, and version through CLI flags.
 conda-ship does not provide default values for them. The version can come from

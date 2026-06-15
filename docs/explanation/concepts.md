@@ -52,7 +52,7 @@ Released builds and packaged local builds use prebuilt template assets.
 ## Runtime Lock
 
 The runtime lock is derived from the configured source environment, then filtered
-through `[tool.conda-ship].exclude`. conda-ship stamps the derived lock into every
+through `[tool.conda-ship].exclude-packages`. conda-ship stamps the derived lock into every
 runtime artifact and stages a copy next to the output binary. It is not a second
 checked-in project lockfile.
 

@@ -56,12 +56,12 @@ struct ShipConfig {
     artifact_name: Option<String>,
     #[serde(default, rename = "runtime-version")]
     runtime_version: Option<RuntimeVersionConfig>,
-    #[serde(default)]
-    delegate: Option<String>,
-    #[serde(default)]
-    layout: Option<BundleLayout>,
-    #[serde(default)]
-    exclude: Vec<String>,
+    #[serde(default, rename = "delegate-executable")]
+    delegate_executable: Option<String>,
+    #[serde(default, rename = "artifact-layout")]
+    artifact_layout: Option<BundleLayout>,
+    #[serde(default, rename = "exclude-packages")]
+    exclude_packages: Vec<String>,
     #[serde(default, rename = "source-environment")]
     source_environment: Option<String>,
     #[serde(default, rename = "docs-url")]
@@ -70,8 +70,8 @@ struct ShipConfig {
     install_scheme: Option<runtime_data::InstallScheme>,
     #[serde(default, rename = "install-name")]
     install_name: Option<String>,
-    #[serde(default, rename = "install-method")]
-    install_method: Option<String>,
+    #[serde(default)]
+    installer: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -97,15 +97,15 @@ enum RuntimeVersionSource {
 struct RuntimeStampConfig {
     channels: Vec<String>,
     packages: Vec<String>,
-    exclude: Vec<String>,
-    delegate: Option<String>,
+    exclude_packages: Vec<String>,
+    delegate_executable: Option<String>,
     runtime_version: Option<String>,
     runtime_version_source: Option<RuntimeVersionSource>,
     project_dynamic_version: bool,
     docs_url: Option<String>,
     install_scheme: Option<runtime_data::InstallScheme>,
     install_name: Option<String>,
-    install_method: Option<String>,
+    installer: Option<String>,
 }
 
 #[derive(Parser)]
@@ -120,8 +120,8 @@ enum Command {
     /// Build and stage a ready-to-run runtime
     Build {
         /// Artifact layout to produce
-        #[arg(long, value_enum)]
-        layout: Option<BundleLayout>,
+        #[arg(long = "artifact-layout", value_enum)]
+        artifact_layout: Option<BundleLayout>,
 
         /// Base runtime identity and default artifact name
         #[arg(long = "runtime-name")]
@@ -132,8 +132,8 @@ enum Command {
         artifact_name: Option<String>,
 
         /// Delegate executable inside the managed prefix
-        #[arg(long)]
-        delegate: Option<String>,
+        #[arg(long = "delegate-executable")]
+        delegate_executable: Option<String>,
 
         /// Version shown by the generated runtime
         #[arg(long)]
@@ -167,9 +167,9 @@ enum Command {
         #[arg(long)]
         install_name: Option<String>,
 
-        /// Package-manager or installer method that provided the runtime binary
+        /// Package manager or installer that provided the runtime binary
         #[arg(long)]
-        install_method: Option<String>,
+        installer: Option<String>,
 
         /// Output directory for staged artifacts
         #[arg(long, default_value = "dist")]
@@ -187,8 +187,8 @@ enum Command {
     /// Build and run a staged runtime for local smoke testing
     Run {
         /// Artifact layout to produce before running
-        #[arg(long, value_enum)]
-        layout: Option<BundleLayout>,
+        #[arg(long = "artifact-layout", value_enum)]
+        artifact_layout: Option<BundleLayout>,
 
         /// Base runtime identity and default artifact name
         #[arg(long = "runtime-name")]
@@ -199,8 +199,8 @@ enum Command {
         artifact_name: Option<String>,
 
         /// Delegate executable inside the managed prefix
-        #[arg(long)]
-        delegate: Option<String>,
+        #[arg(long = "delegate-executable")]
+        delegate_executable: Option<String>,
 
         /// Version shown by the generated runtime
         #[arg(long)]
@@ -230,9 +230,9 @@ enum Command {
         #[arg(long)]
         install_name: Option<String>,
 
-        /// Package-manager or installer method that provided the runtime binary
+        /// Package manager or installer that provided the runtime binary
         #[arg(long)]
-        install_method: Option<String>,
+        installer: Option<String>,
 
         /// Project root (default: auto-detect from current directory)
         #[arg(long)]
@@ -321,10 +321,10 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> miette::Result<()> {
     match cli.command {
         Command::Build {
-            layout,
+            artifact_layout,
             runtime_name,
             artifact_name,
-            delegate,
+            delegate_executable,
             runtime_version,
             target_label,
             platform,
@@ -333,17 +333,17 @@ fn run(cli: Cli) -> miette::Result<()> {
             docs_url,
             install_scheme,
             install_name,
-            install_method,
+            installer,
             out_dir,
             dry_run,
             root,
         } => {
             if dry_run {
                 dry_run_build_artifact(
-                    layout,
+                    artifact_layout,
                     runtime_name,
                     artifact_name,
-                    delegate,
+                    delegate_executable,
                     runtime_version,
                     target_label,
                     platform,
@@ -352,17 +352,17 @@ fn run(cli: Cli) -> miette::Result<()> {
                     docs_url,
                     install_scheme,
                     install_name,
-                    install_method,
+                    installer,
                     out_dir,
                     root,
                 )?;
                 return Ok(());
             }
             let output = build_artifact(
-                layout,
+                artifact_layout,
                 runtime_name,
                 artifact_name,
-                delegate,
+                delegate_executable,
                 runtime_version,
                 target_label,
                 platform,
@@ -371,7 +371,7 @@ fn run(cli: Cli) -> miette::Result<()> {
                 docs_url,
                 install_scheme,
                 install_name,
-                install_method,
+                installer,
                 out_dir,
                 root,
             )?;
@@ -384,10 +384,10 @@ fn run(cli: Cli) -> miette::Result<()> {
             }
         }
         Command::Run {
-            layout,
+            artifact_layout,
             runtime_name,
             artifact_name,
-            delegate,
+            delegate_executable,
             runtime_version,
             platform,
             out_dir,
@@ -395,14 +395,14 @@ fn run(cli: Cli) -> miette::Result<()> {
             docs_url,
             install_scheme,
             install_name,
-            install_method,
+            installer,
             root,
             args,
         } => run_artifact(
-            layout,
+            artifact_layout,
             runtime_name,
             artifact_name,
-            delegate,
+            delegate_executable,
             runtime_version,
             platform,
             out_dir,
@@ -410,7 +410,7 @@ fn run(cli: Cli) -> miette::Result<()> {
             docs_url,
             install_scheme,
             install_name,
-            install_method,
+            installer,
             root,
             args,
         )?,

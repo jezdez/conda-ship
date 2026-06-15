@@ -32,7 +32,7 @@ Then it:
 
 1. selects that solved environment from the source lock
 2. copies the concrete conda package records into a new lock
-3. applies `[tool.conda-ship].exclude`
+3. applies `[tool.conda-ship].exclude-packages`
 4. validates the required runtime packages
 5. writes `dist/RUNTIME.runtime.lock`
 6. stamps the same lock into the generated runtime binary

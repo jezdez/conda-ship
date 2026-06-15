@@ -17,8 +17,8 @@ plus `conda.lock`, `pixi.toml` plus `pixi.lock`, or `pyproject.toml` with
 `[tool.pixi]` plus `pixi.lock`. When the manifest or matching lockfile is
 missing, the action fails instead of generating or solving project configuration
 in CI. This minimal example assumes the manifest contains
-`[tool.conda-ship].runtime-name`, `[tool.conda-ship].delegate`, and a downstream
-runtime version.
+`[tool.conda-ship].runtime-name`,
+`[tool.conda-ship].delegate-executable`, and a downstream runtime version.
 
 When the selected conda-ship config sets
 `runtime-version = { from = "project-metadata" }`, the action first lets
@@ -49,12 +49,12 @@ inputs do not set up Python.
   different runtime name than `[tool.conda-ship].runtime-name`.
 
 `artifact-name`
-: Staged executable and artifact name override. Set this when any layout should
+: Staged executable and artifact stem override. Set this when any layout should
   stage a different command and release artifact name than `runtime-name`, such
   as `cxz` for a distribution whose base runtime name is `cx`. When omitted,
   artifacts use the resolved `runtime-name` exactly.
 
-`delegate`
+`delegate-executable`
 : Delegate executable override. Set this when the release job intentionally
   changes which executable receives pass-through arguments.
 
@@ -73,12 +73,12 @@ inputs do not set up Python.
   or `pyproject.toml` with either `[tool.conda]`/`conda.lock` or
   `[tool.pixi]`/`pixi.lock`. Defaults to the workflow workspace.
 
-`layout`
+`artifact-layout`
 : Artifact layout to build. Supported values are `online`, `external`, and
-  `embedded`. Overrides `[tool.conda-ship].layout` when set; otherwise the
-  action leaves layout selection to the manifest and `cs` defaults to `online`.
-  External artifacts stage the runtime and bundle as separate files. Embedded
-  artifacts carry package archives inside the runtime.
+  `embedded`. Overrides `[tool.conda-ship].artifact-layout` when set; otherwise
+  the action leaves layout selection to the manifest and `cs` defaults to
+  `online`. External artifacts stage the runtime and bundle as separate files.
+  Embedded artifacts carry package archives inside the runtime.
 
 `docs-url`
 : Documentation URL stamped into generated runtime help output. Must start
@@ -90,12 +90,12 @@ inputs do not set up Python.
   `conda-home` and `user-data`.
 
 `install-name`
-: Name used inside the install scheme. When omitted, `cs` uses
-  `[tool.conda-ship].install-name` or the resolved runtime name.
+: Directory name for this runtime's managed base prefix under the install
+  scheme. When omitted, `cs` uses `[tool.conda-ship].install-name` or the
+  resolved runtime name.
 
-`install-method`
-: Package-manager or installer method stamped into the runtime for uninstall
-  guidance.
+`installer`
+: Package manager or installer stamped into the runtime for uninstall guidance.
 
 The action does not duplicate `cs build` validation in shell. It passes
 non-empty inputs to `cs build --dry-run` and then to `cs build`; invalid values
@@ -146,5 +146,5 @@ source by full commit SHA and pass the matching conda-ship release through the
 : Absolute path to the SHA256 checksum file.
 
 `bundle-path`
-: Absolute path to the external bundle when `layout: external`; empty for
+: Absolute path to the external bundle when `artifact-layout: external`; empty for
   `online` and `embedded`.

@@ -9,12 +9,12 @@ use tempfile::TempDir;
 
 use super::artifact::{
     PackageInfo, apply_runtime_metadata_overrides, artifact_stem, binary_filename,
-    render_package_list, resolve_artifact_name, resolve_bundle_layout, resolve_delegate,
-    resolve_runtime_name, runtime_env_var, runtime_template_filename, runtime_template_from_env,
-    source_binary, source_binary_plan, stage_artifacts, validate_artifact_name, validate_delegate,
-    validate_docs_url, validate_install_method, validate_install_name,
-    validate_package_archive_name, validate_runtime_name, validate_runtime_version,
-    validate_target_label, validate_target_triple,
+    render_package_list, resolve_artifact_layout, resolve_artifact_name,
+    resolve_delegate_executable, resolve_runtime_name, runtime_env_var, runtime_template_filename,
+    runtime_template_from_env, source_binary, source_binary_plan, stage_artifacts,
+    validate_artifact_name, validate_delegate_executable, validate_docs_url, validate_install_name,
+    validate_installer, validate_package_archive_name, validate_runtime_name,
+    validate_runtime_version, validate_target_label, validate_target_triple,
 };
 use super::diagnostic::{DiagnosticKind, ShipDiagnostic};
 use super::project::{
@@ -94,8 +94,8 @@ channels = ["conda-forge"]
 
 [tool.conda-ship]
 runtime-name = "demo"
-delegate = "conda"
-layout = "external"
+delegate-executable = "conda"
+artifact-layout = "external"
 source-environment = "ship"
 "#,
     )
@@ -106,8 +106,8 @@ source-environment = "ship"
 
     assert_eq!(input.lock_path, tmp.path().join("pixi.lock"));
     assert_eq!(input.config.runtime_name.as_deref(), Some("demo"));
-    assert_eq!(input.config.delegate.as_deref(), Some("conda"));
-    assert_eq!(input.config.layout, Some(BundleLayout::External));
+    assert_eq!(input.config.delegate_executable.as_deref(), Some("conda"));
+    assert_eq!(input.config.artifact_layout, Some(BundleLayout::External));
     assert_eq!(input.config.source_environment.as_deref(), Some("ship"));
     assert_eq!(input.runtime_version.as_deref(), Some("1.2.3"));
     assert_eq!(input.runtime_version_source, None);
@@ -125,8 +125,8 @@ channels = ["conda-forge"]
 
 [tool.conda-ship]
 runtime-name = "demo"
-delegate = "conda"
-layout = "embedded"
+delegate-executable = "conda"
+artifact-layout = "embedded"
 source-environment = "ship"
 "#,
     )
@@ -137,8 +137,8 @@ source-environment = "ship"
 
     assert_eq!(input.lock_path, tmp.path().join("conda.lock"));
     assert_eq!(input.config.runtime_name.as_deref(), Some("demo"));
-    assert_eq!(input.config.delegate.as_deref(), Some("conda"));
-    assert_eq!(input.config.layout, Some(BundleLayout::Embedded));
+    assert_eq!(input.config.delegate_executable.as_deref(), Some("conda"));
+    assert_eq!(input.config.artifact_layout, Some(BundleLayout::Embedded));
     assert_eq!(input.config.source_environment.as_deref(), Some("ship"));
 }
 
@@ -218,8 +218,8 @@ channels = ["conda-forge"]
 [tool.conda-ship]
 runtime-name = "demo"
 runtime-version = { from = "project-metadata" }
-delegate = "conda"
-layout = "embedded"
+delegate-executable = "conda"
+artifact-layout = "embedded"
 source-environment = "ship"
 "#,
     )
@@ -286,6 +286,52 @@ artifact-name = "demo-cli"
         manifest.tool.conda_ship.artifact_name.as_deref(),
         Some("demo-cli")
     );
+}
+
+#[test]
+fn test_full_clarity_config_keys_deserialize() {
+    let manifest: super::ProjectManifest = toml::from_str(
+        r#"
+[tool.conda-ship]
+delegate-executable = "conda"
+artifact-layout = "embedded"
+exclude-packages = ["conda-libmamba-solver"]
+installer = "homebrew"
+"#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        manifest.tool.conda_ship.delegate_executable.as_deref(),
+        Some("conda")
+    );
+    assert_eq!(
+        manifest.tool.conda_ship.artifact_layout,
+        Some(BundleLayout::Embedded)
+    );
+    assert_eq!(
+        manifest.tool.conda_ship.exclude_packages,
+        vec!["conda-libmamba-solver".to_string()]
+    );
+    assert_eq!(
+        manifest.tool.conda_ship.installer.as_deref(),
+        Some("homebrew")
+    );
+}
+
+#[rstest]
+#[case::delegate("delegate = \"conda\"", "delegate")]
+#[case::layout("layout = \"embedded\"", "layout")]
+#[case::exclude("exclude = [\"conda-libmamba-solver\"]", "exclude")]
+#[case::install_method("install-method = \"homebrew\"", "install-method")]
+fn test_old_full_clarity_config_keys_are_rejected(#[case] key: &str, #[case] expected: &str) {
+    let err = match toml::from_str::<super::ProjectManifest>(&format!("[tool.conda-ship]\n{key}\n"))
+    {
+        Ok(_) => panic!("old key should be rejected"),
+        Err(err) => err.to_string(),
+    };
+
+    assert!(err.contains(expected), "{err}");
 }
 
 #[test]
@@ -554,9 +600,9 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
         runtime_config: RuntimeStampConfig {
             channels: vec!["conda-forge".to_string()],
             packages: vec!["conda".to_string()],
-            delegate: Some("conda".to_string()),
+            delegate_executable: Some("conda".to_string()),
             runtime_version: Some("9.8.7".to_string()),
-            install_method: Some("homebrew".to_string()),
+            installer: Some("homebrew".to_string()),
             ..RuntimeStampConfig::default()
         },
         platforms: vec![platform],
@@ -588,13 +634,14 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
     let stamped = runtime_data::read_from_path(&output.binary)
         .unwrap()
         .expect("staged binary should be stamped");
-    assert_eq!(stamped.header.runtime_name, "demo-cli");
-    assert_eq!(stamped.header.embedded_runtime_name, "demo-cli");
-    assert_eq!(stamped.header.display_name, "demo");
+    assert_eq!(stamped.header.artifact_name, "demo-cli");
+    assert_eq!(stamped.header.runtime_name, "demo");
+    assert_eq!(stamped.header.embedded_artifact_name, "demo-cli");
+    assert_eq!(stamped.header.delegate_executable, "conda");
     assert_eq!(stamped.header.metadata_file, ".demo.json");
     assert_eq!(stamped.header.bundle_env_var, "DEMO_BUNDLE");
     assert_eq!(stamped.header.runtime_version, "9.8.7");
-    assert_eq!(stamped.header.install_method.as_deref(), Some("homebrew"));
+    assert_eq!(stamped.header.installer.as_deref(), Some("homebrew"));
     assert_eq!(
         stamped.header.runtime_config.packages,
         vec!["conda".to_string()]
@@ -657,7 +704,7 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
         runtime_config: RuntimeStampConfig {
             channels: vec!["conda-forge".to_string()],
             packages: vec!["conda".to_string()],
-            delegate: Some("conda".to_string()),
+            delegate_executable: Some("conda".to_string()),
             runtime_version: Some("9.8.7".to_string()),
             ..RuntimeStampConfig::default()
         },
@@ -692,9 +739,10 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
     let stamped = runtime_data::read_from_path(&output.binary)
         .unwrap()
         .expect("staged binary should be stamped");
-    assert_eq!(stamped.header.runtime_name, "demoz");
-    assert_eq!(stamped.header.embedded_runtime_name, "demoz");
-    assert_eq!(stamped.header.display_name, "demo");
+    assert_eq!(stamped.header.artifact_name, "demoz");
+    assert_eq!(stamped.header.runtime_name, "demo");
+    assert_eq!(stamped.header.embedded_artifact_name, "demoz");
+    assert_eq!(stamped.header.delegate_executable, "conda");
     assert_eq!(stamped.header.install_name, "demo");
     assert_eq!(stamped.header.metadata_file, ".demo.json");
     assert_eq!(stamped.header.bundle_env_var, "DEMO_BUNDLE");
@@ -713,7 +761,7 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
 #[case::artifact_name("artifact name", validate_artifact_name, "conda-ship_1.0")]
 #[case::runtime_version("runtime version", validate_runtime_version, "1!2.3+local")]
 #[case::docs_url("docs URL", validate_docs_url, "https://example.com/demo/")]
-#[case::delegate("delegate", validate_delegate, "python3.12")]
+#[case::delegate_executable("delegate executable", validate_delegate_executable, "python3.12")]
 #[case::install_name("install name", validate_install_name, "conda-express_1.0")]
 fn test_artifact_component_allows_filename_safe_values(
     #[case] _kind: &str,
@@ -781,10 +829,10 @@ fn test_artifact_component_allows_filename_safe_values(
     "docs/index.html",
     "docs URL must start with https:// or http://"
 )]
-#[case::install_method_path(
-    validate_install_method,
+#[case::installer_path(
+    validate_installer,
     "home/brew",
-    "install method may only contain ASCII letters, digits, dots, dashes, and underscores"
+    "installer may only contain ASCII letters, digits, dots, dashes, and underscores"
 )]
 fn test_artifact_component_rejects_unsafe_values(
     #[case] validate: fn(&str) -> miette::Result<()>,
@@ -804,7 +852,7 @@ fn test_build_accepts_install_scheme_with_install_name() {
         "cx",
         "--artifact-name",
         "cxz",
-        "--delegate",
+        "--delegate-executable",
         "conda",
         "--runtime-version",
         "0.6.0",
@@ -812,7 +860,7 @@ fn test_build_accepts_install_scheme_with_install_name() {
         "user-data",
         "--install-name",
         "express",
-        "--install-method",
+        "--installer",
         "homebrew",
     ])
     .unwrap();
@@ -820,11 +868,11 @@ fn test_build_accepts_install_scheme_with_install_name() {
     let Command::Build {
         runtime_name,
         artifact_name,
-        delegate,
+        delegate_executable,
         runtime_version,
         install_scheme,
         install_name,
-        install_method,
+        installer,
         ..
     } = cli.command
     else {
@@ -833,11 +881,11 @@ fn test_build_accepts_install_scheme_with_install_name() {
 
     assert_eq!(runtime_name.as_deref(), Some("cx"));
     assert_eq!(artifact_name.as_deref(), Some("cxz"));
-    assert_eq!(delegate.as_deref(), Some("conda"));
+    assert_eq!(delegate_executable.as_deref(), Some("conda"));
     assert_eq!(runtime_version.as_deref(), Some("0.6.0"));
     assert_eq!(install_scheme, Some(runtime_data::InstallScheme::UserData));
     assert_eq!(install_name.as_deref(), Some("express"));
-    assert_eq!(install_method.as_deref(), Some("homebrew"));
+    assert_eq!(installer.as_deref(), Some("homebrew"));
 }
 
 #[test]
@@ -846,7 +894,7 @@ fn test_build_accepts_manifest_runtime_without_cli_runtime() {
 
     let Command::Build {
         runtime_name,
-        layout,
+        artifact_layout,
         ..
     } = cli.command
     else {
@@ -854,7 +902,7 @@ fn test_build_accepts_manifest_runtime_without_cli_runtime() {
     };
 
     assert_eq!(runtime_name, None);
-    assert_eq!(layout, None);
+    assert_eq!(artifact_layout, None);
 }
 
 #[test]
@@ -974,33 +1022,39 @@ fn test_resolve_runtime_name_uses_manifest_config() {
 }
 
 #[test]
-fn test_resolve_delegate_uses_manifest_config() {
+fn test_resolve_delegate_executable_uses_manifest_config() {
     let config = ShipConfig {
-        delegate: Some("python".to_string()),
+        delegate_executable: Some("python".to_string()),
         ..ShipConfig::default()
     };
 
-    assert_eq!(resolve_delegate(None, &config).unwrap(), "python");
     assert_eq!(
-        resolve_delegate(Some("conda".to_string()), &config).unwrap(),
+        resolve_delegate_executable(None, &config).unwrap(),
+        "python"
+    );
+    assert_eq!(
+        resolve_delegate_executable(Some("conda".to_string()), &config).unwrap(),
         "conda"
     );
 }
 
 #[test]
-fn test_resolve_bundle_layout_uses_manifest_config() {
+fn test_resolve_artifact_layout_uses_manifest_config() {
     let config = ShipConfig {
-        layout: Some(BundleLayout::Embedded),
+        artifact_layout: Some(BundleLayout::Embedded),
         ..ShipConfig::default()
     };
 
-    assert_eq!(resolve_bundle_layout(None, &config), BundleLayout::Embedded);
     assert_eq!(
-        resolve_bundle_layout(Some(BundleLayout::External), &config),
+        resolve_artifact_layout(None, &config),
+        BundleLayout::Embedded
+    );
+    assert_eq!(
+        resolve_artifact_layout(Some(BundleLayout::External), &config),
         BundleLayout::External
     );
     assert_eq!(
-        resolve_bundle_layout(None, &ShipConfig::default()),
+        resolve_artifact_layout(None, &ShipConfig::default()),
         BundleLayout::Online
     );
 }
@@ -1057,13 +1111,13 @@ fn test_run_rejects_path_option_before_runtime_args() {
 }
 
 #[test]
-fn test_run_accepts_install_method() {
+fn test_run_accepts_installer() {
     let cli = Cli::try_parse_from([
         "cs",
         "run",
         "--artifact-name",
         "demoz",
-        "--install-method",
+        "--installer",
         "conda-forge",
         "--",
     ])
@@ -1071,7 +1125,7 @@ fn test_run_accepts_install_method() {
 
     let Command::Run {
         artifact_name,
-        install_method,
+        installer,
         ..
     } = cli.command
     else {
@@ -1079,7 +1133,7 @@ fn test_run_accepts_install_method() {
     };
 
     assert_eq!(artifact_name.as_deref(), Some("demoz"));
-    assert_eq!(install_method.as_deref(), Some("conda-forge"));
+    assert_eq!(installer.as_deref(), Some("conda-forge"));
 }
 
 #[rstest]

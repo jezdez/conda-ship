@@ -42,7 +42,7 @@ the adapter fails instead of falling back to the packaged `cs`.
 Arguments after `conda ship` are passed to `cs`:
 
 ```bash
-conda ship build --layout embedded
+conda ship build --artifact-layout embedded
 ```
 
 When you need to pass an argument that conda's own parser would consume, insert

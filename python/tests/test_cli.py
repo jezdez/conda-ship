@@ -26,9 +26,9 @@ def test_configure_parser_collects_ship_args() -> None:
     parser = argparse.ArgumentParser(prog="conda ship")
     configure_parser(parser)
 
-    args = parser.parse_args(["build", "--layout", "online", "--runtime-name", "demo"])
+    args = parser.parse_args(["build", "--artifact-layout", "online", "--runtime-name", "demo"])
 
-    assert args.ship_args == ["build", "--layout", "online", "--runtime-name", "demo"]
+    assert args.ship_args == ["build", "--artifact-layout", "online", "--runtime-name", "demo"]
 
 
 @pytest.mark.parametrize(

@@ -16,6 +16,9 @@ When `[tool.conda-ship].artifact-name` or `--artifact-name` is set, all layouts 
 that value for the staged runtime and metadata stem. On Windows, binary
 filenames also include `.exe`.
 
+For the difference between `runtime-name` and `artifact-name`, see
+{doc}`names`.
+
 ## Bundle Contents
 
 Bundles are a transport for the conda package archives already named in the

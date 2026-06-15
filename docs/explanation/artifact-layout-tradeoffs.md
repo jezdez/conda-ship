@@ -65,10 +65,10 @@ Layout is release metadata, not package intent. A project can solve one source
 environment and build multiple layouts from the same source lock:
 
 ```bash
-cs build --layout online
-cs build --layout external
-cs build --layout embedded
+cs build --artifact-layout online
+cs build --artifact-layout external
+cs build --artifact-layout embedded
 ```
 
-This is why the GitHub Action exposes `layout` as an input. A release matrix can
-choose layouts without changing package or channel input.
+This is why the GitHub Action exposes `artifact-layout` as an input. A release
+matrix can choose layouts without changing package or channel input.

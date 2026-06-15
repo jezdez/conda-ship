@@ -129,7 +129,7 @@ RUNTIME uninstall [OPTIONS]
 
 The command removes the managed install path, including named environments
 below it, and prints a hint for removing the runtime through the package manager
-or install method that provided the runtime binary.
+or installer that provided the runtime binary.
 
 ## `RUNTIME help`
 
