@@ -17,7 +17,7 @@ plus `conda.lock`, `pixi.toml` plus `pixi.lock`, or `pyproject.toml` with
 `[tool.pixi]` plus `pixi.lock`. When the manifest or matching lockfile is
 missing, the action fails instead of generating or solving project configuration
 in CI. This minimal example assumes the manifest contains
-`[tool.conda-ship].runtime`, `[tool.conda-ship].delegate`, and a downstream
+`[tool.conda-ship].runtime-name`, `[tool.conda-ship].delegate`, and a downstream
 runtime version.
 
 When the selected conda-ship config sets
@@ -44,9 +44,15 @@ inputs do not set up Python.
   action source is pinned by full commit SHA. When omitted, the action uses the
   exact action tag if available.
 
-`runtime`
+`runtime-name`
 : Runtime name override. Set this when the release job intentionally stamps a
-  different runtime name than `[tool.conda-ship].runtime`.
+  different runtime name than `[tool.conda-ship].runtime-name`.
+
+`artifact-name`
+: Staged executable and artifact name override. Set this when any layout should
+  stage a different command and release artifact name than `runtime-name`, such
+  as `cxz` for a distribution whose base runtime name is `cx`. When omitted,
+  artifacts use the resolved `runtime-name` exactly.
 
 `delegate`
 : Delegate executable override. Set this when the release job intentionally
@@ -72,7 +78,7 @@ inputs do not set up Python.
   `embedded`. Overrides `[tool.conda-ship].layout` when set; otherwise the
   action leaves layout selection to the manifest and `cs` defaults to `online`.
   External artifacts stage the runtime and bundle as separate files. Embedded
-  artifacts carry package archives inside the runtime and use the `z` suffix.
+  artifacts carry package archives inside the runtime.
 
 `docs-url`
 : Documentation URL stamped into generated runtime help output. Must start

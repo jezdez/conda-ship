@@ -64,7 +64,7 @@ Add conda-ship policy:
 cat >> conda.toml <<'TOML'
 
 [tool.conda-ship]
-runtime = "pydemo"
+runtime-name = "pydemo"
 runtime-version = "0.1.0"
 delegate = "python"
 layout = "online"
@@ -93,7 +93,7 @@ cat >> pixi.toml <<'TOML'
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "pydemo"
+runtime-name = "pydemo"
 runtime-version = "0.1.0"
 delegate = "python"
 layout = "online"

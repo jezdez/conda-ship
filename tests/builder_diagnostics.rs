@@ -9,7 +9,7 @@ fn test_cs_emits_structured_builder_diagnostic_when_requested() {
         tmp.path().join("conda.toml"),
         r#"
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 delegate = "conda"
 source-environment = "ship"
 "#,

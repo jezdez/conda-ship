@@ -24,7 +24,7 @@ verification. Self-hosted runners must provide `gh`.
 The checked-out repository must contain `conda.toml` plus `conda.lock`,
 `pyproject.toml` with `[tool.conda]` plus `conda.lock`, `pixi.toml` plus
 `pixi.lock`, or `pyproject.toml` with `[tool.pixi]` plus `pixi.lock`. These
-examples assume the manifest contains `[tool.conda-ship].runtime`,
+examples assume the manifest contains `[tool.conda-ship].runtime-name`,
 `[tool.conda-ship].delegate`, and a downstream runtime version, unless those
 values are supplied as action inputs.
 
@@ -104,8 +104,9 @@ access:
     layout: embedded
 ```
 
-The output runtime uses the `z` suffix, for example `demoz` on Unix or
-`demoz.exe` on Windows.
+The output runtime uses the configured runtime name by default. Set the
+`artifact-name` input when the staged artifact should have a distinct command
+name.
 
 ## Matrix Builds
 
@@ -119,19 +120,19 @@ strategy:
     include:
       - os: ubuntu-latest
         layout: online
-        runtime: demo
+        runtime_name: demo
         install-method: standalone
       - os: macos-15-intel
         layout: embedded
-        runtime: demo
+        runtime_name: demo
         install-method: homebrew
       - os: macos-15
         layout: embedded
-        runtime: demo
+        runtime_name: demo
         install-method: homebrew
       - os: windows-latest
         layout: online
-        runtime: demo
+        runtime_name: demo
         install-method: standalone
 
 runs-on: ${{ matrix.os }}
@@ -144,7 +145,7 @@ steps:
     with:
       conda-ship-version: "X.Y.Z"
       layout: ${{ matrix.layout }}
-      runtime: ${{ matrix.runtime }}
+      runtime-name: ${{ matrix.runtime_name }}
       runtime-version: ${{ github.ref_name }}
       delegate: conda
       docs-url: https://example.com/demo/

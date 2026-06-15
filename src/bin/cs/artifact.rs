@@ -123,7 +123,8 @@ pub(crate) struct PackageInfo {
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn dry_run_build_artifact(
     layout: Option<BundleLayout>,
-    runtime: Option<String>,
+    runtime_name: Option<String>,
+    artifact_name: Option<String>,
     delegate: Option<String>,
     runtime_version: Option<String>,
     target_label: Option<String>,
@@ -147,10 +148,12 @@ pub(crate) fn dry_run_build_artifact(
     let platform = parse_platform(platform_str)?;
 
     let mut derived = derive_runtime_lock(&root)?;
-    let runtime = resolve_runtime_name(runtime, &derived.input.config)?;
+    let runtime = resolve_runtime_name(runtime_name, &derived.input.config)?;
     let delegate = resolve_delegate(delegate, &derived.input.config)?;
     let layout = resolve_bundle_layout(layout, &derived.input.config);
+    let artifact_name = resolve_artifact_name(&runtime, artifact_name, &derived.input.config);
     validate_runtime_name(&runtime)?;
+    validate_artifact_name(&artifact_name)?;
     validate_delegate(&delegate)?;
     derived.runtime_config.delegate = Some(delegate.clone());
     apply_runtime_metadata_overrides(
@@ -172,7 +175,7 @@ pub(crate) fn dry_run_build_artifact(
     let out_dir = resolve_out_dir(&root, &out_dir);
     let paths = planned_artifact_paths(
         &out_dir,
-        &runtime,
+        &artifact_name,
         layout,
         target_label.as_deref(),
         target.as_deref(),
@@ -182,6 +185,7 @@ pub(crate) fn dry_run_build_artifact(
         &derived,
         layout,
         &runtime,
+        &artifact_name,
         platform,
         target.as_deref(),
         &template_source,
@@ -195,7 +199,8 @@ pub(crate) fn dry_run_build_artifact(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn build_artifact(
     layout: Option<BundleLayout>,
-    runtime: Option<String>,
+    runtime_name: Option<String>,
+    artifact_name: Option<String>,
     delegate: Option<String>,
     runtime_version: Option<String>,
     target_label: Option<String>,
@@ -219,10 +224,12 @@ pub(crate) fn build_artifact(
     let platform = parse_platform(platform_str)?;
 
     let mut derived = derive_runtime_lock(&root)?;
-    let runtime = resolve_runtime_name(runtime, &derived.input.config)?;
+    let runtime = resolve_runtime_name(runtime_name, &derived.input.config)?;
     let delegate = resolve_delegate(delegate, &derived.input.config)?;
     let layout = resolve_bundle_layout(layout, &derived.input.config);
+    let artifact_name = resolve_artifact_name(&runtime, artifact_name, &derived.input.config);
     validate_runtime_name(&runtime)?;
+    validate_artifact_name(&artifact_name)?;
     validate_delegate(&delegate)?;
     derived.runtime_config.delegate = Some(delegate);
     apply_runtime_metadata_overrides(
@@ -254,6 +261,7 @@ pub(crate) fn build_artifact(
         &source_binary,
         layout,
         &runtime,
+        &artifact_name,
         target_label.as_deref(),
         platform,
         target.as_deref(),
@@ -266,7 +274,8 @@ pub(crate) fn build_artifact(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_artifact(
     layout: Option<BundleLayout>,
-    runtime: Option<String>,
+    runtime_name: Option<String>,
+    artifact_name: Option<String>,
     delegate: Option<String>,
     runtime_version: Option<String>,
     platform: Option<String>,
@@ -281,13 +290,14 @@ pub(crate) fn run_artifact(
 ) -> miette::Result<()> {
     let root = project_root(root_override.as_deref())?;
     let derived = derive_runtime_lock(&root)?;
-    let runtime = resolve_runtime_name(runtime, &derived.input.config)?;
+    let runtime = resolve_runtime_name(runtime_name, &derived.input.config)?;
     let layout = resolve_bundle_layout(layout, &derived.input.config);
     let bundle_env_var = runtime_env_var(&runtime, "BUNDLE");
     let bundle_dir = root.join(SHIP_STATE_DIR).join("bundle");
     let output = build_artifact(
         Some(layout),
         Some(runtime),
+        artifact_name,
         delegate,
         runtime_version,
         None,
@@ -319,15 +329,15 @@ pub(crate) fn run_artifact(
 }
 
 pub(crate) fn resolve_runtime_name(
-    runtime: Option<String>,
+    runtime_name: Option<String>,
     config: &ShipConfig,
 ) -> miette::Result<String> {
-    runtime.or_else(|| config.runtime.clone()).ok_or_else(|| {
+    runtime_name.or_else(|| config.runtime_name.clone()).ok_or_else(|| {
         ship_error(
             DiagnosticKind::MissingRuntime,
-            "runtime is required; pass --runtime or set [tool.conda-ship].runtime",
+            "runtime name is required; pass --runtime-name or set [tool.conda-ship].runtime-name",
             Some(
-                "Pass --runtime to this command or set [tool.conda-ship].runtime in the source manifest."
+                "Pass --runtime-name to this command or set [tool.conda-ship].runtime-name in the source manifest."
                     .to_string(),
             ),
         )
@@ -355,6 +365,16 @@ pub(crate) fn resolve_bundle_layout(
     config: &ShipConfig,
 ) -> BundleLayout {
     layout.or(config.layout).unwrap_or(BundleLayout::Online)
+}
+
+pub(crate) fn resolve_artifact_name(
+    runtime: &str,
+    artifact_name: Option<String>,
+    config: &ShipConfig,
+) -> String {
+    artifact_name
+        .or_else(|| config.artifact_name.clone())
+        .unwrap_or_else(|| runtime.to_string())
 }
 
 pub(crate) fn inspect_artifact(
@@ -527,6 +547,7 @@ fn print_build_dry_run(
     derived: &DerivedRuntimeLock,
     layout: BundleLayout,
     runtime: &str,
+    artifact_name: &str,
     platform: Platform,
     target: Option<&str>,
     template_source: &RuntimeTemplateSource,
@@ -561,7 +582,10 @@ fn print_build_dry_run(
         print_project_summary(writer, root, derived)?;
         writeln!(writer)?;
         writeln!(writer, "Runtime")?;
-        writeln!(writer, "  runtime: {runtime}")?;
+        writeln!(writer, "  runtime name: {runtime}")?;
+        if artifact_name != runtime {
+            writeln!(writer, "  artifact name: {artifact_name}")?;
+        }
         writeln!(writer, "  version: {runtime_version}")?;
         writeln!(writer, "  delegate: {delegate}")?;
         writeln!(writer, "  layout: {}", layout.as_str())?;
@@ -708,7 +732,8 @@ pub(crate) fn stage_artifacts(
     root: &Path,
     source_binary: &Path,
     layout: BundleLayout,
-    name: &str,
+    runtime: &str,
+    artifact_name: &str,
     target_label: Option<&str>,
     platform: Platform,
     target: Option<&str>,
@@ -721,7 +746,7 @@ pub(crate) fn stage_artifacts(
         .into_diagnostic()
         .with_context(|| format!("failed to create {}", out_dir.display()))?;
 
-    let paths = planned_artifact_paths(&out_dir, name, layout, target_label, target);
+    let paths = planned_artifact_paths(&out_dir, artifact_name, layout, target_label, target);
     std::fs::copy(source_binary, &paths.binary)
         .into_diagnostic()
         .with_context(|| {
@@ -731,7 +756,14 @@ pub(crate) fn stage_artifacts(
                 paths.binary.display()
             )
         })?;
-    stamp_runtime_data(&paths.binary, layout, name, derived, generated_bundle)?;
+    stamp_runtime_data(
+        &paths.binary,
+        layout,
+        runtime,
+        artifact_name,
+        derived,
+        generated_bundle,
+    )?;
 
     let bundle = if layout == BundleLayout::External {
         let source_bundle = generated_bundle
@@ -789,7 +821,7 @@ fn planned_artifact_paths(
     target_label: Option<&str>,
     target: Option<&str>,
 ) -> PlannedArtifactPaths {
-    let stem = artifact_stem(name, layout, target_label);
+    let stem = artifact_stem(name, target_label);
     let binary = out_dir.join(binary_filename(&stem, target));
     let bundle =
         (layout == BundleLayout::External).then(|| out_dir.join(format!("{stem}.bundle.tar.zst")));
@@ -922,6 +954,10 @@ pub(crate) fn parse_platform(platform_str: Option<String>) -> miette::Result<Pla
 
 pub(crate) fn validate_runtime_name(runtime: &str) -> miette::Result<()> {
     validate_artifact_component("runtime name", runtime)
+}
+
+pub(crate) fn validate_artifact_name(artifact_name: &str) -> miette::Result<()> {
+    validate_artifact_component("artifact name", artifact_name)
 }
 
 pub(crate) fn validate_delegate(delegate: &str) -> miette::Result<()> {
@@ -1146,21 +1182,11 @@ fn validate_artifact_component(kind: &str, value: &str) -> miette::Result<()> {
     Ok(())
 }
 
-pub(crate) fn artifact_stem(
-    name: &str,
-    layout: BundleLayout,
-    target_label: Option<&str>,
-) -> String {
-    let base = if layout == BundleLayout::Embedded {
-        format!("{name}z")
+pub(crate) fn artifact_stem(name: &str, target_label: Option<&str>) -> String {
+    if let Some(label) = target_label {
+        format!("{name}-{label}")
     } else {
         name.to_string()
-    };
-
-    if let Some(label) = target_label {
-        format!("{base}-{label}")
-    } else {
-        base
     }
 }
 
@@ -1310,15 +1336,11 @@ fn resolve_runtime_template(path: &Path) -> miette::Result<PathBuf> {
 fn stamp_runtime_data(
     binary: &Path,
     layout: BundleLayout,
-    name: &str,
+    runtime: &str,
+    artifact_name: &str,
     derived: &DerivedRuntimeLock,
     generated_bundle: Option<&Path>,
 ) -> miette::Result<()> {
-    let runtime_name = if layout == BundleLayout::Embedded {
-        format!("{name}z")
-    } else {
-        name.to_string()
-    };
     let delegate = derived
         .runtime_config
         .delegate
@@ -1326,7 +1348,7 @@ fn stamp_runtime_data(
         .ok_or_else(|| miette::miette!("delegate has not been resolved before stamping"))?;
     let header = runtime_data::RuntimeDataHeader {
         schema_version: 1,
-        runtime_name,
+        runtime_name: artifact_name.to_string(),
         runtime_version: derived
             .runtime_config
             .runtime_version
@@ -1334,18 +1356,18 @@ fn stamp_runtime_data(
             .ok_or_else(|| {
                 missing_runtime_version(derived.runtime_config.project_dynamic_version)
             })?,
-        embedded_runtime_name: format!("{name}z"),
+        embedded_runtime_name: artifact_name.to_string(),
         delegate,
-        display_name: name.to_string(),
+        display_name: runtime.to_string(),
         install_scheme: derived.runtime_config.install_scheme.unwrap_or_default(),
         install_name: derived
             .runtime_config
             .install_name
             .clone()
-            .unwrap_or_else(|| name.to_string()),
-        metadata_file: format!(".{name}.json"),
-        bundle_env_var: runtime_env_var(name, "BUNDLE"),
-        offline_env_var: runtime_env_var(name, "OFFLINE"),
+            .unwrap_or_else(|| runtime.to_string()),
+        metadata_file: format!(".{runtime}.json"),
+        bundle_env_var: runtime_env_var(runtime, "BUNDLE"),
+        offline_env_var: runtime_env_var(runtime, "OFFLINE"),
         docs_url: derived
             .runtime_config
             .docs_url

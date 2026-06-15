@@ -21,7 +21,7 @@ The manifest must contain `[tool.conda-ship]` with at least:
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
 delegate = "conda"
 source-environment = "ship"
@@ -135,8 +135,9 @@ demo-x86_64-unknown-linux-gnu.sha256
 ```
 
 For an `external` build, the directory also contains
-`demo-<target>.bundle.tar.zst`. For an `embedded` build, the runtime name gets
-the `z` suffix, for example `demoz-aarch64-apple-darwin`.
+`demo-<target>.bundle.tar.zst`. For an `embedded` build, the runtime carries
+the bundle inside the binary and uses the configured runtime name unless
+`artifact-name` sets a distinct artifact name.
 
 ## Override Runtime Metadata
 
@@ -148,7 +149,7 @@ for release-job metadata that may vary across a matrix:
   id: cs
   with:
     conda-ship-version: "X.Y.Z"
-    runtime: demo
+    runtime-name: demo
     delegate: conda
     layout: ${{ matrix.layout }}
     docs-url: https://example.com/demo/

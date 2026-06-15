@@ -2,6 +2,37 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## Unreleased
+
+### Added
+
+- Added `[tool.conda-ship].artifact-name`, `cs build --artifact-name`,
+  `cs run --artifact-name`, and the GitHub Action `artifact-name` input for
+  downstream distributions that want staged artifacts to use a distinct
+  executable name for any layout.
+
+### Changed
+
+- Renamed `[tool.conda-ship].runtime`, `cs build --runtime`,
+  `cs run --runtime`, and the GitHub Action `runtime` input to
+  `runtime-name`.
+- Embedded builds no longer append `z` to the runtime name automatically.
+  `layout = "embedded"` now stages the configured `runtime-name` unless an
+  explicit artifact name is provided.
+
+### Migration
+
+- Inside `[tool.conda-ship]`, rename `runtime = "demo"` to
+  `runtime-name = "demo"`. Replace `--runtime demo` with
+  `--runtime-name demo`, and use `runtime-name: demo` in GitHub Actions.
+- If you currently rely on the old `runtime = "demo"` setting producing
+  `dist/demoz` for embedded builds, set `artifact-name = "demoz"` in
+  `[tool.conda-ship]`, pass `cs build --artifact-name demoz`, or set the
+  GitHub Action `artifact-name: demoz` input.
+- If you do not need a distinct embedded executable name, no additional
+  artifact-name setting is needed. Update release scripts and artifact upload
+  patterns to use `demo` instead of `demoz`.
+
 ## 0.3.2 - 2026-06-15
 
 ### Fixed

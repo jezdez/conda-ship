@@ -80,17 +80,18 @@ Choose `embedded` when a single runtime binary must carry the package archives:
 cs build --layout embedded
 ```
 
-Embedded runtimes use the `z` suffix:
+Embedded runtimes use the configured runtime name unless you set
+`artifact-name`:
 
 ```text
-demo   -> online or external runtime
-demoz  -> embedded runtime
+demo          -> online, external, or embedded runtime
+demo-cli      -> staged runtime when configured explicitly
 ```
 
 Bootstrap detects the embedded bundle automatically:
 
 ```bash
-demoz bootstrap
+demo bootstrap
 ```
 
 This is useful when the runtime must install without network access and you do

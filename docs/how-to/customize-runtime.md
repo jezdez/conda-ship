@@ -32,7 +32,7 @@ Use a product-specific name:
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 delegate = "conda"
 layout = "online"
 ```
@@ -50,7 +50,7 @@ operating-system-specific path:
 
 ```toml
 [tool.conda-ship]
-runtime = "cx"
+runtime-name = "cx"
 delegate = "conda"
 layout = "online"
 install-scheme = "conda-home"
@@ -86,7 +86,7 @@ remove the runtime binary itself:
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 delegate = "conda"
 install-method = "homebrew"
 ```
@@ -157,7 +157,7 @@ pandas = "*"
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
 delegate = "conda"
 layout = "online"
@@ -199,7 +199,7 @@ conda-spawn = ">=0.1.0"
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
 delegate = "conda"
 layout = "online"
@@ -242,7 +242,7 @@ pandas = "*"
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
 delegate = "conda"
 layout = "online"
@@ -300,8 +300,10 @@ package archives inside itself:
 cs build --layout embedded
 ```
 
-The embedded runtime uses the `z` suffix, so the staged binary is
-`dist/demoz` on Unix and `dist/demoz.exe` on Windows.
+The embedded runtime uses `runtime` by default, so the staged binary is
+`dist/demo` on Unix and `dist/demo.exe` on Windows. Set
+`artifact-name = "demo-offline"` or pass `--artifact-name demo-offline` when a
+release artifact should have a distinct command name.
 
 The embedded runtime detects its built-in bundle automatically during
 `bootstrap`; users do not need to pass `--bundle` or `--offline`.

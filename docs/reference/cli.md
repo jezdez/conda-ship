@@ -33,22 +33,26 @@ Options:
 Build and stage a runtime artifact.
 
 ```bash
-cs build [--runtime RUNTIME] [--delegate EXECUTABLE] [--layout LAYOUT] [--target-label LABEL] \
+cs build [--runtime-name RUNTIME] [--artifact-name NAME] \
+  [--delegate EXECUTABLE] [--layout LAYOUT] [--target-label LABEL] \
   [--platform PLATFORM] [--target TRIPLE] [--template PATH] \
   [--runtime-version VERSION] [--docs-url URL] [--install-scheme SCHEME] \
   [--install-name NAME] [--install-method METHOD] \
   [--out-dir PATH] [--dry-run] [--root PATH]
 ```
 
-Identifier-like values such as `RUNTIME`, `EXECUTABLE`, `LABEL`, `TRIPLE`, and
-`METHOD` must start with an ASCII letter or digit and may only contain ASCII
-letters, digits, `.`, `_`, and `-`. `RUNTIME` names the generated runtime; it
-is not a conda environment name. Runtime metadata can come from CLI flags or
-`[tool.conda-ship]`.
+Identifier-like values such as `RUNTIME`, `NAME`, `EXECUTABLE`, `LABEL`,
+`TRIPLE`, and `METHOD` must start with an ASCII letter or digit and may only
+contain ASCII letters, digits, `.`, `_`, and `-`. `RUNTIME` is the base runtime
+identity and default artifact name. It is not a conda environment name.
+Runtime metadata can come from CLI flags or `[tool.conda-ship]`.
 
 Options:
 
-- `--runtime RUNTIME`: override `[tool.conda-ship].runtime`.
+- `--runtime-name RUNTIME`: override `[tool.conda-ship].runtime-name`.
+- `--artifact-name NAME`: override `[tool.conda-ship].artifact-name` for the
+  staged executable and artifact stem. When omitted, artifacts use
+  `--runtime-name` exactly.
 - `--delegate EXECUTABLE`: override `[tool.conda-ship].delegate`.
 - `--runtime-version VERSION`: version shown by the generated runtime. Overrides
   `[tool.conda-ship].runtime-version`, `[project].version`, and project
@@ -85,7 +89,8 @@ Options:
 Build a runtime artifact and execute it immediately.
 
 ```bash
-cs run [--runtime RUNTIME] [--delegate EXECUTABLE] [--layout LAYOUT] [--platform PLATFORM] \
+cs run [--runtime-name RUNTIME] [--artifact-name NAME] \
+  [--delegate EXECUTABLE] [--layout LAYOUT] [--platform PLATFORM] \
   [--template PATH] [--runtime-version VERSION] [--docs-url URL] \
   [--install-scheme SCHEME] [--install-name NAME] [--install-method METHOD] \
   [--out-dir PATH] [--root PATH] \
@@ -96,7 +101,10 @@ Everything after `--` is passed to the staged runtime.
 
 Options:
 
-- `--runtime RUNTIME`: override `[tool.conda-ship].runtime`.
+- `--runtime-name RUNTIME`: override `[tool.conda-ship].runtime-name`.
+- `--artifact-name NAME`: override `[tool.conda-ship].artifact-name` for the
+  staged executable and artifact stem. When omitted, artifacts use
+  `--runtime-name` exactly.
 - `--delegate EXECUTABLE`: override `[tool.conda-ship].delegate`.
 - `--runtime-version VERSION`: version shown by the generated runtime. Overrides
   `[tool.conda-ship].runtime-version`, `[project].version`, and project

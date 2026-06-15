@@ -3,10 +3,13 @@
 When you run `cs build`, conda-ship does not invent a new program from scratch.
 It starts with a small generic runtime template, copies it to the resolved
 runtime name, and writes your build data into that copy. The runtime name can
-come from `[tool.conda-ship].runtime` or from `--runtime`.
+come from `[tool.conda-ship].runtime-name` or from `--runtime-name`. Builds can use
+`[tool.conda-ship].artifact-name` or `--artifact-name` when the staged artifact
+needs a distinct command name.
 
 Users rarely need to think about the template. They run the
-finished runtime, such as `demo`, `demoz`, `cx`, or `cxz`.
+finished runtime, such as `demo`, `cx`, or a downstream-specific embedded name
+like `cxz`.
 
 ## What `cs build` Writes
 

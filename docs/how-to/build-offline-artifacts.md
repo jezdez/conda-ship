@@ -68,7 +68,7 @@ package archives directly.
 An embedded runtime carries the bundle inside the binary:
 
 ```bash
-demoz --path /opt/demo bootstrap
+demo --path /opt/demo bootstrap
 ```
 
 The runtime extracts the compressed package archives to a temporary directory

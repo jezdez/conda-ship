@@ -401,7 +401,7 @@ fn test_stamped_runtime_status_uses_stamped_version() {
             "build",
             "--root",
             root,
-            "--runtime",
+            "--runtime-name",
             "demo",
             "--delegate",
             "conda",

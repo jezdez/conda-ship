@@ -50,8 +50,10 @@ struct ToolSection {
 #[derive(Clone, Default, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 struct ShipConfig {
-    #[serde(default)]
-    runtime: Option<String>,
+    #[serde(default, rename = "runtime-name")]
+    runtime_name: Option<String>,
+    #[serde(default, rename = "artifact-name")]
+    artifact_name: Option<String>,
     #[serde(default, rename = "runtime-version")]
     runtime_version: Option<RuntimeVersionConfig>,
     #[serde(default)]
@@ -121,9 +123,13 @@ enum Command {
         #[arg(long, value_enum)]
         layout: Option<BundleLayout>,
 
-        /// Runtime name to stage for the generated runtime
+        /// Base runtime identity and default artifact name
+        #[arg(long = "runtime-name")]
+        runtime_name: Option<String>,
+
+        /// Staged executable and artifact stem
         #[arg(long)]
-        runtime: Option<String>,
+        artifact_name: Option<String>,
 
         /// Delegate executable inside the managed prefix
         #[arg(long)]
@@ -184,9 +190,13 @@ enum Command {
         #[arg(long, value_enum)]
         layout: Option<BundleLayout>,
 
-        /// Runtime name to stage for the generated runtime
+        /// Base runtime identity and default artifact name
+        #[arg(long = "runtime-name")]
+        runtime_name: Option<String>,
+
+        /// Staged executable and artifact stem
         #[arg(long)]
-        runtime: Option<String>,
+        artifact_name: Option<String>,
 
         /// Delegate executable inside the managed prefix
         #[arg(long)]
@@ -312,7 +322,8 @@ fn run(cli: Cli) -> miette::Result<()> {
     match cli.command {
         Command::Build {
             layout,
-            runtime,
+            runtime_name,
+            artifact_name,
             delegate,
             runtime_version,
             target_label,
@@ -330,7 +341,8 @@ fn run(cli: Cli) -> miette::Result<()> {
             if dry_run {
                 dry_run_build_artifact(
                     layout,
-                    runtime,
+                    runtime_name,
+                    artifact_name,
                     delegate,
                     runtime_version,
                     target_label,
@@ -348,7 +360,8 @@ fn run(cli: Cli) -> miette::Result<()> {
             }
             let output = build_artifact(
                 layout,
-                runtime,
+                runtime_name,
+                artifact_name,
                 delegate,
                 runtime_version,
                 target_label,
@@ -372,7 +385,8 @@ fn run(cli: Cli) -> miette::Result<()> {
         }
         Command::Run {
             layout,
-            runtime,
+            runtime_name,
+            artifact_name,
             delegate,
             runtime_version,
             platform,
@@ -386,7 +400,8 @@ fn run(cli: Cli) -> miette::Result<()> {
             args,
         } => run_artifact(
             layout,
-            runtime,
+            runtime_name,
+            artifact_name,
             delegate,
             runtime_version,
             platform,

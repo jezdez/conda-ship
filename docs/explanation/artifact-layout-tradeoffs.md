@@ -55,7 +55,9 @@ Embedded is useful when:
 - a wrapper installer is not available
 - the runtime is intended for constrained or disconnected environments
 
-Embedded runtimes use the `z` suffix by convention.
+Embedded runtimes use the configured runtime name by default. A downstream
+distribution can set `artifact-name` when a release artifact should use a
+different command name.
 
 ## Choosing At Release Time
 

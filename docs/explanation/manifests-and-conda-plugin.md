@@ -37,7 +37,7 @@ The solved environment used for the runtime is selected explicitly by
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 delegate = "conda"
 layout = "online"
 source-environment = "ship"
@@ -75,7 +75,7 @@ conda-spawn = ">=0.1.0"
 ship = { features = ["ship"], no-default-feature = true }
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 delegate = "conda"
 layout = "online"
 source-environment = "ship"

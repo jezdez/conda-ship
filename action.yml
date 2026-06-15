@@ -12,8 +12,12 @@ inputs:
     description: "conda-ship release version to download, such as 0.3.0. Set this when the action is pinned by commit SHA. When omitted, the action uses the exact action tag if available."
     required: false
     default: ""
-  runtime:
-    description: "Runtime name to build. Overrides [tool.conda-ship].runtime when set."
+  runtime-name:
+    description: "Base runtime identity and default artifact name. Overrides [tool.conda-ship].runtime-name when set."
+    required: false
+    default: ""
+  artifact-name:
+    description: "Staged executable and artifact name. Overrides [tool.conda-ship].artifact-name when set."
     required: false
     default: ""
   delegate:
@@ -239,7 +243,8 @@ runs:
         CONDA_SHIP_INSTALL_NAME: ${{ inputs.install-name }}
         CONDA_SHIP_INSTALL_SCHEME: ${{ inputs.install-scheme }}
         CONDA_SHIP_LAYOUT: ${{ inputs.layout }}
-        CONDA_SHIP_RUNTIME: ${{ inputs.runtime }}
+        CONDA_SHIP_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        CONDA_SHIP_RUNTIME_NAME: ${{ inputs.runtime-name }}
         CONDA_SHIP_RUNTIME_VERSION: ${{ inputs.runtime-version }}
         CS_PATH: ${{ steps.download.outputs.cs_path }}
         CONDA_SHIP_ROOT: ${{ inputs.root }}
@@ -260,8 +265,11 @@ runs:
           --root "$CONDA_SHIP_ROOT"
           --out-dir "$dist_dir"
         )
-        if [ -n "$CONDA_SHIP_RUNTIME" ]; then
-          build_args+=(--runtime "$CONDA_SHIP_RUNTIME")
+        if [ -n "$CONDA_SHIP_RUNTIME_NAME" ]; then
+          build_args+=(--runtime-name "$CONDA_SHIP_RUNTIME_NAME")
+        fi
+        if [ -n "$CONDA_SHIP_ARTIFACT_NAME" ]; then
+          build_args+=(--artifact-name "$CONDA_SHIP_ARTIFACT_NAME")
         fi
         if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
           build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
@@ -344,7 +352,8 @@ runs:
         CONDA_SHIP_INSTALL_NAME: ${{ inputs.install-name }}
         CONDA_SHIP_INSTALL_SCHEME: ${{ inputs.install-scheme }}
         CONDA_SHIP_LAYOUT: ${{ inputs.layout }}
-        CONDA_SHIP_RUNTIME: ${{ inputs.runtime }}
+        CONDA_SHIP_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        CONDA_SHIP_RUNTIME_NAME: ${{ inputs.runtime-name }}
         CONDA_SHIP_RUNTIME_VERSION: ${{ inputs.runtime-version || steps.project_metadata.outputs.runtime_version }}
         CS_PATH: ${{ steps.download.outputs.cs_path }}
         CONDA_SHIP_ROOT: ${{ inputs.root }}
@@ -364,8 +373,11 @@ runs:
           --root "$CONDA_SHIP_ROOT"
           --out-dir "$dist_dir"
         )
-        if [ -n "$CONDA_SHIP_RUNTIME" ]; then
-          build_args+=(--runtime "$CONDA_SHIP_RUNTIME")
+        if [ -n "$CONDA_SHIP_RUNTIME_NAME" ]; then
+          build_args+=(--runtime-name "$CONDA_SHIP_RUNTIME_NAME")
+        fi
+        if [ -n "$CONDA_SHIP_ARTIFACT_NAME" ]; then
+          build_args+=(--artifact-name "$CONDA_SHIP_ARTIFACT_NAME")
         fi
         if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
           build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")

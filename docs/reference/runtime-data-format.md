@@ -26,15 +26,15 @@ The stamped header records:
 : Runtime data schema version.
 
 `runtime_name`
-: Name of the generated runtime executable. Embedded layouts use the `z`
-  suffix.
+: Name of the generated runtime executable.
 
 `runtime_version`
 : Version shown by the generated runtime and written to prefix ownership
   metadata.
 
 `embedded_runtime_name`
-: Conventional embedded runtime name for the same base runtime.
+: Runtime executable name used when the artifact carries an embedded bundle.
+  This is explicit build metadata, not a derived suffix.
 
 `delegate`
 : Executable inside the managed prefix that receives pass-through arguments.

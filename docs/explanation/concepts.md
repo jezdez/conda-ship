@@ -27,12 +27,14 @@ runtime artifacts.
 ## Runtime
 
 A runtime is the executable that users run after conda-ship finishes.
-Examples include `demo`, `demoz`, `cx`, and `cxz`.
+Examples include `demo`, `cx`, and downstream-specific embedded names such as
+`cxz`.
 
-The runtime name is the base executable name for that runtime. It can come from
-`[tool.conda-ship].runtime` or `--runtime`, and it is not a conda environment
-name. The `embedded` layout adds the `z` suffix to the staged executable name
-because that variant contains compressed package archives.
+The runtime name is the base identity for that runtime. It can come from
+`[tool.conda-ship].runtime-name` or `--runtime-name`, and it is not a conda
+environment name. Builds use the same value as the staged executable and
+artifact name unless `[tool.conda-ship].artifact-name` or `--artifact-name`
+names a distinct artifact.
 
 Use "runtime" for the executable conda-ship produces, "delegate" for the
 executable inside the managed prefix that receives pass-through arguments, and
@@ -71,8 +73,8 @@ mirrors; conda-ship already has the channel and package records in the runtime
 lock.
 
 The `external` layout pairs a runtime with `RUNTIME.bundle.tar.zst`. The
-`embedded` layout appends `z` to the runtime name and includes the compressed
-bundle inside the runtime.
+`embedded` layout includes the compressed bundle inside the runtime and can use
+an explicit artifact name when configured.
 
 An embedded runtime automatically uses its bundled archives during
 bootstrap. An explicit `--bundle` can still override that bundle.

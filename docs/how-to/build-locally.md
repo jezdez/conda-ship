@@ -4,7 +4,7 @@ Use local builds while iterating on runtime package sets, channel choices, or
 conda-ship runtime behavior.
 
 Packaged local builds find the runtime template installed next to `cs`
-automatically. When your manifest contains `[tool.conda-ship].runtime`, a
+automatically. When your manifest contains `[tool.conda-ship].runtime-name`, a
 normal build is:
 
 ```bash
@@ -87,7 +87,7 @@ Preview runtime metadata and artifact names without writing release files.
 
 ## Build A Runtime
 
-`[tool.conda-ship].runtime`, `[tool.conda-ship].delegate`,
+`[tool.conda-ship].runtime-name`, `[tool.conda-ship].delegate`,
 `[tool.conda-ship].source-environment`, and a downstream runtime version are
 required unless you pass the runtime, delegate, and version through CLI flags.
 conda-ship does not provide default values for them. The version can come from
@@ -126,7 +126,7 @@ Pass a target triple, an artifact label, and a matching prebuilt template:
 
 ```bash
 cs build \
-  --runtime demo \
+  --runtime-name demo \
   --target x86_64-unknown-linux-gnu \
   --target-label x86_64-unknown-linux-gnu \
   --template ./cs-template-x86_64-unknown-linux-gnu
@@ -137,9 +137,9 @@ The target label is appended to staged artifact names and metadata files.
 ## Keep Names Distribution-Specific
 
 Use a runtime name owned by the distribution you are building. For example,
-conda-express uses `cx` as its runtime name. The online layout stages `cx`; the
-embedded layout stages `cxz`. A different distribution uses a different
-`[tool.conda-ship].runtime` value or the `--runtime` override.
+conda-express uses `cx` as its runtime name and can set
+`artifact-name = "cxz"` for a release artifact. A different distribution uses a
+different `[tool.conda-ship].runtime-name` value or the `--runtime-name` override.
 
 ## Run Release Checks
 

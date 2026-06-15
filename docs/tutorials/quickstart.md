@@ -42,7 +42,7 @@ Add conda-ship build policy:
 cat >> conda.toml <<'TOML'
 
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
 runtime-version = "0.1.0"
 delegate = "conda"
 layout = "online"

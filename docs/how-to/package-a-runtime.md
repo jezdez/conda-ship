@@ -121,7 +121,7 @@ RUNTIME bootstrap --bundle /path/to/bundle --offline
 For `embedded`, no extra bundle path is needed:
 
 ```bash
-RUNTIMEz bootstrap
+RUNTIME bootstrap
 ```
 
 The installer should not unpack the managed conda prefix by itself. Let the

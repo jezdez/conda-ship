@@ -78,7 +78,7 @@ impl RuntimeDataHeader {
             schema_version: FORMAT_VERSION,
             runtime_name: name.to_string(),
             runtime_version: env!("CARGO_PKG_VERSION").to_string(),
-            embedded_runtime_name: format!("{name}z"),
+            embedded_runtime_name: name.to_string(),
             delegate: "conda".to_string(),
             display_name: name.to_string(),
             install_scheme: InstallScheme::CondaHome,

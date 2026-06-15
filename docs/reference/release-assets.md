@@ -69,11 +69,11 @@ demo.sha256
 For an embedded runtime:
 
 ```text
-demoz
-demoz.info.json
-demoz.packages.txt
-demoz.runtime.lock
-demoz.sha256
+demo
+demo.info.json
+demo.packages.txt
+demo.runtime.lock
+demo.sha256
 ```
 
 ## Target Labels

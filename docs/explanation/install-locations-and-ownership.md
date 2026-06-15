@@ -28,7 +28,7 @@ a short executable name and a clearer install name:
 
 ```toml
 [tool.conda-ship]
-runtime = "cx"
+runtime-name = "cx"
 install-name = "express"
 ```
 

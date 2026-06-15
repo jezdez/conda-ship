@@ -78,7 +78,8 @@ Generated runtimes always write the reset snapshot that `conda-self` expects.
 
 ```toml
 [tool.conda-ship]
-runtime = "demo"
+runtime-name = "demo"
+artifact-name = "demo-cli"
 runtime-version = "1.0.0"
 delegate = "conda"
 layout = "online"
@@ -90,10 +91,16 @@ install-name = "demo"
 install-method = "homebrew"
 ```
 
-`runtime`
-: Name for the generated runtime executable. `cs build` and `cs run` require
-  this value, either here or through `--runtime`. It is not a conda environment
-  name.
+`runtime-name`
+: Base runtime identity and default artifact name. `cs build` and `cs run`
+  require this value, either here or through `--runtime-name`. It is not a
+  conda environment name.
+
+`artifact-name`
+: Optional staged executable and artifact stem for any layout. When omitted,
+  builds use `runtime-name` exactly. Set this when a release artifact should
+  have a distinct command name, such as `cxz` while keeping
+  `runtime-name = "cx"` for install metadata and environment variable names.
 
 `runtime-version`
 : Version shown by the generated runtime when users run `RUNTIME --version`.
@@ -149,7 +156,7 @@ install-method = "homebrew"
 
 `install-name`
 : Name used inside the install scheme. When omitted, conda-ship uses the
-  generated runtime name. For example, `runtime = "cx"` can use
+  generated runtime name. For example, `runtime-name = "cx"` can use
   `install-name = "express"` so the `conda-home` install scheme resolves to
   `~/.conda/express`.
   Choose a product-specific install name. conda-ship does not reserve names
@@ -186,23 +193,23 @@ URLs from the source lockfile environment into generated runtime metadata.
 
 ## Stamped Runtime Metadata
 
-`cs build` stamps these values onto the runtime after resolving `runtime` and
-`layout` from CLI flags or `[tool.conda-ship]`:
+`cs build` stamps these values onto the runtime after resolving `runtime-name`,
+`artifact-name`, and `layout` from CLI flags or `[tool.conda-ship]`:
 
-- runtime name: `RUNTIME` for `online` and `external`, `RUNTIME` plus `z` for
-  `embedded`
+- staged runtime name: `ARTIFACT_NAME`, or `RUNTIME_NAME` when
+  `artifact-name` is not configured
 - runtime version: the configured `runtime-version`, static
   `[project].version` from the selected `pyproject.toml`, or the concrete
-  value resolved by `conda ship` from `{ from = "project-metadata" }`; builds
+  value resolved by `conda ship` from `{ from = "project-metadata" }`. Builds
   fail when no downstream version can be resolved
 - delegate executable: the configured `delegate`
-- display name: `RUNTIME`
+- display name: `RUNTIME_NAME`
 - install scheme: `conda-home`, or the configured `install-scheme`
-- install name: `RUNTIME`, or the configured `install-name`
+- install name: `RUNTIME_NAME`, or the configured `install-name`
 - install method: the configured `install-method`, when present
-- metadata file: `.RUNTIME.json`
-- bundle environment variable: uppercased `RUNTIME` plus `_BUNDLE`
-- offline environment variable: uppercased `RUNTIME` plus `_OFFLINE`
+- metadata file: `.RUNTIME_NAME.json`
+- bundle environment variable: uppercased `RUNTIME_NAME` plus `_BUNDLE`
+- offline environment variable: uppercased `RUNTIME_NAME` plus `_OFFLINE`
 
 At bootstrap time, the generated runtime writes a separate prefix metadata file
 inside the managed prefix. That file is used for ownership checks before later
@@ -224,5 +231,6 @@ conda-ship's repository default package set exists so the builder and
 runtime behavior can be tested. A downstream distribution makes its own
 package choices in its project manifest before committing the matching lockfile.
 
-For example, conda-express owns the package set used when building `cx` and
-`cxz`; those package choices are conda-express policy, not conda-ship policy.
+For example, conda-express owns the package set and runtime names used when
+building `cx` and `cxz`. Those choices are conda-express policy, not
+conda-ship policy.
