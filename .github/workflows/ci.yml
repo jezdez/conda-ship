@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/ci.yml"
       - ".github/workflows/canary.yml"
+      - ".github/workflows/build.yml"
       - ".github/workflows/release.yml"
       - "prek.toml"
       - "action.yml"
@@ -22,6 +23,7 @@ on:
     paths:
       - ".github/workflows/ci.yml"
       - ".github/workflows/canary.yml"
+      - ".github/workflows/build.yml"
       - ".github/workflows/release.yml"
       - "prek.toml"
       - "action.yml"
