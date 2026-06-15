@@ -8,6 +8,10 @@ branding:
   color: green
 
 inputs:
+  conda-ship-version:
+    description: "conda-ship release version to download, such as 0.3.0. Set this when the action is pinned by commit SHA. When omitted, the action uses the exact action tag if available."
+    required: false
+    default: ""
   runtime:
     description: "Runtime name to build. Overrides [tool.conda-ship].runtime when set."
     required: false
@@ -85,6 +89,7 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
         ACTION_REF: ${{ github.action_ref }}
         ACTION_REPOSITORY: ${{ github.action_repository }}
+        CONDA_SHIP_VERSION_INPUT: ${{ inputs.conda-ship-version }}
         RUNNER_ARCH_NAME: ${{ runner.arch }}
         RUNNER_OS_NAME: ${{ runner.os }}
       run: |
@@ -121,8 +126,8 @@ runs:
             ;;
         esac
 
-        version=""
-        if [ -n "$ACTION_PATH" ]; then
+        version="$CONDA_SHIP_VERSION_INPUT"
+        if [ -z "$version" ] && [ -n "$ACTION_PATH" ]; then
           version="$(git -C "$ACTION_PATH" describe --tags --exact-match 2>/dev/null || true)"
         fi
         if [ -z "$version" ]; then
@@ -131,7 +136,7 @@ runs:
         version="${version#refs/tags/}"
         if [[ ! "$version" =~ ^[0-9]+[.][0-9]+[.][0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
           echo "Could not infer a conda-ship release tag from ${version:-<empty>}." >&2
-          echo "Use jezdez/conda-ship@X.Y.Z. Branch refs do not have release assets." >&2
+          echo "Use jezdez/conda-ship@X.Y.Z or pass conda-ship-version: X.Y.Z when pinning the action by commit SHA." >&2
           exit 1
         fi
 

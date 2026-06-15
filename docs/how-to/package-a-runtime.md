@@ -41,8 +41,10 @@ For release automation, use the GitHub Action `dist-path` output. It contains
 all files produced by the build.
 
 ```yaml
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
+  with:
+    conda-ship-version: "X.Y.Z"
 
 - uses: actions/upload-artifact@v4
   with:

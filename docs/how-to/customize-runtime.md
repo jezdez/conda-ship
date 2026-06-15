@@ -281,9 +281,10 @@ at that project root:
 ```yaml
 - uses: actions/checkout@v4
 
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
   with:
+    conda-ship-version: "X.Y.Z"
     root: .
 ```
 

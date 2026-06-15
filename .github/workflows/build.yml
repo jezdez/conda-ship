@@ -3,6 +3,11 @@ name: Build custom conda runtime
 on:
   workflow_call:
     inputs:
+      conda-ship-version:
+        description: "conda-ship release version to download when the action wrapper is pinned by commit SHA."
+        required: false
+        type: string
+        default: ""
       runtime:
         description: "Runtime name to build. Overrides [tool.conda-ship].runtime when set."
         required: false
@@ -126,6 +131,7 @@ jobs:
         id: cs
         uses: ./.conda-ship-action
         with:
+          conda-ship-version: ${{ inputs.conda-ship-version }}
           runtime: ${{ inputs.runtime }}
           delegate: ${{ inputs.delegate }}
           root: ${{ inputs.root }}

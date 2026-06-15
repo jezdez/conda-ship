@@ -8,12 +8,13 @@ Downstream repositories, including conda-express, keep their package set in a
 committed manifest and lockfile. The action reads that project input and stamps
 a runtime instead of carrying a copy of the generic builder.
 
-Pin the action to a conda-ship release tag. The action downloads the matching
-`cs` and `cs-template` release assets, verifies their GitHub
-artifact attestations and release `SHA256SUMS`, and stamps the generated
-runtime. It runs `cs build --dry-run` before the real build so manifest,
-lockfile, naming, template, install location, and bundle metadata issues fail
-before artifact files are written.
+Pin the action source to a full conda-ship release commit SHA and pass the
+matching conda-ship release through `conda-ship-version`. The action downloads the
+configured `cs` and `cs-template` release assets, verifies their GitHub artifact
+attestations and release `SHA256SUMS`, and stamps the generated runtime. It
+runs `cs build --dry-run` before the real build so manifest, lockfile, naming,
+template, install location, and bundle metadata issues fail before artifact
+files are written.
 
 GitHub-hosted runners already include the GitHub CLI used for attestation
 verification. Self-hosted runners must provide `gh`.
@@ -34,8 +35,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jezdez/conda-ship@0.3.0
+      - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
         id: cs
+        with:
+          conda-ship-version: "X.Y.Z"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -43,7 +46,9 @@ jobs:
           path: ${{ steps.cs.outputs.dist-path }}
 ```
 
-Use a tag for release builds. Branch refs do not have matching release assets.
+When the action is invoked by an exact release tag, `conda-ship-version` can be
+omitted for backwards compatibility. Release workflows should prefer full
+commit SHA pins.
 
 ## Project Root Example
 
@@ -54,9 +59,10 @@ at that directory:
 steps:
   - uses: actions/checkout@v4
 
-  - uses: jezdez/conda-ship@0.3.0
+  - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
     id: cs
     with:
+      conda-ship-version: "X.Y.Z"
       root: dist/demo
 ```
 
@@ -73,9 +79,10 @@ Set `layout` to `external` when you want to distribute the runtime and package
 bundle as separate files:
 
 ```yaml
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
   with:
+    conda-ship-version: "X.Y.Z"
     layout: external
 
 - uses: actions/upload-artifact@v4
@@ -90,9 +97,10 @@ Set `layout` to `embedded` when the runtime must bootstrap without network
 access:
 
 ```yaml
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
   with:
+    conda-ship-version: "X.Y.Z"
     layout: embedded
 ```
 
@@ -131,9 +139,10 @@ runs-on: ${{ matrix.os }}
 steps:
   - uses: actions/checkout@v4
 
-  - uses: jezdez/conda-ship@0.3.0
+  - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
     id: cs
     with:
+      conda-ship-version: "X.Y.Z"
       layout: ${{ matrix.layout }}
       runtime: ${{ matrix.runtime }}
       runtime-version: ${{ github.ref_name }}
@@ -179,8 +188,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jezdez/conda-ship@0.3.0
+      - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
         id: cs
+        with:
+          conda-ship-version: "X.Y.Z"
 
       - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:

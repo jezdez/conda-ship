@@ -76,9 +76,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: jezdez/conda-ship@0.3.0
+      - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
         id: cs
         with:
+          conda-ship-version: "X.Y.Z"
           layout: ${{ matrix.layout }}
           install-method: ${{ matrix.install-method }}
 
@@ -92,8 +93,8 @@ jobs:
           path: ${{ steps.cs.outputs.dist-path }}
 ```
 
-Pin the action to a conda-ship release tag. Branch refs do not have matching
-release assets for `cs` and `cs-template`.
+Pin the action source to a full conda-ship release commit SHA and pass the
+matching conda-ship release through `conda-ship-version`.
 
 ```{warning}
 Use the latest reviewed `actions/attest` release in your workflow and pin it by
@@ -143,9 +144,10 @@ Keep package and channel choices in the manifest and lockfile. Use action inputs
 for release-job metadata that may vary across a matrix:
 
 ```yaml
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
   with:
+    conda-ship-version: "X.Y.Z"
     runtime: demo
     delegate: conda
     layout: ${{ matrix.layout }}
