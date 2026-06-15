@@ -2,6 +2,15 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## 0.3.1 - 2026-06-15
+
+### Added
+
+- Added a `conda-ship-version` GitHub Action input so release workflows can
+  pin the action source by full commit SHA while selecting the conda-ship
+  release assets to download. Exact release-tag usage remains supported for
+  backwards compatibility.
+
 ## 0.3.0 - 2026-06-10
 
 ### Added
