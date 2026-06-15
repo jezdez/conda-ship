@@ -462,6 +462,7 @@ fn make_download_client() -> miette::Result<reqwest_middleware::ClientWithMiddle
     crate::tls::install_default_provider();
 
     let raw = reqwest::Client::builder()
+        .user_agent(crate::http::USER_AGENT)
         .no_gzip()
         .connect_timeout(Duration::from_secs(30))
         .timeout(Duration::from_secs(600))
