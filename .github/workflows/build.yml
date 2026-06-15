@@ -8,13 +8,18 @@ on:
         required: false
         type: string
         default: ""
-      runtime:
-        description: "Runtime name to build. Overrides [tool.conda-ship].runtime when set."
+      runtime-name:
+        description: "Base runtime identity and default artifact name. Overrides [tool.conda-ship].runtime-name when set."
         required: false
         type: string
         default: ""
-      delegate:
-        description: "Delegate executable inside the managed prefix. Overrides [tool.conda-ship].delegate when set."
+      artifact-name:
+        description: "Staged executable and artifact stem. Overrides [tool.conda-ship].artifact-name when set."
+        required: false
+        type: string
+        default: ""
+      delegate-executable:
+        description: "Delegate executable inside the managed prefix. Overrides [tool.conda-ship].delegate-executable when set."
         required: false
         type: string
         default: ""
@@ -23,8 +28,8 @@ on:
         required: false
         type: string
         default: "project"
-      layout:
-        description: "Artifact layout to build: online, external, or embedded. Overrides [tool.conda-ship].layout when set."
+      artifact-layout:
+        description: "Artifact layout to build: online, external, or embedded. Overrides [tool.conda-ship].artifact-layout when set."
         required: false
         type: string
         default: ""
@@ -39,12 +44,12 @@ on:
         type: string
         default: ""
       install-name:
-        description: "Name used inside the install scheme."
+        description: "Final directory name under the install scheme."
         required: false
         type: string
         default: ""
-      install-method:
-        description: "Package-manager or installer method stamped into the runtime. Overrides [tool.conda-ship].install-method when set."
+      installer:
+        description: "Package manager or installer stamped into the runtime. Overrides [tool.conda-ship].installer when set."
         required: false
         type: string
         default: ""
@@ -132,14 +137,15 @@ jobs:
         uses: ./.conda-ship-action
         with:
           conda-ship-version: ${{ inputs.conda-ship-version }}
-          runtime: ${{ inputs.runtime }}
-          delegate: ${{ inputs.delegate }}
+          runtime-name: ${{ inputs.runtime-name }}
+          artifact-name: ${{ inputs.artifact-name }}
+          delegate-executable: ${{ inputs.delegate-executable }}
           root: ${{ inputs.root }}
-          layout: ${{ inputs.layout }}
+          artifact-layout: ${{ inputs.artifact-layout }}
           docs-url: ${{ inputs.docs-url }}
           install-scheme: ${{ inputs.install-scheme }}
           install-name: ${{ inputs.install-name }}
-          install-method: ${{ inputs.install-method }}
+          installer: ${{ inputs.installer }}
 
       - name: Upload runtime artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
