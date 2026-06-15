@@ -754,7 +754,7 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
         serde_json::from_str(&std::fs::read_to_string(&output.info).unwrap()).unwrap();
     assert_eq!(info["name"], "demoz");
     assert_eq!(info["layout"], "embedded");
-    assert_eq!(info["binary"], "demoz");
+    assert_eq!(info["binary"], expected_binary);
     assert!(info["bundle"].is_null());
 }
 
