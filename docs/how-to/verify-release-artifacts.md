@@ -14,14 +14,18 @@ The composite action downloads `cs`, `cs-template`, and `SHA256SUMS`
 from a tagged conda-ship release. It verifies GitHub artifact attestations and
 then checks SHA256 sums before running `cs`.
 
-Use a tag:
+Pin the action source by full commit SHA and pass the matching conda-ship
+release version:
 
 ```yaml
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
+  with:
+    conda-ship-version: "X.Y.Z"
 ```
 
-Do not use a branch ref for release builds. Branch refs do not have matching
-release assets.
+When the action is invoked by an exact release tag, `conda-ship-version` can be
+omitted for backwards compatibility. Release workflows should prefer full
+commit SHA pins.
 
 Self-hosted runners must provide the GitHub CLI because the action calls
 `gh attestation verify`.
@@ -124,8 +128,10 @@ permissions:
   artifact-metadata: write
 
 steps:
-  - uses: jezdez/conda-ship@0.3.0
+  - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
     id: cs
+    with:
+      conda-ship-version: "X.Y.Z"
 
   - uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
     with:

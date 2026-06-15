@@ -127,7 +127,8 @@ strategy:
     layout: [online, embedded]
 
 steps:
-  - uses: jezdez/conda-ship@0.3.0
+  - uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
     with:
+      conda-ship-version: "X.Y.Z"
       layout: ${{ matrix.layout }}
 ```

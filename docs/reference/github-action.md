@@ -3,11 +3,11 @@
 The repository root provides a composite GitHub Action for downstream
 distribution repositories.
 
-The action downloads the tagged conda-ship release assets for the current
+The action downloads the configured conda-ship release assets for the current
 runner, verifies their GitHub artifact attestations and `SHA256SUMS`, and runs
-the downloaded `cs` binary to preflight and build a runtime. The preflight
-uses `cs build --dry-run`, then the action runs the real build. It does not
-build conda-ship from source.
+the downloaded `cs` binary to preflight and build a runtime. The preflight uses
+`cs build --dry-run`, then the action runs the real build. It does not build
+conda-ship from source.
 Self-hosted runners must provide the GitHub CLI because attestation
 verification uses `gh attestation verify`.
 
@@ -31,11 +31,18 @@ inputs do not set up Python.
 ```yaml
 - uses: actions/checkout@v4
 
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
+  with:
+    conda-ship-version: "X.Y.Z"
 ```
 
 ## Inputs
+
+`conda-ship-version`
+: conda-ship release version to download, such as `0.3.0`. Set this when the
+  action source is pinned by full commit SHA. When omitted, the action uses the
+  exact action tag if available.
 
 `runtime`
 : Runtime name override. Set this when the release job intentionally stamps a
@@ -103,8 +110,9 @@ runner's operating system and architecture:
 | `Windows` | `ARM64` | `aarch64-pc-windows-msvc` | Builder assets, template assets, PyPI wheels, and action target mapping only; full runtime bootstrap is not end-to-end supported yet. |
 
 Use GitHub-hosted or self-hosted runners that report one of those
-`runner.os`/`runner.arch` combinations. Branch refs do not have matching
-release assets, so release workflows should pin `jezdez/conda-ship@X.Y.Z`.
+`runner.os`/`runner.arch` combinations. Release workflows should pin the action
+source by full commit SHA and pass the matching conda-ship release through the
+`conda-ship-version` input.
 
 ## Outputs
 

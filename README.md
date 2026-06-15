@@ -166,19 +166,23 @@ The repository root is also a composite GitHub Action for downstream release
 jobs:
 
 ```yaml
-- uses: jezdez/conda-ship@0.3.0
+- uses: jezdez/conda-ship@FULL_RELEASE_COMMIT_SHA # X.Y.Z
   id: cs
   with:
+    conda-ship-version: "X.Y.Z"
     layout: embedded
 ```
 
 The action expects a committed manifest and matching lockfile. It downloads the
-tagged `cs`, `cs-template`, and `SHA256SUMS` release assets for the runner,
-verifies their GitHub Artifact Attestations, checks the release checksums, runs
-`cs build --dry-run`, and then stages the runtime into a `dist-path` output.
+configured `cs`, `cs-template`, and `SHA256SUMS` release assets for the
+runner, verifies their GitHub Artifact Attestations, checks the release
+checksums, runs `cs build --dry-run`, and then stages the runtime into a
+`dist-path` output.
 
-Use release tags for release builds. Branch refs do not have matching
-conda-ship release assets.
+Pin the action source to a full release commit SHA for release builds and pass
+the matching conda-ship release through `conda-ship-version`. When the action
+is invoked by an exact release tag, `conda-ship-version` can be omitted for
+backwards compatibility.
 
 ## Packaging
 
