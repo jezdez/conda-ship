@@ -627,9 +627,10 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
     .unwrap();
 
     assert!(output.binary.is_file());
+    let expected_binary = binary_filename("demo-cli-linux-64", None);
     assert_eq!(
         output.binary.file_name().and_then(|name| name.to_str()),
-        Some("demo-cli-linux-64")
+        Some(expected_binary.as_str())
     );
     let stamped = runtime_data::read_from_path(&output.binary)
         .unwrap()
@@ -730,9 +731,10 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
     .unwrap();
 
     assert!(output.binary.is_file());
+    let expected_binary = binary_filename("demoz", None);
     assert_eq!(
         output.binary.file_name().and_then(|name| name.to_str()),
-        Some("demoz")
+        Some(expected_binary.as_str())
     );
     assert!(output.bundle.is_none());
 
