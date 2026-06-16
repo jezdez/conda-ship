@@ -8,7 +8,7 @@ Hide
 Type `mkdir -p "$DEMO_HOME/quickstart" && cp pixi.toml pixi.lock "$DEMO_HOME/quickstart/"`
 Enter
 Wait /\$/
-Type `awk '{ print; if ($0 == "[tool.conda-ship]") { print "runtime = \"demo\""; print "delegate = \"conda\""; print "layout = \"online\"" } }' "$DEMO_HOME/quickstart/pixi.toml" > "$DEMO_HOME/quickstart/pixi.toml.new" && mv "$DEMO_HOME/quickstart/pixi.toml.new" "$DEMO_HOME/quickstart/pixi.toml" && cd "$DEMO_HOME/quickstart"`
+Type `awk '{ print; if ($0 == "[tool.conda-ship]") { print "runtime-name = \"demo\""; print "delegate-executable = \"conda\""; print "artifact-layout = \"online\"" } }' "$DEMO_HOME/quickstart/pixi.toml" > "$DEMO_HOME/quickstart/pixi.toml.new" && mv "$DEMO_HOME/quickstart/pixi.toml.new" "$DEMO_HOME/quickstart/pixi.toml" && cd "$DEMO_HOME/quickstart"`
 Enter
 Wait /\$/
 Type "clear"
