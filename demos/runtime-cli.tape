@@ -5,7 +5,7 @@ Output demos/runtime-cli.mp4
 
 Source demos/_cs_setup.tape
 Hide
-Type `cs build --runtime demo --delegate conda --layout online --install-name demo --out-dir "$DEMO_HOME/runtime"`
+Type `cs build --runtime-name demo --delegate-executable conda --artifact-layout online --install-name demo --out-dir "$DEMO_HOME/runtime"`
 Enter
 Wait /\$/
 Type "clear"

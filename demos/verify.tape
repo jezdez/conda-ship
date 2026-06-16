@@ -13,7 +13,7 @@ Type "# Build release files into a staging directory"
 Enter
 Sleep 500ms
 
-Type@80ms `cs build --runtime demo --delegate conda --layout online --install-name demo --out-dir "$DEMO_HOME/dist"`
+Type@80ms `cs build --runtime-name demo --delegate-executable conda --artifact-layout online --install-name demo --out-dir "$DEMO_HOME/dist"`
 Enter
 Wait /\$/
 Sleep 1s

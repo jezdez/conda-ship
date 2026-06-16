@@ -13,7 +13,7 @@ Type "# Preview release artifacts without writing files"
 Enter
 Sleep 500ms
 
-Type@80ms "cs build --dry-run --runtime demo --delegate conda --layout online --install-name demo"
+Type@80ms "cs build --dry-run --runtime-name demo --delegate-executable conda --artifact-layout online --install-name demo"
 Enter
 Wait /\$/
 Sleep 3s
@@ -22,7 +22,7 @@ Type "# Change the layout when distribution needs change"
 Enter
 Sleep 500ms
 
-Type@80ms "cs build --dry-run --runtime demo --delegate conda --layout embedded --install-name demo"
+Type@80ms "cs build --dry-run --runtime-name demo --delegate-executable conda --artifact-layout embedded --install-name demo"
 Enter
 Wait /\$/
 Sleep 4s
