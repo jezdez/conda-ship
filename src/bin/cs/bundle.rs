@@ -1,11 +1,11 @@
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::Platform;
 use rattler_lock::{CondaPackageData, LockFile};
-use sha2::{Digest, Sha256};
+use sha2::Digest;
 
 use super::artifact::{validate_bundle_package_hashes, validate_package_archive_name};
 use super::tls;
@@ -103,7 +103,7 @@ async fn download_and_bundle(
                 .ok_or_else(|| format!("{archive_name} has no SHA256 in the runtime lock"))?;
 
             if dest.exists() {
-                let (actual, _) = sha256_file_for_bundle(&dest)?;
+                let (actual, _) = crate::hash::sha256_file(&dest)?;
                 if actual.as_slice() == expected.as_slice() {
                     return Ok::<(), Box<dyn std::error::Error + Send + Sync>>(());
                 }
@@ -124,7 +124,7 @@ async fn download_and_bundle(
 
             let tmp_dest = dest.with_file_name(format!(".{archive_name}.download"));
             let mut out = std::fs::File::create(&tmp_dest)?;
-            let mut hasher = Sha256::new();
+            let mut hasher = sha2::Sha256::new();
             while let Some(chunk) = response
                 .chunk()
                 .await
@@ -136,7 +136,7 @@ async fn download_and_bundle(
             out.flush()?;
             drop(out);
 
-            let actual = hasher.finalize();
+            let actual = crate::hash::digest_to_array(hasher.finalize());
             if actual.as_slice() != expected.as_slice() {
                 let _ = std::fs::remove_file(&tmp_dest);
                 return Err(format!("SHA256 mismatch for {archive_name}").into());
@@ -189,25 +189,4 @@ async fn download_and_bundle(
     );
 
     Ok(())
-}
-
-fn sha256_file_for_bundle(
-    path: &Path,
-) -> Result<([u8; 32], u64), Box<dyn std::error::Error + Send + Sync>> {
-    let mut file = std::fs::File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut bytes = 0_u64;
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        bytes += read as u64;
-        hasher.update(&buffer[..read]);
-    }
-    let digest = hasher.finalize();
-    let mut out = [0_u8; 32];
-    out.copy_from_slice(&digest);
-    Ok((out, bytes))
 }

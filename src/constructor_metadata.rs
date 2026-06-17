@@ -134,16 +134,12 @@ fn explicit_url(record: &RepoDataRecord) -> String {
     let mut url = url.to_string();
     if let Some(hash) = record.package_record.sha256.as_ref() {
         url.push_str("#sha256:");
-        url.push_str(&hex_bytes(hash.as_slice()));
+        url.push_str(&crate::hash::hex(hash.as_slice()));
     } else if let Some(hash) = record.package_record.md5.as_ref() {
         url.push('#');
-        url.push_str(&hex_bytes(hash.as_slice()));
+        url.push_str(&crate::hash::hex(hash.as_slice()));
     }
     url
-}
-
-fn hex_bytes(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 #[cfg(test)]

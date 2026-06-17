@@ -1,7 +1,6 @@
 Source demos/_settings.tape
 
 Output demos/inspect.gif
-Output demos/inspect.mp4
 
 Source demos/_cs_setup.tape
 Type "clear"

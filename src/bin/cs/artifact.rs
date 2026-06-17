@@ -1,12 +1,11 @@
 use std::env;
 use std::ffi::OsString;
-use std::io::{self, Read, Write as _};
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::Platform;
 use rattler_lock::{CondaPackageData, LockFile};
-use sha2::{Digest, Sha256};
 
 use super::bundle::gen_bundle_from_lock;
 use super::diagnostic::{DiagnosticKind, ship_error};
@@ -294,7 +293,7 @@ pub(crate) fn run_artifact(
     let derived = derive_runtime_lock(&root)?;
     let runtime = resolve_runtime_name(runtime_name, &derived.input.config)?;
     let layout = resolve_artifact_layout(artifact_layout, &derived.input.config);
-    let bundle_env_var = runtime_env_var(&runtime, "BUNDLE");
+    let bundle_env_var = runtime_data::runtime_env_var(&runtime, "BUNDLE");
     let bundle_dir = root.join(SHIP_STATE_DIR).join("bundle");
     let output = build_artifact(
         Some(layout),
@@ -1377,8 +1376,8 @@ fn stamp_runtime_data(
             .clone()
             .unwrap_or_else(|| runtime.to_string()),
         metadata_file: format!(".{runtime}.json"),
-        bundle_env_var: runtime_env_var(runtime, "BUNDLE"),
-        offline_env_var: runtime_env_var(runtime, "OFFLINE"),
+        bundle_env_var: runtime_data::runtime_env_var(runtime, "BUNDLE"),
+        offline_env_var: runtime_data::runtime_env_var(runtime, "OFFLINE"),
         docs_url: derived
             .runtime_config
             .docs_url
@@ -1404,20 +1403,6 @@ fn stamp_runtime_data(
         .into_diagnostic()
         .with_context(|| format!("failed to stamp runtime data onto {}", binary.display()))?;
     Ok(())
-}
-
-pub(crate) fn runtime_env_var(name: &str, suffix: &str) -> String {
-    let prefix: String = name
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() {
-                c.to_ascii_uppercase()
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    format!("{prefix}_{suffix}")
 }
 
 fn target_is_windows(target: Option<&str>) -> bool {
@@ -1494,7 +1479,7 @@ fn package_infos(packages: &[&CondaPackageData]) -> miette::Result<Vec<PackageIn
             sha256: record
                 .sha256
                 .as_ref()
-                .map(|hash| hex_bytes(hash.as_slice())),
+                .map(|hash| crate::hash::hex(hash.as_slice())),
         });
     }
     infos.sort_by(|a, b| a.name.cmp(&b.name).then(a.version.cmp(&b.version)));
@@ -1517,36 +1502,14 @@ pub(crate) fn render_package_list(packages: &[PackageInfo]) -> String {
 }
 
 fn checksum_for_path(path: &Path) -> miette::Result<ArtifactChecksum> {
-    let (digest, bytes) = sha256_file_for_artifact(path)?;
-    Ok(ArtifactChecksum {
-        path: file_name(path)?,
-        sha256: hex_bytes(&digest),
-        bytes,
-    })
-}
-
-fn sha256_file_for_artifact(path: &Path) -> miette::Result<([u8; 32], u64)> {
-    let mut file = std::fs::File::open(path)
+    let (digest, bytes) = crate::hash::sha256_file(path)
         .into_diagnostic()
         .with_context(|| format!("failed to read {} for checksum", path.display()))?;
-    let mut hasher = Sha256::new();
-    let mut bytes = 0_u64;
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file
-            .read(&mut buffer)
-            .into_diagnostic()
-            .with_context(|| format!("failed to read {} for checksum", path.display()))?;
-        if read == 0 {
-            break;
-        }
-        bytes += read as u64;
-        hasher.update(&buffer[..read]);
-    }
-    let digest = hasher.finalize();
-    let mut out = [0_u8; 32];
-    out.copy_from_slice(&digest);
-    Ok((out, bytes))
+    Ok(ArtifactChecksum {
+        path: file_name(path)?,
+        sha256: crate::hash::hex(&digest),
+        bytes,
+    })
 }
 
 fn write_checksums(path: &Path, checksums: &[ArtifactChecksum]) -> miette::Result<()> {
@@ -1558,10 +1521,6 @@ fn write_checksums(path: &Path, checksums: &[ArtifactChecksum]) -> miette::Resul
         .into_diagnostic()
         .with_context(|| format!("failed to write {}", path.display()))?;
     Ok(())
-}
-
-fn hex_bytes(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn file_name(path: &Path) -> miette::Result<String> {

@@ -10,7 +10,7 @@ use tempfile::TempDir;
 use super::artifact::{
     PackageInfo, apply_runtime_metadata_overrides, artifact_stem, binary_filename,
     render_package_list, resolve_artifact_layout, resolve_artifact_name,
-    resolve_delegate_executable, resolve_runtime_name, runtime_env_var, runtime_template_filename,
+    resolve_delegate_executable, resolve_runtime_name, runtime_template_filename,
     runtime_template_from_env, source_binary, source_binary_plan, stage_artifacts,
     validate_artifact_name, validate_delegate_executable, validate_docs_url, validate_install_name,
     validate_installer, validate_package_archive_name, validate_runtime_name,
@@ -1169,7 +1169,10 @@ fn test_package_archive_name_rejects_invalid_archives(#[case] name: &str) {
 
 #[test]
 fn test_runtime_env_var_sanitizes_artifact_name() {
-    assert_eq!(runtime_env_var("demo-tool", "BUNDLE"), "DEMO_TOOL_BUNDLE");
+    assert_eq!(
+        runtime_data::runtime_env_var("demo-tool", "BUNDLE"),
+        "DEMO_TOOL_BUNDLE"
+    );
 }
 
 #[test]

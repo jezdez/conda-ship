@@ -167,7 +167,6 @@ pub enum Command {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use rstest::rstest;
 
     #[test]
@@ -175,27 +174,30 @@ mod tests {
         let cli = Cli::parse_from(["cs-template", "bootstrap"]);
         assert!(!cli.version);
         assert!(cli.path.is_none());
-        assert_matches!(
+        assert!(matches!(
             cli.command,
             Some(Command::Bootstrap {
                 force: false,
                 bundle: None,
                 offline: false,
             })
-        );
+        ));
     }
 
     #[test]
     fn test_parse_global_path_for_bootstrap() {
         let cli = Cli::parse_from(["cs-template", "--path", "/tmp/test", "bootstrap"]);
         assert_eq!(cli.path.as_deref(), Some(std::path::Path::new("/tmp/test")));
-        assert_matches!(cli.command, Some(Command::Bootstrap { force: false, .. }));
+        assert!(matches!(
+            cli.command,
+            Some(Command::Bootstrap { force: false, .. })
+        ));
     }
 
     #[test]
     fn test_parse_status() {
         let cli = Cli::parse_from(["cs-template", "status"]);
-        assert_matches!(cli.command, Some(Command::Status));
+        assert!(matches!(cli.command, Some(Command::Status)));
     }
 
     #[test]
@@ -205,47 +207,50 @@ mod tests {
             cli.path.as_deref(),
             Some(std::path::Path::new("/opt/cs-template"))
         );
-        assert_matches!(cli.command, Some(Command::Status));
+        assert!(matches!(cli.command, Some(Command::Status)));
     }
 
     #[test]
     fn test_parse_shell_with_env() {
         let cli = Cli::parse_from(["cs-template", "shell", "myenv"]);
-        assert_matches!(
+        assert!(matches!(
             cli.command,
             Some(Command::Shell { env: Some(ref e), ref args }) if e == "myenv" && args.is_empty()
-        );
+        ));
     }
 
     #[test]
     fn test_parse_shell_no_env() {
         let cli = Cli::parse_from(["cs-template", "shell"]);
-        assert_matches!(
+        assert!(matches!(
             cli.command,
             Some(Command::Shell {
                 env: None,
                 ref args
             }) if args.is_empty()
-        );
+        ));
     }
 
     #[test]
     fn test_parse_shell_extra_args() {
         let cli = Cli::parse_from(["cs-template", "shell", "myenv", "--", "python", "-q"]);
-        assert_matches!(
+        assert!(matches!(
             cli.command,
             Some(Command::Shell {
                 env: Some(ref e),
                 ref args
             }) if e == "myenv"
                 && args == &vec![OsString::from("python"), OsString::from("-q")]
-        );
+        ));
     }
 
     #[test]
     fn test_parse_uninstall_yes() {
         let cli = Cli::parse_from(["cs-template", "uninstall", "--yes"]);
-        assert_matches!(cli.command, Some(Command::Uninstall { yes: true }));
+        assert!(matches!(
+            cli.command,
+            Some(Command::Uninstall { yes: true })
+        ));
     }
 
     #[test]
@@ -261,7 +266,10 @@ mod tests {
             cli.path.as_deref(),
             Some(std::path::Path::new("/opt/cs-template"))
         );
-        assert_matches!(cli.command, Some(Command::Uninstall { yes: true, .. }));
+        assert!(matches!(
+            cli.command,
+            Some(Command::Uninstall { yes: true, .. })
+        ));
     }
 
     #[test]
@@ -277,11 +285,11 @@ mod tests {
             cli.path.as_deref(),
             Some(std::path::Path::new("/opt/cs-template"))
         );
-        assert_matches!(
+        assert!(matches!(
             cli.command,
             Some(Command::Passthrough(ref args))
                 if args == &vec![OsString::from("install"), OsString::from("numpy")]
-        );
+        ));
     }
 
     #[test]

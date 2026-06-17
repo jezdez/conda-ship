@@ -140,12 +140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "assert_matches"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
-
-[[package]]
 name = "astral-reqwest-middleware"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -515,7 +509,6 @@ name = "conda-ship"
 version = "0.4.0"
 dependencies = [
  "assert_cmd",
- "assert_matches",
  "astral-reqwest-middleware",
  "clap",
  "console",
@@ -542,7 +535,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml",
- "tracing",
  "tracing-subscriber",
  "zstd",
 ]

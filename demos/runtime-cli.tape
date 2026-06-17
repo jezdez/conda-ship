@@ -1,7 +1,6 @@
 Source demos/_settings.tape
 
 Output demos/runtime-cli.gif
-Output demos/runtime-cli.mp4
 
 Source demos/_cs_setup.tape
 Hide
