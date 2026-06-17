@@ -1,7 +1,6 @@
 Source demos/_settings.tape
 
 Output demos/dry-run.gif
-Output demos/dry-run.mp4
 
 Source demos/_cs_setup.tape
 Type "clear"

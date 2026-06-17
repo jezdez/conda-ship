@@ -256,6 +256,13 @@ runs:
         dist_dir="${RUNNER_TEMP}/conda-ship-${CONDA_SHIP_TARGET}-dist"
         rm -rf "$dist_dir"
         mkdir -p "$dist_dir"
+        build_args_file="${RUNNER_TEMP}/conda-ship-build.args0"
+
+        add_optional_arg() {
+          if [ -n "$2" ]; then
+            build_args+=("$1" "$2")
+          fi
+        }
 
         build_args=(
           build
@@ -265,33 +272,16 @@ runs:
           --root "$CONDA_SHIP_ROOT"
           --out-dir "$dist_dir"
         )
-        if [ -n "$CONDA_SHIP_RUNTIME_NAME" ]; then
-          build_args+=(--runtime-name "$CONDA_SHIP_RUNTIME_NAME")
-        fi
-        if [ -n "$CONDA_SHIP_ARTIFACT_NAME" ]; then
-          build_args+=(--artifact-name "$CONDA_SHIP_ARTIFACT_NAME")
-        fi
-        if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
-          build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
-        fi
-        if [ -n "$CONDA_SHIP_DELEGATE_EXECUTABLE" ]; then
-          build_args+=(--delegate-executable "$CONDA_SHIP_DELEGATE_EXECUTABLE")
-        fi
-        if [ -n "$CONDA_SHIP_ARTIFACT_LAYOUT" ]; then
-          build_args+=(--artifact-layout "$CONDA_SHIP_ARTIFACT_LAYOUT")
-        fi
-        if [ -n "$CONDA_SHIP_DOCS_URL" ]; then
-          build_args+=(--docs-url "$CONDA_SHIP_DOCS_URL")
-        fi
-        if [ -n "$CONDA_SHIP_INSTALL_SCHEME" ]; then
-          build_args+=(--install-scheme "$CONDA_SHIP_INSTALL_SCHEME")
-        fi
-        if [ -n "$CONDA_SHIP_INSTALL_NAME" ]; then
-          build_args+=(--install-name "$CONDA_SHIP_INSTALL_NAME")
-        fi
-        if [ -n "$CONDA_SHIP_INSTALLER" ]; then
-          build_args+=(--installer "$CONDA_SHIP_INSTALLER")
-        fi
+        add_optional_arg --runtime-name "$CONDA_SHIP_RUNTIME_NAME"
+        add_optional_arg --artifact-name "$CONDA_SHIP_ARTIFACT_NAME"
+        add_optional_arg --delegate-executable "$CONDA_SHIP_DELEGATE_EXECUTABLE"
+        add_optional_arg --artifact-layout "$CONDA_SHIP_ARTIFACT_LAYOUT"
+        add_optional_arg --docs-url "$CONDA_SHIP_DOCS_URL"
+        add_optional_arg --install-scheme "$CONDA_SHIP_INSTALL_SCHEME"
+        add_optional_arg --install-name "$CONDA_SHIP_INSTALL_NAME"
+        add_optional_arg --installer "$CONDA_SHIP_INSTALLER"
+        printf '%s\0' "${build_args[@]}" > "$build_args_file"
+        add_optional_arg --runtime-version "$CONDA_SHIP_RUNTIME_VERSION"
 
         dry_run_stderr="${RUNNER_TEMP}/conda-ship-dry-run.stderr"
         needs_project_metadata=false
@@ -345,60 +335,20 @@ runs:
     - name: Build runtime
       shell: bash
       env:
-        CONDA_SHIP_DELEGATE_EXECUTABLE: ${{ inputs.delegate-executable }}
-        CONDA_SHIP_DOCS_URL: ${{ inputs.docs-url }}
         CONDA_SHIP_DRY_RUN_READY: ${{ steps.plan.outputs.dry_run_ready }}
-        CONDA_SHIP_INSTALLER: ${{ inputs.installer }}
-        CONDA_SHIP_INSTALL_NAME: ${{ inputs.install-name }}
-        CONDA_SHIP_INSTALL_SCHEME: ${{ inputs.install-scheme }}
-        CONDA_SHIP_ARTIFACT_LAYOUT: ${{ inputs.artifact-layout }}
-        CONDA_SHIP_ARTIFACT_NAME: ${{ inputs.artifact-name }}
-        CONDA_SHIP_RUNTIME_NAME: ${{ inputs.runtime-name }}
         CONDA_SHIP_RUNTIME_VERSION: ${{ inputs.runtime-version || steps.project_metadata.outputs.runtime_version }}
         CS_PATH: ${{ steps.download.outputs.cs_path }}
-        CONDA_SHIP_ROOT: ${{ inputs.root }}
         CONDA_SHIP_TARGET: ${{ steps.resolve.outputs.target }}
-        TEMPLATE_PATH: ${{ steps.download.outputs.template_path }}
       run: |
         set -euo pipefail
 
         dist_dir="${RUNNER_TEMP}/conda-ship-${CONDA_SHIP_TARGET}-dist"
         mkdir -p "$dist_dir"
+        build_args_file="${RUNNER_TEMP}/conda-ship-build.args0"
 
-        build_args=(
-          build
-          --target "$CONDA_SHIP_TARGET"
-          --target-label "$CONDA_SHIP_TARGET"
-          --template "$TEMPLATE_PATH"
-          --root "$CONDA_SHIP_ROOT"
-          --out-dir "$dist_dir"
-        )
-        if [ -n "$CONDA_SHIP_RUNTIME_NAME" ]; then
-          build_args+=(--runtime-name "$CONDA_SHIP_RUNTIME_NAME")
-        fi
-        if [ -n "$CONDA_SHIP_ARTIFACT_NAME" ]; then
-          build_args+=(--artifact-name "$CONDA_SHIP_ARTIFACT_NAME")
-        fi
+        mapfile -d '' -t build_args < "$build_args_file"
         if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
           build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
-        fi
-        if [ -n "$CONDA_SHIP_DELEGATE_EXECUTABLE" ]; then
-          build_args+=(--delegate-executable "$CONDA_SHIP_DELEGATE_EXECUTABLE")
-        fi
-        if [ -n "$CONDA_SHIP_ARTIFACT_LAYOUT" ]; then
-          build_args+=(--artifact-layout "$CONDA_SHIP_ARTIFACT_LAYOUT")
-        fi
-        if [ -n "$CONDA_SHIP_DOCS_URL" ]; then
-          build_args+=(--docs-url "$CONDA_SHIP_DOCS_URL")
-        fi
-        if [ -n "$CONDA_SHIP_INSTALL_SCHEME" ]; then
-          build_args+=(--install-scheme "$CONDA_SHIP_INSTALL_SCHEME")
-        fi
-        if [ -n "$CONDA_SHIP_INSTALL_NAME" ]; then
-          build_args+=(--install-name "$CONDA_SHIP_INSTALL_NAME")
-        fi
-        if [ -n "$CONDA_SHIP_INSTALLER" ]; then
-          build_args+=(--installer "$CONDA_SHIP_INSTALLER")
         fi
 
         if [ "$CONDA_SHIP_DRY_RUN_READY" != "true" ]; then

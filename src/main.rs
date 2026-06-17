@@ -9,6 +9,7 @@ mod commands;
 mod config;
 mod constructor_metadata;
 mod exec;
+mod hash;
 mod http;
 mod install;
 mod policy;

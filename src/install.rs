@@ -3,7 +3,6 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
-    io::Read,
     path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
@@ -21,7 +20,6 @@ use rattler_conda_types::{
 };
 use rattler_lock::LockFile;
 use rattler_networking::AuthenticationMiddleware;
-use sha2::{Digest, Sha256};
 
 use crate::config;
 
@@ -415,38 +413,17 @@ fn verify_bundle_package(
     let expected = record.package_record.sha256.as_ref().ok_or_else(|| {
         miette::miette!("{filename} has no SHA256 in the lockfile; refusing bundle install")
     })?;
-    let actual = sha256_file(path)?;
+    let (actual, _) = crate::hash::sha256_file(path)
+        .into_diagnostic()
+        .with_context(|| format!("failed to read bundle package: {}", path.display()))?;
     if actual.as_slice() != expected.as_slice() {
         return Err(miette::miette!(
             "SHA256 mismatch for bundled package {filename}: expected {}, got {}",
-            hex_bytes(expected.as_slice()),
-            hex_bytes(actual.as_slice())
+            crate::hash::hex(expected.as_slice()),
+            crate::hash::hex(actual.as_slice())
         ));
     }
     Ok(())
-}
-
-fn sha256_file(path: &Path) -> miette::Result<[u8; 32]> {
-    let mut file = std::fs::File::open(path)
-        .into_diagnostic()
-        .with_context(|| format!("failed to open bundle package: {}", path.display()))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file
-            .read(&mut buffer)
-            .into_diagnostic()
-            .with_context(|| format!("failed to read bundle package: {}", path.display()))?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(hasher.finalize().into())
-}
-
-fn hex_bytes(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 pub(crate) fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
@@ -620,7 +597,8 @@ mod tests {
             "0".to_string(),
         );
         let mut record_json = serde_json::to_value(&record).unwrap();
-        record_json["sha256"] = serde_json::json!(hex_bytes(Sha256::digest(data).as_slice()));
+        let (digest, _) = crate::hash::sha256_reader(data).unwrap();
+        record_json["sha256"] = serde_json::json!(crate::hash::hex(&digest));
         let record = serde_json::from_value(record_json).unwrap();
         RepoDataRecord {
             package_record: record,

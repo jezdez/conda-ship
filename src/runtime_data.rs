@@ -175,7 +175,7 @@ pub fn append_to_binary(
         None => 0,
     };
 
-    let header_sha256 = digest_to_array(Sha256::digest(&header_bytes));
+    let header_sha256 = crate::hash::digest_to_array(Sha256::digest(&header_bytes));
     let mut bundle_hasher = Sha256::new();
 
     let mut output = OpenOptions::new().append(true).open(binary)?;
@@ -194,7 +194,7 @@ pub fn append_to_binary(
         }
     }
 
-    let bundle_sha256 = digest_to_array(bundle_hasher.finalize());
+    let bundle_sha256 = crate::hash::digest_to_array(bundle_hasher.finalize());
     output.write_all(&encode_footer(
         header_len,
         bundle_len,
@@ -252,7 +252,7 @@ pub fn read_from_path(path: &Path) -> io::Result<Option<RuntimeData>> {
         .map_err(|_| invalid_data("runtime data header does not fit in memory"))?;
     let mut header_bytes = vec![0_u8; header_len];
     file.read_exact(&mut header_bytes)?;
-    let actual_header_sha256 = digest_to_array(Sha256::digest(&header_bytes));
+    let actual_header_sha256 = crate::hash::digest_to_array(Sha256::digest(&header_bytes));
     if actual_header_sha256 != decoded.header_sha256 {
         return Err(invalid_data("runtime data header checksum mismatch"));
     }
@@ -332,25 +332,10 @@ fn decode_footer(footer: &[u8; FOOTER_LEN]) -> io::Result<Option<DecodedFooter>>
 #[allow(dead_code)]
 fn hash_file_range(file: &mut File, offset: u64, len: u64) -> io::Result<[u8; 32]> {
     file.seek(SeekFrom::Start(offset))?;
-    let mut remaining = len;
-    let mut buf = [0_u8; 64 * 1024];
-    let mut hasher = Sha256::new();
-    while remaining > 0 {
-        let chunk_len = remaining.min(buf.len() as u64) as usize;
-        file.read_exact(&mut buf[..chunk_len])?;
-        hasher.update(&buf[..chunk_len]);
-        remaining -= chunk_len as u64;
-    }
-    Ok(digest_to_array(hasher.finalize()))
+    crate::hash::sha256_reader(file.take(len)).map(|(digest, _)| digest)
 }
 
-fn digest_to_array(digest: impl AsRef<[u8]>) -> [u8; 32] {
-    let mut out = [0_u8; 32];
-    out.copy_from_slice(digest.as_ref());
-    out
-}
-
-fn runtime_env_var(name: &str, suffix: &str) -> String {
+pub(crate) fn runtime_env_var(name: &str, suffix: &str) -> String {
     let prefix: String = name
         .chars()
         .map(|c| {

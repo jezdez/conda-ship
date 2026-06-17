@@ -1,7 +1,6 @@
 Source demos/_settings.tape
 
 Output demos/verify.gif
-Output demos/verify.mp4
 
 Source demos/_cs_setup.tape
 Type "clear"

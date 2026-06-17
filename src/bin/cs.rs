@@ -4,6 +4,8 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
+#[path = "../hash.rs"]
+mod hash;
 #[path = "../http.rs"]
 mod http;
 #[path = "../runtime_data.rs"]

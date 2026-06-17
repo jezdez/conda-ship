@@ -1,7 +1,6 @@
 Source demos/_settings.tape
 
 Output demos/quickstart.gif
-Output demos/quickstart.mp4
 
 Source demos/_cs_setup.tape
 Hide
