@@ -4,6 +4,26 @@ Every `cs build` writes a runtime plus metadata files. The runtime
 is the final stamped binary artifact. Downstream signing and attestation
 workflows run after conda-ship writes these files.
 
+## conda-ship Release Assets
+
+Tagged conda-ship releases publish the builder assets that the GitHub Action
+downloads:
+
+`cs-<target>`
+: Builder CLI for the target platform.
+
+`cs-template-<target>`
+: Generic runtime template for the target platform.
+
+`SHA256SUMS`
+: Checksums for release assets.
+
+The PyPI release for the same tag publishes platform wheels that install `cs`
+and `cs-template` into the Python environment's scripts directory, plus a
+source distribution for packaging systems. Published release assets are
+immutable; fixes use a new tag rather than replacing files under an existing
+tag.
+
 ## Layouts
 
 | Layout | Runtime | Bundle file | Network during bootstrap |

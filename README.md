@@ -27,9 +27,10 @@ This shortest path uses conda-workspaces to create a solved source environment,
 then builds an online runtime named `demo`:
 
 ```bash
+conda install --name base -c conda-forge conda-pypi
 conda create -n cs-demo -c conda-forge python pip conda-workspaces
 conda activate cs-demo
-python -m pip install conda-ship
+conda pypi install conda-ship
 
 mkdir demo-runtime
 cd demo-runtime
@@ -59,8 +60,8 @@ cs build
 
 ![Quickstart: inspect, preview, build, and run a stamped runtime](demos/quickstart.gif)
 
-For a guided walkthrough with Pixi, bootstrap, status, uninstall, and embedded
-runtime examples, see the
+For a guided walkthrough with bootstrap, status, uninstall, and embedded runtime
+examples, see the
 [first runtime tutorial](https://jezdez.github.io/conda-ship/tutorials/first-runtime/).
 
 ## What It Builds

@@ -59,7 +59,6 @@ conda-sphinx-theme = ">=0.2"
 myst-parser = ">=3.0"
 sphinx-design = ">=0.6"
 sphinx-copybutton = ">=0.5"
-sphinx-reredirects = ">=0.1"
 sphinx-sitemap = ">=2.5"
 
 [feature.docs.tasks]
