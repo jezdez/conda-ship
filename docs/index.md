@@ -7,10 +7,10 @@ installs the `cs` CLI, but it does not ship a first-party distribution.
 Downstream projects choose the runtime name, delegate executable, package set,
 channels, documentation URL, and release channel.
 
-`conda-express` is one downstream distribution maintained by Jannis Leidel: it
-uses conda-ship to build the `cx` and `cxz` runtimes. conda-ship owns the
-reusable builder; conda-express owns the product defaults and release channels
-for `cx`.
+[conda-express](https://jezdez.github.io/conda-express/) is one downstream
+distribution maintained by Jannis Leidel: it uses conda-ship to build the `cx`
+and `cxz` runtimes. conda-ship owns the reusable builder; conda-express owns
+the product defaults and release channels for `cx`.
 
 ## Start Here
 
@@ -106,12 +106,12 @@ Read the builder/runtime model and where conda-ship fits in the conda ecosystem.
 
 ::::
 
-## Example Distribution
+## Builder And Downstream Distribution
 
 ::::{grid} 1 1 2 2
 :gutter: 3
 
-:::{grid-item-card} conda-ship
+:::{grid-item-card} conda-ship Builder
 :link: explanation/project-boundaries
 :link-type: doc
 
