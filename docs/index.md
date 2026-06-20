@@ -18,113 +18,36 @@ If you are new to conda-ship, start with the quickstart. It creates a small
 conda workspace, locks it, and stages a `demo` runtime:
 
 ```bash
+conda install --name base -c conda-forge conda-pypi
 conda create -n cs-demo -c conda-forge python pip conda-workspaces
 conda activate cs-demo
-python -m pip install conda-ship
+conda pypi install conda-ship
 mkdir demo-runtime
 cd demo-runtime
 ```
 
-Then follow the [quickstart](tutorials/quickstart.md), or use the documentation
-by the kind of help you need.
+Then follow the [quickstart](tutorials/quickstart.md).
 
-## Common Workflows
+## Choose A Path
 
-::::{grid} 1 1 2 4
-:gutter: 3
+- New to conda-ship: follow the
+  [first runtime tutorial](tutorials/first-runtime.md).
+- Building a downstream runtime: use
+  [customize a runtime](how-to/customize-runtime.md), then check the exact
+  fields in the [configuration reference](reference/configuration.md).
+- Shipping from CI: start with
+  [build in GitHub Actions](how-to/build-in-github-actions.md).
+- Choosing names or release files: read
+  [runtime and artifact names](reference/names.md) and
+  [artifacts](reference/artifacts.md).
+- Unsure what belongs here versus downstream: read
+  [project boundaries](explanation/project-boundaries.md).
 
-:::{grid-item-card} Quickstart
-:link: tutorials/quickstart
-:link-type: doc
+## Scope
 
-Build an online runtime artifact from a small conda workspace.
-:::
-
-:::{grid-item-card} First Runtime
-:link: tutorials/first-runtime
-:link-type: doc
-
-Build a small conda runtime and smoke-test the generated binary.
-:::
-
-:::{grid-item-card} GitHub Actions Runtime
-:link: tutorials/github-action-runtime
-:link-type: doc
-
-Build release artifacts from CI with a platform matrix.
-:::
-
-:::{grid-item-card} Custom Delegate Runtime
-:link: tutorials/custom-delegate-runtime
-:link-type: doc
-
-Expose a command other than `conda` through the generated runtime.
-:::
-
-::::
-
-## Documentation By Need
-
-::::{grid} 1 1 2 4
-:gutter: 3
-
-:::{grid-item-card} Learn
-:link: tutorials/first-runtime
-:link-type: doc
-
-Follow a guided first build from lockfile to smoke test.
-:::
-
-:::{grid-item-card} Do
-:link: how-to/customize-runtime
-:link-type: doc
-
-Build a downstream runtime with your own package set.
-:::
-
-:::{grid-item-card} Look Up
-:link: reference/cli
-:link-type: doc
-
-Find exact commands, options, artifact names, and configuration keys.
-:::
-
-:::{grid-item-card} Naming Guide
-:link: reference/names
-:link-type: doc
-
-Choose between runtime names, artifact names, install names, and runtime
-versions.
-:::
-
-:::{grid-item-card} Understand
-:link: explanation/concepts
-:link-type: doc
-
-Read the builder/runtime model and where conda-ship fits in the conda ecosystem.
-:::
-
-::::
-
-## Builder And Downstream Distribution
-
-::::{grid} 1 1 2 2
-:gutter: 3
-
-:::{grid-item-card} conda-ship Builder
-:link: explanation/project-boundaries
-:link-type: doc
-
-Read what the builder owns and what downstream distributions own.
-:::
-
-:::{grid-item-card} conda-express
-:link: https://jezdez.github.io/conda-express/
-
-See a concrete downstream distribution built with conda-ship.
-:::
-
-::::
+conda-ship builds runtimes from solved conda environments. It does not choose
+package sets, reserve downstream runtime names, publish a first-party runtime,
+or generate operating-system installers.
 
 ```{toctree}
 :hidden:
@@ -166,7 +89,6 @@ reference/configuration
 reference/artifacts
 reference/environment-variables
 reference/runtime-data-format
-reference/release-assets
 reference/errors
 ```
 
@@ -179,7 +101,6 @@ explanation/concepts
 explanation/source-locks-and-runtime-locks
 explanation/runtime-template
 explanation/install-locations-and-ownership
-explanation/artifact-layout-tradeoffs
 explanation/trust-and-provenance
 explanation/project-boundaries
 explanation/manifests-and-conda-plugin

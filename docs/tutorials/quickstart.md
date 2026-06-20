@@ -2,17 +2,22 @@
 
 Use this page when you want the shortest local path from an empty directory to a
 staged runtime artifact. It uses conda-workspaces. The full first-runtime
-tutorial also covers Pixi, bootstrap, status, uninstall, and embedded builds.
+tutorial also covers bootstrap, status, uninstall, and embedded builds.
 
 ## Install The Builder
 
-Create an environment with conda-workspaces, then install conda-ship:
+Create an environment with conda-workspaces, then install conda-ship from PyPI
+through conda:
 
 ```bash
+conda install --name base -c conda-forge conda-pypi
 conda create -n cs-demo -c conda-forge python pip conda-workspaces
 conda activate cs-demo
-python -m pip install conda-ship
+conda pypi install conda-ship
 ```
+
+If you prefer not to install `conda-pypi` into `base`, use
+`python -m pip install conda-ship` in the activated environment instead.
 
 Check that the builder is available:
 

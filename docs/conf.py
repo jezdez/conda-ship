@@ -14,15 +14,12 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx_copybutton",
     "sphinx_design",
-    "sphinx_reredirects",
     "sphinx_sitemap",
 ]
 
 myst_enable_extensions = [
     "colon_fence",
     "deflist",
-    "fieldlist",
-    "tasklist",
 ]
 
 html_theme = "conda_sphinx_theme"
@@ -45,8 +42,6 @@ html_context = {
     "doc_path": "docs",
 }
 
-html_static_path = ["_static"]
-html_css_files = ["css/custom.css"]
 html_baseurl = "https://jezdez.github.io/conda-ship/"
 
 intersphinx_mapping = {

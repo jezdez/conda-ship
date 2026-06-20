@@ -17,9 +17,10 @@ Install conda-ship and either conda-workspaces or Pixi:
 :::{tab-item} conda-workspaces
 
 ```bash
+conda install --name base -c conda-forge conda-pypi
 conda create -n cs-python-demo -c conda-forge python pip conda-workspaces
 conda activate cs-python-demo
-python -m pip install conda-ship
+conda pypi install conda-ship
 ```
 
 :::
@@ -27,14 +28,18 @@ python -m pip install conda-ship
 :::{tab-item} Pixi
 
 ```bash
+conda install --name base -c conda-forge conda-pypi
 conda create -n cs-python-demo -c conda-forge python pip pixi
 conda activate cs-python-demo
-python -m pip install conda-ship
+conda pypi install conda-ship
 ```
 
 :::
 
 ::::
+
+If you prefer not to install `conda-pypi` into `base`, use
+`python -m pip install conda-ship` in the activated environment instead.
 
 ## Create The Project
 
