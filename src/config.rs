@@ -85,10 +85,20 @@ pub fn read_metadata(prefix: &Path) -> miette::Result<PrefixMetadata> {
     let path = metadata_path(prefix);
     let data = std::fs::read_to_string(&path)
         .into_diagnostic()
-        .with_context(|| format!("failed to read runtime metadata at {}", path.display()))?;
+        .with_context(|| {
+            format!(
+                "failed to read runtime metadata at {}",
+                policy::path_for_display(&path)
+            )
+        })?;
     serde_json::from_str(&data)
         .into_diagnostic()
-        .with_context(|| format!("failed to parse runtime metadata at {}", path.display()))
+        .with_context(|| {
+            format!(
+                "failed to parse runtime metadata at {}",
+                policy::path_for_display(&path)
+            )
+        })
 }
 
 pub(crate) fn validate_metadata_identity(meta: &PrefixMetadata) -> miette::Result<()> {
@@ -137,7 +147,7 @@ pub fn write_frozen(prefix: &Path) -> miette::Result<()> {
         serde_json::to_string_pretty(&contents).into_diagnostic()?,
     )
     .into_diagnostic()?;
-    eprintln!("   Wrote {}", frozen_path.display());
+    eprintln!("   Wrote {}", policy::path_for_display(&frozen_path));
     Ok(())
 }
 
@@ -166,7 +176,7 @@ show_channel_urls: true
 
     std::fs::create_dir_all(prefix).into_diagnostic()?;
     std::fs::write(&condarc_path, contents).into_diagnostic()?;
-    eprintln!("   Wrote {}", condarc_path.display());
+    eprintln!("   Wrote {}", policy::path_for_display(&condarc_path));
     Ok(())
 }
 

@@ -58,7 +58,7 @@ fn build_delegate_command(prefix: &Path, delegate: &str, args: &[&str]) -> miett
     if !delegate_bin.exists() {
         return Err(miette::miette!(
             "{delegate} executable not found at {}",
-            delegate_bin.display()
+            policy::path_for_display(&delegate_bin)
         ));
     }
     let mut cmd = Command::new(delegate_bin);

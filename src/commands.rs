@@ -35,23 +35,23 @@ fn read_managed_metadata(prefix: &Path, action: &str) -> miette::Result<PrefixMe
     if !metadata_path.is_file() {
         return Err(miette::miette!(
             "refusing to {action} unmanaged install path: {}\n  Expected runtime metadata file: {}",
-            prefix.display(),
-            metadata_path.display()
+            policy::path_for_display(prefix),
+            policy::path_for_display(&metadata_path)
         ));
     }
 
     let meta = read_metadata(prefix).map_err(|err| {
         miette::miette!(
             "refusing to {action} unmanaged install path: {}\n  Invalid runtime metadata file: {}\n  {err}",
-            prefix.display(),
-            metadata_path.display()
+            policy::path_for_display(prefix),
+            policy::path_for_display(&metadata_path)
         )
     })?;
     crate::config::validate_metadata_identity(&meta).map_err(|err| {
         miette::miette!(
             "refusing to {action} install path owned by a different runtime: {}\n  Invalid runtime metadata file: {}\n  {err}",
-            prefix.display(),
-            metadata_path.display()
+            policy::path_for_display(prefix),
+            policy::path_for_display(&metadata_path)
         )
     })?;
     Ok(meta)
@@ -78,7 +78,7 @@ fn reject_dangerous_prefix(prefix: &Path) -> miette::Result<()> {
     {
         return Err(miette::miette!(
             "refusing to remove symbolic-link install path: {}",
-            prefix.display()
+            policy::path_for_display(prefix)
         ));
     }
     let canon = prefix
@@ -94,7 +94,7 @@ fn reject_dangerous_prefix(prefix: &Path) -> miette::Result<()> {
     if dangerous {
         return Err(miette::miette!(
             "refusing to remove dangerous path: {}",
-            prefix.display()
+            policy::path_for_display(prefix)
         ));
     }
     Ok(())
@@ -106,7 +106,7 @@ pub(crate) fn validate_bootstrap_flags(bundle: &Option<std::path::PathBuf>) -> m
     {
         return Err(miette::miette!(
             "--bundle path is not a directory: {}",
-            path.display()
+            policy::path_for_display(path)
         ));
     }
     Ok(())
@@ -126,7 +126,7 @@ pub(crate) async fn bootstrap(
                 eprintln!(
                     "{} conda is already installed at {}",
                     console::style("✔").green(),
-                    prefix.display()
+                    policy::path_for_display(prefix)
                 );
                 eprintln!("  Use --force to re-bootstrap.");
                 return Ok(());
@@ -134,7 +134,7 @@ pub(crate) async fn bootstrap(
         } else if !is_empty_dir(prefix)? {
             return Err(miette::miette!(
                 "refusing to bootstrap into existing non-empty path: {}",
-                prefix.display()
+                policy::path_for_display(prefix)
             ));
         }
     }
@@ -147,7 +147,7 @@ pub(crate) async fn bootstrap(
         eprintln!(
             "{} Removing existing install path at {}",
             console::style(">>").cyan().bold(),
-            prefix.display()
+            policy::path_for_display(prefix)
         );
         remove_install_path(prefix)?;
     }
@@ -160,7 +160,7 @@ pub(crate) async fn bootstrap(
         eprintln!(
             "{} Bootstrapping conda into {}",
             console::style(">>").cyan().bold(),
-            prefix.display()
+            policy::path_for_display(prefix)
         );
         eprintln!("   Channels: {}", channels.join(", "));
         eprintln!("   Packages: {}", specs.join(", "));
@@ -183,7 +183,7 @@ pub(crate) async fn bootstrap(
             .as_deref()
             .ok_or_else(|| miette::miette!("--bundle requires a stamped runtime lock"))?;
         if verbosity != Verbosity::Quiet {
-            eprintln!("   Bundle:   {}", bundle_dir.display());
+            eprintln!("   Bundle:   {}", policy::path_for_display(bundle_dir));
         }
         install::from_lockfile_with_bundle(prefix, content, bundle_dir, offline).await?;
     } else if let Some(embedded_dir) = install::extract_embedded_bundle()? {
@@ -222,7 +222,7 @@ pub(crate) async fn bootstrap(
             "\n{} runtime bootstrapped successfully!",
             console::style("✔").green().bold()
         );
-        eprintln!("   Install path: {}", prefix.display());
+        eprintln!("   Install path: {}", policy::path_for_display(prefix));
         eprintln!("   Run `{} status` for details.", policy::command_name());
         eprintln!(
             "   Use `{} <{}-args>` to run delegate commands.",
@@ -263,7 +263,10 @@ fn compile_python_bytecode(prefix: &Path) {
 
 pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
     if !is_bootstrapped(prefix) {
-        eprintln!("No conda installation found at {}", prefix.display());
+        eprintln!(
+            "No conda installation found at {}",
+            policy::path_for_display(prefix)
+        );
         return Ok(());
     }
     let meta = read_managed_metadata(prefix, "inspect")?;
@@ -271,7 +274,7 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
     let bundle_len = crate::config::embedded_bundle_len();
     let binary_name = policy::status_binary_name(bundle_len.is_some());
     println!("{} {}", binary_name, policy::runtime_version());
-    println!("  path:      {}", prefix.display());
+    println!("  path:      {}", policy::path_for_display(prefix));
     println!("  channels:  {}", meta.channels.join(", "));
     println!("  packages:  {}", meta.packages.join(", "));
     if let Some(bundle_len) = bundle_len {
@@ -290,7 +293,7 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
         "  delegate:  {} ({})",
         delegate,
         if delegate_bin.exists() {
-            delegate_bin.display().to_string()
+            policy::path_for_display(&delegate_bin)
         } else {
             "(not found)".to_string()
         }
@@ -304,7 +307,7 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
         eprintln!(
             "{} No conda installation found at {}",
             console::style("!").yellow().bold(),
-            prefix.display()
+            policy::path_for_display(prefix)
         );
         eprintln!("  Nothing to uninstall.");
         return Ok(());
@@ -334,7 +337,7 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
         "{} This will permanently remove:",
         console::style("!").yellow().bold()
     );
-    eprintln!("   Install path: {}", prefix.display());
+    eprintln!("   Install path: {}", policy::path_for_display(prefix));
     if !named_envs.is_empty() {
         eprintln!(
             "   Named environments ({}): {}",
@@ -361,7 +364,7 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
         eprintln!(
             "\n{} Removing install path at {}",
             console::style(">>").cyan().bold(),
-            prefix.display()
+            policy::path_for_display(prefix)
         );
     }
     remove_install_path(prefix)?;
@@ -371,7 +374,7 @@ pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miett
             Some("homebrew") => format!("   brew uninstall {}", policy::display_name()),
             Some("cargo") => format!("   cargo uninstall {}", policy::display_name()),
             Some(installer) => format!("   Installed via: {installer}"),
-            None => format!("   {}", bin.display()),
+            None => format!("   {}", policy::path_for_display(bin)),
         };
         eprintln!(
             "\n{} To complete removal, delete the {} binary:",
@@ -419,7 +422,7 @@ fn clear_readonly_recursive(path: &Path) -> miette::Result<()> {
 
     let metadata = std::fs::symlink_metadata(path)
         .into_diagnostic()
-        .with_context(|| format!("failed to inspect {}", path.display()))?;
+        .with_context(|| format!("failed to inspect {}", policy::path_for_display(path)))?;
     if metadata.file_type().is_symlink() {
         return Ok(());
     }
@@ -427,7 +430,7 @@ fn clear_readonly_recursive(path: &Path) -> miette::Result<()> {
     if metadata.is_dir() {
         for entry in std::fs::read_dir(path)
             .into_diagnostic()
-            .with_context(|| format!("failed to read {}", path.display()))?
+            .with_context(|| format!("failed to read {}", policy::path_for_display(path)))?
         {
             let entry = entry.into_diagnostic()?;
             clear_readonly_recursive(&entry.path())?;
@@ -439,7 +442,12 @@ fn clear_readonly_recursive(path: &Path) -> miette::Result<()> {
         permissions.set_readonly(false);
         std::fs::set_permissions(path, permissions)
             .into_diagnostic()
-            .with_context(|| format!("failed to clear read-only bit on {}", path.display()))?;
+            .with_context(|| {
+                format!(
+                    "failed to clear read-only bit on {}",
+                    policy::path_for_display(path)
+                )
+            })?;
     }
     Ok(())
 }

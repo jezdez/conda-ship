@@ -12,7 +12,10 @@ use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use miette::{Context, IntoDiagnostic};
 use rattler::{
     default_cache_dir,
-    install::{IndicatifReporter, Installer},
+    install::{
+        IndicatifReporter, Installer,
+        link_script::{LinkScriptError, PrePostLinkResult},
+    },
     package_cache::PackageCache,
 };
 use rattler_conda_types::{
@@ -21,7 +24,7 @@ use rattler_conda_types::{
 use rattler_lock::LockFile;
 use rattler_networking::AuthenticationMiddleware;
 
-use crate::config;
+use crate::{config, policy};
 
 static GLOBAL_MP: std::sync::LazyLock<MultiProgress> = std::sync::LazyLock::new(|| {
     let mp = MultiProgress::new();
@@ -139,7 +142,7 @@ pub async fn from_lockfile_with_bundle(
                 .into_diagnostic()
                 .context(format!(
                     "failed to cache package from bundle: {}",
-                    path.display()
+                    policy::path_for_display(path)
                 ))
         }
     });
@@ -180,6 +183,7 @@ pub async fn from_lockfile_with_bundle(
     if result.transaction.operations.is_empty() {
         eprintln!("   {} Already up to date", console::style("✔").green());
     } else {
+        report_post_link_script_failures(result.post_link_script_result.as_ref());
         eprintln!(
             "   Installed {} packages in {:.1}s",
             result.transaction.operations.len(),
@@ -221,6 +225,7 @@ pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette:
     if result.transaction.operations.is_empty() {
         eprintln!("   {} Already up to date", console::style("✔").green());
     } else {
+        report_post_link_script_failures(result.post_link_script_result.as_ref());
         eprintln!(
             "   Installed {} packages in {:.1}s",
             result.transaction.operations.len(),
@@ -298,7 +303,7 @@ pub fn extract_embedded_bundle() -> miette::Result<Option<PathBuf>> {
     eprintln!(
         "   Extracted embedded bundle ({:.1} MB) to {}",
         bundle.len() as f64 / 1_048_576.0,
-        tmp_dir.path().display()
+        policy::path_for_display(tmp_dir.path())
     );
 
     let path = tmp_dir.keep();
@@ -312,7 +317,7 @@ pub(crate) fn index_bundle_dir(dir: &Path) -> miette::Result<HashMap<String, Pat
     let mut index = HashMap::new();
     let entries = std::fs::read_dir(dir).into_diagnostic().context(format!(
         "failed to read bundle directory: {}",
-        dir.display()
+        policy::path_for_display(dir)
     ))?;
 
     for entry in entries {
@@ -320,7 +325,12 @@ pub(crate) fn index_bundle_dir(dir: &Path) -> miette::Result<HashMap<String, Pat
         let path = entry.path();
         let metadata = std::fs::symlink_metadata(&path)
             .into_diagnostic()
-            .with_context(|| format!("failed to inspect bundle entry: {}", path.display()))?;
+            .with_context(|| {
+                format!(
+                    "failed to inspect bundle entry: {}",
+                    policy::path_for_display(&path)
+                )
+            })?;
         if metadata.file_type().is_symlink() || !metadata.is_file() {
             continue;
         }
@@ -415,7 +425,12 @@ fn verify_bundle_package(
     })?;
     let (actual, _) = crate::hash::sha256_file(path)
         .into_diagnostic()
-        .with_context(|| format!("failed to read bundle package: {}", path.display()))?;
+        .with_context(|| {
+            format!(
+                "failed to read bundle package: {}",
+                policy::path_for_display(path)
+            )
+        })?;
     if actual.as_slice() != expected.as_slice() {
         return Err(miette::miette!(
             "SHA256 mismatch for bundled package {filename}: expected {}, got {}",
@@ -424,6 +439,62 @@ fn verify_bundle_package(
         ));
     }
     Ok(())
+}
+
+fn report_post_link_script_failures(
+    post_link_result: Option<&Result<PrePostLinkResult, LinkScriptError>>,
+) {
+    match post_link_result {
+        Some(Ok(result)) => {
+            for line in post_link_failure_lines(result) {
+                eprintln!("{line}");
+            }
+        }
+        Some(Err(err)) => {
+            eprintln!(
+                "   {} failed to inspect post-link script results: {err}",
+                console::style("!").yellow(),
+            );
+        }
+        None => {}
+    }
+}
+
+fn post_link_failure_lines(result: &PrePostLinkResult) -> Vec<String> {
+    if result.failed_packages.is_empty() {
+        return Vec::new();
+    }
+
+    let packages: Vec<_> = result
+        .failed_packages
+        .iter()
+        .map(|package| package.as_normalized().to_string())
+        .collect();
+    let mut lines = vec![format!(
+        "   {} post-link scripts failed for {} package(s): {}",
+        console::style("!").yellow(),
+        result.failed_packages.len(),
+        packages.join(", ")
+    )];
+
+    for package in &result.failed_packages {
+        let Some(message) = result.messages.get(package) else {
+            continue;
+        };
+        let message = message.trim();
+        if message.is_empty() {
+            continue;
+        }
+        for line in message
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
+            lines.push(format!("     {}: {line}", package.as_normalized()));
+        }
+    }
+
+    lines
 }
 
 pub(crate) fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
@@ -483,6 +554,7 @@ async fn run_installer(
     if result.transaction.operations.is_empty() {
         eprintln!("   {} Already up to date", console::style("✔").green());
     } else {
+        report_post_link_script_failures(result.post_link_script_result.as_ref());
         eprintln!(
             "   Installed {} packages in {:.1}s",
             result.transaction.operations.len(),
@@ -505,6 +577,7 @@ pub(crate) fn wrap_spinner<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rattler_conda_types::PackageName;
     use rstest::rstest;
 
     #[test]
@@ -531,6 +604,32 @@ mod tests {
         let specs = vec![">=>=not_a_package!!!".to_string()];
         let result = parse_specs(&specs);
         assert!(result.is_err(), "malformed spec should fail to parse");
+    }
+
+    #[test]
+    fn test_post_link_failure_lines_include_package_messages() {
+        let prompt = PackageName::new_unchecked("anaconda_prompt");
+        let powershell = PackageName::new_unchecked("anaconda_powershell_prompt");
+        let result = PrePostLinkResult {
+            messages: HashMap::from([
+                (
+                    prompt.clone(),
+                    "\nThis package requires menuinst v2.1.1 in the base environment.\n"
+                        .to_string(),
+                ),
+                (powershell.clone(), "".to_string()),
+            ]),
+            failed_packages: vec![prompt, powershell],
+        };
+
+        let lines = post_link_failure_lines(&result);
+
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("post-link scripts failed for 2 package(s)"));
+        assert!(lines[0].contains("anaconda_prompt"));
+        assert!(lines[0].contains("anaconda_powershell_prompt"));
+        assert!(lines[1].contains("anaconda_prompt"));
+        assert!(lines[1].contains("menuinst v2.1.1"));
     }
 
     #[rstest]

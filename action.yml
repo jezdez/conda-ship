@@ -346,7 +346,10 @@ runs:
         mkdir -p "$dist_dir"
         build_args_file="${RUNNER_TEMP}/conda-ship-build.args0"
 
-        mapfile -d '' -t build_args < "$build_args_file"
+        build_args=()
+        while IFS= read -r -d '' arg; do
+          build_args+=("$arg")
+        done < "$build_args_file"
         if [ -n "$CONDA_SHIP_RUNTIME_VERSION" ]; then
           build_args+=(--runtime-version "$CONDA_SHIP_RUNTIME_VERSION")
         fi
