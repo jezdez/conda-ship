@@ -111,6 +111,18 @@ pub(crate) fn install_path_for_posix_shell() -> String {
     }
 }
 
+pub(crate) fn path_for_display(path: &Path) -> String {
+    normalize_path_display(&path.display().to_string(), std::path::MAIN_SEPARATOR)
+}
+
+fn normalize_path_display(path: &str, separator: char) -> String {
+    if separator == '\\' {
+        path.replace('/', "\\")
+    } else {
+        path.to_string()
+    }
+}
+
 fn user_data_dir_for_display() -> &'static str {
     if cfg!(target_os = "windows") {
         "%LOCALAPPDATA%"
@@ -295,5 +307,24 @@ mod tests {
             install_path_for_scheme(runtime_data::InstallScheme::UserData, install_name()).unwrap();
         let expected_base = dirs::data_local_dir().unwrap();
         assert_eq!(path, expected_base.join("conda").join(install_name()));
+    }
+
+    #[test]
+    fn test_normalize_path_display_uses_windows_separators() {
+        assert_eq!(
+            normalize_path_display(
+                r"D:\a\_temp/distro-bootstrap-smoke-online\conda-meta/history",
+                '\\'
+            ),
+            r"D:\a\_temp\distro-bootstrap-smoke-online\conda-meta\history"
+        );
+    }
+
+    #[test]
+    fn test_normalize_path_display_preserves_unix_paths() {
+        assert_eq!(
+            normalize_path_display(r"/tmp/prefix\literal/conda-meta/history", '/'),
+            r"/tmp/prefix\literal/conda-meta/history"
+        );
     }
 }

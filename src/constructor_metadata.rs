@@ -28,7 +28,7 @@ fn write_prefix_metadata_from_records(
     let conda_meta = prefix.join("conda-meta");
     std::fs::create_dir_all(&conda_meta)
         .into_diagnostic()
-        .with_context(|| format!("failed to create {}", conda_meta.display()))?;
+        .with_context(|| format!("failed to create {}", policy::path_for_display(&conda_meta)))?;
 
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -41,8 +41,13 @@ fn write_prefix_metadata_from_records(
         render_history(records, requested_specs, &timestamp)?,
     )
     .into_diagnostic()
-    .with_context(|| format!("failed to write {}", history_path.display()))?;
-    eprintln!("   Wrote {}", history_path.display());
+    .with_context(|| {
+        format!(
+            "failed to write {}",
+            policy::path_for_display(&history_path)
+        )
+    })?;
+    eprintln!("   Wrote {}", policy::path_for_display(&history_path));
 
     let explicit_path = conda_meta.join("initial-state.explicit.txt");
     std::fs::write(
@@ -50,8 +55,13 @@ fn write_prefix_metadata_from_records(
         render_initial_state_explicit(platform, records),
     )
     .into_diagnostic()
-    .with_context(|| format!("failed to write {}", explicit_path.display()))?;
-    eprintln!("   Wrote {}", explicit_path.display());
+    .with_context(|| {
+        format!(
+            "failed to write {}",
+            policy::path_for_display(&explicit_path)
+        )
+    })?;
+    eprintln!("   Wrote {}", policy::path_for_display(&explicit_path));
 
     Ok(())
 }
