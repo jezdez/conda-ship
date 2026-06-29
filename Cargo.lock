@@ -522,7 +522,7 @@ dependencies = [
  "rattler_cache",
  "rattler_conda_types",
  "rattler_lock",
- "rattler_networking 0.28.0",
+ "rattler_networking 0.29.0",
  "reqwest",
  "rstest",
  "rustls",
@@ -1222,6 +1222,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-auth"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "150fa4a9462ef926824cf4519c84ed652ca8f4fbae34cb8af045b5cbcaf98822"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "http-body"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1523,9 +1532,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.47.2"
+version = "1.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4a6248eb93a4401ed2f37dfe8ea592d3cf05b7cf4f8efa867b6895af7e094e"
+checksum = "86f0f8fee8c926415c58d6ae43a08523a26faccb2323f5e6b644fe7dd4ef6b82"
 dependencies = [
  "console",
  "once_cell",
@@ -2584,9 +2593,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_networking"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cbe3eb2914bd715ca7dde169979bce15a8e3c6f0850a039d3ab67110180f73a"
+checksum = "e7ab3403a06270c88d721acd0b6c1eca2d3583644620912174af8c0283f75821"
 dependencies = [
  "ambient-id",
  "anyhow",
@@ -2595,8 +2604,10 @@ dependencies = [
  "async-trait",
  "base64",
  "fs-err",
+ "futures",
  "getrandom 0.4.2",
  "http",
+ "http-auth",
  "itertools 0.14.0",
  "reqwest",
  "retry-policies",
