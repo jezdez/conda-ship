@@ -265,6 +265,11 @@ impl Fleet {
 }
 
 /// Fully resolved runtime input accepted by [`Fleet::install`].
+///
+/// `RuntimeSpec` is the programmatic boundary between a downstream
+/// orchestrator and fleet. It is not a user-facing catalog format: callers are
+/// expected to derive it from their own catalog, policy layer, downloaded
+/// descriptor, or conda-ship-generated runtime metadata.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct RuntimeSpec {

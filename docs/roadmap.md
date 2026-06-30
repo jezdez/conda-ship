@@ -36,10 +36,12 @@ The first API intentionally stays narrow:
 - no global PATH mutation
 - no filesystem-mutating shim writer
 
-The feature-gated `nan` binary is an example for testing and documentation. It
-is not a new end-user CLI. See [conda-fleet concepts](explanation/conda-fleet.md),
-the [API reference](reference/conda-fleet.md), and the
-[`nan` tutorial](tutorials/nan-fleet-example.md).
+The feature-gated `nan` binary is only a low-level harness for testing and
+debugging the API without a real catalog or artifact-discovery layer. It is not
+a new end-user CLI or a proposed runtime distribution workflow. See
+[conda-fleet concepts](explanation/conda-fleet.md), the
+[API reference](reference/conda-fleet.md), and the
+[`nan` harness guide](tutorials/nan-fleet-example.md).
 
 ## Manifest And Plugin Work
 
