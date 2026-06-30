@@ -83,8 +83,7 @@ pub async fn from_lockfile(
 ) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     let client = make_download_client()?;
 
@@ -111,6 +110,24 @@ pub async fn from_lockfile_with_bundle(
     bundle_dir: &Path,
     offline: bool,
     reinstall: bool,
+) -> miette::Result<()> {
+    from_lockfile_with_bundle_and_specs(
+        prefix,
+        lock_content,
+        &config::embedded_config().packages,
+        bundle_dir,
+        offline,
+    )
+    .await
+}
+
+/// Install packages from a lockfile and local bundle using explicit requested specs.
+pub(crate) async fn from_lockfile_with_bundle_and_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
+    bundle_dir: &Path,
+    offline: bool,
 ) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
@@ -159,8 +176,7 @@ pub async fn from_lockfile_with_bundle(
         start.elapsed().as_secs_f64()
     );
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     let reinstall_packages = reinstall_package_names(&required_packages, reinstall);
 
@@ -214,8 +230,7 @@ pub async fn from_lockfile_offline(
         .map_err(|e| miette::miette!("could not determine cache directory: {}", e))?;
     let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     let reinstall_packages = reinstall_package_names(&required_packages, reinstall);
 

@@ -22,6 +22,7 @@ include = [
   "/pyproject.toml",
   "/python/conda_ship/*.py",
   "/README.md",
+  "/src/lib.rs",
   "/src/*.rs",
   "/src/bin/*.rs",
   "/src/bin/cs/*.rs",
@@ -41,8 +42,14 @@ required-features = ["runtime-template"]
 name = "cs"
 path = "src/bin/cs.rs"
 
+[[bin]]
+name = "nan"
+path = "src/bin/nan.rs"
+required-features = ["fleet"]
+
 [features]
 default = ["rustls-tls"]
+fleet = []
 native-tls = [
   "reqwest/native-tls",
   "rattler/native-tls",

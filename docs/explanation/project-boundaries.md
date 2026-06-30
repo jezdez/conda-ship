@@ -42,6 +42,12 @@ The generated runtime behavior also lives here: automatic first-run bootstrap,
 execution of the configured delegate, offline bundle handling, and embedded
 bundle handling. conda-ship does not define the delegate's commands or plugins.
 
+The experimental [conda-fleet API](conda-fleet.md) also lives here because it
+reuses conda-ship install mechanics for multiple locked prefixes. Fleet remains
+an API layer: it does not choose catalogs, user-facing command names, global
+PATH policy, login behavior, onboarding, enterprise policy, or shim filesystem
+writes.
+
 ## What Downstream Distributions Own
 
 Downstream projects decide what their users get:
@@ -58,6 +64,7 @@ Downstream projects decide what their users get:
 - Docker images
 - GitHub Release policy
 - constructor-based installers or enterprise package manager recipes
+- orchestrator catalogs, onboarding, login, policy, and user-facing shim names
 
 conda-ship produces the runtimes and metadata those channels can distribute. It
 does not decide whether every runtime includes the same conda plugins or uses

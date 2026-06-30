@@ -1,0 +1,7 @@
+---
+source: src/config.rs
+assertion_line: 281
+expression: "serde_json::json!({\n    \"channels\": config.channels, \"packages\": config.packages,\n})"
+---
+channels: []
+packages: []
