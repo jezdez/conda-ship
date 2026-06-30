@@ -45,9 +45,7 @@ without maintaining a separate registry or hash sidecar.
 
 `RuntimeSpec` is the explicit API input to `Fleet::install`, not a user-facing
 specification format. Production callers should derive it from their own
-catalog, downloaded descriptor, or conda-ship-generated runtime metadata. The
-feature-gated `nan` harness reads the same shape from JSON only so the API can
-be exercised without building a real catalog.
+catalog, downloaded descriptor, or conda-ship-generated runtime metadata.
 
 ## What Fleet Owns
 
@@ -56,8 +54,7 @@ Fleet owns reusable mechanics that belong close to conda-ship:
 - installing a resolved lockfile into a known prefix
 - using rattler's package cache and optional bundle or offline install modes
 - writing `.condarc`
-- deriving `.condarc` channels from the default lockfile environment when the
-  caller does not provide explicit channels
+- deriving `.condarc` channels from the default lockfile environment
 - writing CEP 22 `conda-meta/frozen`
 - writing constructor-compatible `conda-meta/history`
 - writing `conda-meta/initial-state.explicit.txt`
@@ -101,7 +98,3 @@ Projects that already standardize on native TLS can keep that choice explicit:
 [dependencies]
 conda-ship = { git = "https://github.com/jezdez/conda-ship", default-features = false, features = ["fleet", "native-tls"] }
 ```
-
-The `nan` binary is also feature-gated and exists only as a low-level API
-harness for tests and debugging. It is not a product CLI or a recommended
-runtime distribution workflow.

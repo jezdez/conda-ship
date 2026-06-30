@@ -61,7 +61,6 @@ tutorials/quickstart
 tutorials/first-runtime
 tutorials/github-action-runtime
 tutorials/custom-delegate-runtime
-tutorials/nan-fleet-example
 ```
 
 ```{toctree}

@@ -36,26 +36,17 @@ The first API intentionally stays narrow:
 - no global PATH mutation
 - no filesystem-mutating shim writer
 
-The feature-gated `nan` binary is only a low-level harness for testing and
-debugging the API without a real catalog or artifact-discovery layer. It is not
-a new end-user CLI or a proposed runtime distribution workflow. See
-[conda-fleet concepts](explanation/conda-fleet.md), the
-[API reference](reference/conda-fleet.md), and the
-[`nan` harness guide](tutorials/nan-fleet-example.md).
+See [conda-fleet concepts](explanation/conda-fleet.md) and the
+[API reference](reference/conda-fleet.md).
 
 Follow-up work should happen outside this first API PR:
 
 - define the adapter from conda-ship runtime artifacts or runtime descriptors
   into `RuntimeSpec`
-- document recommended downstream catalog fields and ownership boundaries
 - add update, repair, and migration flows for fleet-managed runtimes
 - add install/remove concurrency locking
-- add path-oriented binary helpers if downstream catalogs store relative binary
-  paths instead of command names
 - add realistic integration tests with conda-ship-built artifacts
 - clarify shared cache configuration for offline and bundled workflows
-- expand Windows shim integration coverage while keeping filesystem writes
-  caller-owned
 
 ## Manifest And Plugin Work
 
