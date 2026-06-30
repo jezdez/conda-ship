@@ -58,11 +58,7 @@ impl Fleet {
         spec.validate()?;
         validate_bundle_options(options.bundle_dir.as_deref())?;
         let lock_sha256 = lock_sha256(&spec.lock_content);
-        let channels = if spec.channels.is_empty() {
-            channels_from_lock_content(&spec.lock_content)?
-        } else {
-            spec.channels.clone()
-        };
+        let channels = channels_from_lock_content(&spec.lock_content)?;
 
         let prefix = self.prefix_for(&spec.id)?;
         std::fs::create_dir_all(&self.config.install_root)
@@ -201,16 +197,14 @@ impl Fleet {
 
     /// Remove a managed runtime prefix by id.
     ///
-    /// Fleet refuses to remove unmanaged non-empty prefixes even when
-    /// `force` is true.
-    pub fn remove(&self, id: &str, options: RemoveOptions) -> miette::Result<()> {
+    /// Fleet refuses to remove unmanaged non-empty prefixes.
+    pub fn remove(&self, id: &str) -> miette::Result<()> {
         validate_runtime_id(id)?;
         let prefix = self.prefix_for(id)?;
         if !prefix.exists() {
             return Ok(());
         }
 
-        let _force_requested = options.force;
         reject_dangerous_prefix(&prefix)?;
         if is_bootstrapped(&prefix) {
             self.read_installed_runtime(&prefix, id, "remove")?;
@@ -281,9 +275,6 @@ pub struct RuntimeSpec {
     pub delegate_executable: String,
     /// Resolved rattler-lock content for the runtime environment.
     pub lock_content: String,
-    /// Channels written to the runtime `.condarc`.
-    #[serde(default)]
-    pub channels: Vec<String>,
     /// Requested specs recorded in `conda-meta/history` and prefix metadata.
     #[serde(default)]
     pub requested_specs: Vec<String>,
@@ -333,14 +324,6 @@ impl Default for InstallOptions {
             compile_python_bytecode: true,
         }
     }
-}
-
-/// Options for removing a runtime.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct RemoveOptions {
-    /// Reserved for callers that want to signal an explicit destructive action.
-    /// Fleet still refuses unmanaged non-empty prefixes.
-    pub force: bool,
 }
 
 /// Runtime prefix discovered or installed by [`Fleet`].
@@ -429,15 +412,7 @@ impl InstalledRuntime {
     /// ownership metadata when writing files.
     pub fn shim_plan(&self, command_name: &str, options: ShimOptions) -> miette::Result<ShimPlan> {
         validate_command_name(command_name)?;
-        validate_command_name(&options.target_command)?;
         validate_shim_name(&options.shim_name)?;
-        if options.target_command != command_name {
-            return Err(miette::miette!(
-                "shim target_command {} does not match requested command {}",
-                options.target_command,
-                command_name
-            ));
-        }
 
         let command = self.command(command_name)?;
         let env = os_env_to_strings(&command.env);
@@ -446,21 +421,13 @@ impl InstalledRuntime {
             .as_ref()
             .map(|dir| dir.join(&options.shim_name))
             .unwrap_or_else(|| PathBuf::from(&options.shim_name));
-        let wrapper_contents = match options.mode {
-            ShimMode::WrapperScript => Some(render_wrapper_script(
-                self,
-                &options.shim_name,
-                command_name,
-                &command,
-            )?),
-            ShimMode::Symlink => None,
-        };
+        let wrapper_contents =
+            render_wrapper_script(self, &options.shim_name, command_name, &command)?;
 
         Ok(ShimPlan {
             shim_name: options.shim_name,
             target_command: command_name.to_string(),
             destination,
-            mode: options.mode,
             target_executable: command.executable,
             env,
             path_entries: command.path_entries,
@@ -480,29 +447,12 @@ pub struct RuntimeCommand {
     pub path_entries: Vec<PathBuf>,
 }
 
-/// Filesystem strategy for exposing an executable.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum ShimMode {
-    /// Prefer a wrapper script that sets conda environment variables and `PATH`.
-    #[default]
-    WrapperScript,
-    /// Create a symlink to the target executable when the caller can safely
-    /// preserve the needed environment elsewhere.
-    Symlink,
-}
-
 /// Options for building a [`ShimPlan`].
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ShimOptions {
     /// Name of the shim file the caller intends to expose.
     pub shim_name: String,
-    /// Runtime command the shim should target.
-    pub target_command: String,
-    /// Preferred exposure strategy.
-    #[serde(default)]
-    pub mode: ShimMode,
     /// Optional directory where the caller plans to write the shim.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shim_dir: Option<PathBuf>,
@@ -518,16 +468,14 @@ pub struct ShimPlan {
     /// Planned shim path. This may be relative when no shim directory was
     /// provided.
     pub destination: PathBuf,
-    /// Exposure strategy selected by the caller.
-    pub mode: ShimMode,
     /// Absolute executable path inside the runtime prefix.
     pub target_executable: PathBuf,
     /// Environment variables represented as UTF-8 strings for JSON output.
     pub env: BTreeMap<String, String>,
     /// Prefix-local directories that should be prepended to `PATH`.
     pub path_entries: Vec<PathBuf>,
-    /// Suggested wrapper script contents, or `None` for non-wrapper modes.
-    pub wrapper_contents: Option<String>,
+    /// Suggested wrapper script contents.
+    pub wrapper_contents: String,
 }
 
 fn metadata_file_for(id: &str) -> String {
@@ -859,7 +807,6 @@ packages: []
             version: "1.0.0".to_string(),
             delegate_executable: "conda".to_string(),
             lock_content: empty_lock(),
-            channels: vec!["conda-forge".to_string()],
             requested_specs: vec!["conda".to_string()],
         }
     }
@@ -901,7 +848,7 @@ packages: []
     }
 
     #[test]
-    fn test_channels_fallback_reads_default_environment_from_lock() {
+    fn test_channels_reads_default_environment_from_lock() {
         assert_eq!(
             channels_from_lock_content(&empty_lock()).unwrap(),
             vec!["https://conda.anaconda.org/conda-forge".to_string()]
@@ -913,8 +860,8 @@ packages: []
         assert!(validate_command_name("conda").is_ok());
         assert!(validate_command_name("python3.12").is_ok());
         assert!(validate_command_name("bin/conda").is_err());
-        assert!(validate_shim_name("nan").is_ok());
-        assert!(validate_shim_name(".nan").is_err());
+        assert!(validate_shim_name("runner-shim").is_ok());
+        assert!(validate_shim_name(".runner-shim").is_err());
     }
 
     #[tokio::test]
@@ -955,13 +902,16 @@ packages: []
 
         let listed = fleet.list().unwrap();
         assert_eq!(listed, vec![installed.clone()]);
-        assert_eq!(installed.channels, vec!["conda-forge".to_string()]);
+        assert_eq!(
+            installed.channels,
+            vec!["https://conda.anaconda.org/conda-forge".to_string()]
+        );
         assert_eq!(installed.lock_sha256, Some(lock_sha256(&empty_lock())));
 
         let status = fleet.status("tool").unwrap().unwrap();
         assert_eq!(status, installed);
 
-        fleet.remove("tool", RemoveOptions { force: true }).unwrap();
+        fleet.remove("tool").unwrap();
         assert!(!install_root.join("tool").exists());
     }
 
@@ -999,10 +949,7 @@ packages: []
             .to_string();
         assert!(err.contains("unmanaged non-empty prefix"), "{err}");
 
-        let err = fleet
-            .remove("tool", RemoveOptions { force: true })
-            .unwrap_err()
-            .to_string();
+        let err = fleet.remove("tool").unwrap_err().to_string();
         assert!(err.contains("unmanaged non-empty prefix"), "{err}");
     }
 
@@ -1038,15 +985,13 @@ packages: []
             .shim_plan(
                 "runner",
                 ShimOptions {
-                    shim_name: "nan".to_string(),
-                    target_command: "runner".to_string(),
-                    mode: ShimMode::WrapperScript,
+                    shim_name: "runner-shim".to_string(),
                     shim_dir: Some(tmp.path().join("bin")),
                 },
             )
             .unwrap();
-        assert_eq!(plan.destination, tmp.path().join("bin").join("nan"));
+        assert_eq!(plan.destination, tmp.path().join("bin").join("runner-shim"));
         assert_eq!(plan.target_executable, executable);
-        assert!(plan.wrapper_contents.unwrap().contains("conda-fleet-shim"));
+        assert!(plan.wrapper_contents.contains("conda-fleet-shim"));
     }
 }

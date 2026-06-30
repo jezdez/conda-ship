@@ -3,9 +3,6 @@
 `conda-fleet` is an experimental API behind the non-default Cargo feature
 `fleet`.
 
-The feature-gated `nan` binary can exercise this API during development, but
-it is a low-level harness rather than a product CLI or a catalog design.
-
 Downstream Rust consumers enable the same feature:
 
 ```toml
@@ -51,23 +48,8 @@ let spec = RuntimeSpec {
     version: "2026.6.0".to_string(),
     delegate_executable: "conda".to_string(),
     lock_content: std::fs::read_to_string("runtime.lock")?,
-    channels: vec!["conda-forge".to_string()],
     requested_specs: vec!["conda".to_string()],
 };
-```
-
-For tests and debugging, `nan --spec SPEC.fixture.json` reads a JSON fixture
-that maps directly to `RuntimeSpec`:
-
-```json
-{
-  "id": "conda",
-  "version": "2026.6.0",
-  "delegate_executable": "conda",
-  "lock_content": "---\nversion: 6\n...",
-  "channels": ["conda-forge"],
-  "requested_specs": ["conda"]
-}
 ```
 
 `RuntimeSpec::validate()` checks the runtime id, delegate executable, version,
@@ -77,10 +59,9 @@ and lock content before installation.
 metadata. Callers can compare this value with `InstalledRuntime::lock_sha256`
 from `Fleet::status(id)` to decide whether a locked runtime is already current.
 
-If `RuntimeSpec::channels` is empty, fleet derives channels from the default
-environment in the lockfile and writes those to `.condarc`. This lets callers
-that already have conda-ship runtime metadata or embedded lockfiles avoid
-duplicating channel lists in their catalog.
+Fleet derives `.condarc` channels from the default environment in the lockfile.
+This lets callers that already have conda-ship runtime metadata or embedded
+lockfiles avoid duplicating channel lists in their catalog.
 
 ## Install
 
@@ -109,15 +90,15 @@ same runtime id before removing it.
 ```rust
 let runtimes = fleet.list()?;
 let maybe_conda = fleet.status("conda")?;
-fleet.remove("conda", RemoveOptions { force: true })?;
+fleet.remove("conda")?;
 ```
 
 `Fleet::list()` scans direct children of the install root and ignores
 directories without valid fleet metadata. `Fleet::status(id)` validates the
 metadata for one runtime and returns `None` when the metadata file is absent.
 
-`Fleet::remove(id, options)` removes only managed prefixes or empty directories.
-It refuses unmanaged non-empty prefixes even with `force`.
+`Fleet::remove(id)` removes only managed prefixes or empty directories. It
+refuses unmanaged non-empty prefixes.
 
 ## Installed Runtime Inspection
 
@@ -142,14 +123,12 @@ processes or wrapper scripts.
 Fleet provides data-only helpers so callers can implement exposure safely:
 
 ```rust
-use conda_ship::fleet::{ShimMode, ShimOptions};
+use conda_ship::fleet::ShimOptions;
 
 let plan = runtime.shim_plan(
     "conda",
     ShimOptions {
         shim_name: "conda".to_string(),
-        target_command: "conda".to_string(),
-        mode: ShimMode::WrapperScript,
         shim_dir: None,
     },
 )?;
@@ -157,7 +136,7 @@ let plan = runtime.shim_plan(
 
 Recommended caller behavior:
 
-- Prefer wrapper scripts over symlinks for conda commands because wrappers can
+- Prefer wrapper scripts for conda commands because wrappers can
   set `CONDA_PREFIX`, `CONDA_ROOT_PREFIX`, `CONDA_DEFAULT_ENV`,
   `CONDA_SHLVL`, `CONDA_COMPLETION_COMMAND_NAME`, and PATH entries.
 - Do not overwrite existing files by default.
@@ -167,9 +146,8 @@ Recommended caller behavior:
   fleet.
 - Treat `ShimPlan` as a plan. Fleet never writes or removes shim files.
 
-`ShimPlan` includes the shim name, target command, destination path, mode,
-target executable, environment variables, PATH entries, and optional wrapper
-script contents.
+`ShimPlan` includes the shim name, target command, destination path, target
+executable, environment variables, PATH entries, and wrapper script contents.
 
 ## Downstream Tool Manager Integration Shape
 
@@ -186,23 +164,10 @@ manager keeps product policy outside this crate:
 - `InstalledRuntime::command(binary)` replaces direct `prefix/bin/<binary>`
   process construction
 - `InstalledRuntime::shim_plan(binary, options)` returns the target,
-  environment, and PATH entries while leaving symlink or wrapper writes in the
-  caller
+  environment, PATH entries, and wrapper contents while leaving filesystem
+  writes in the caller
 
 Callers can keep their existing catalog entry for the user-facing shim name and
 binary name, build a `RuntimeSpec` from their runtime descriptor or resolved
-lock, install through fleet, then write the shim or symlink using their
-existing overwrite and cleanup policy.
-
-## Test Harness CLI
-
-The `nan` binary is compiled only with `--features fleet`:
-
-```bash
-cargo run --features fleet --bin nan -- --install-root /tmp/fleet list
-```
-
-`nan` is for API exploration and test coverage. It accepts JSON fixtures
-because it intentionally has no catalog, downloader, policy layer, or
-conda-ship artifact discovery. It is not a conda CLI, conda-ship product
-surface, or recommended runtime orchestration interface.
+lock, install through fleet, then write the wrapper using their existing
+overwrite and cleanup policy.
