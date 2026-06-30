@@ -43,6 +43,20 @@ a new end-user CLI or a proposed runtime distribution workflow. See
 [API reference](reference/conda-fleet.md), and the
 [`nan` harness guide](tutorials/nan-fleet-example.md).
 
+Follow-up work should happen outside this first API PR:
+
+- define the adapter from conda-ship runtime artifacts or runtime descriptors
+  into `RuntimeSpec`
+- document recommended downstream catalog fields and ownership boundaries
+- add update, repair, and migration flows for fleet-managed runtimes
+- add install/remove concurrency locking
+- add path-oriented binary helpers if downstream catalogs store relative binary
+  paths instead of command names
+- add realistic integration tests with conda-ship-built artifacts
+- clarify shared cache configuration for offline and bundled workflows
+- expand Windows shim integration coverage while keeping filesystem writes
+  caller-owned
+
 ## Manifest And Plugin Work
 
 conda-ship supports conda-workspaces project input for downstream

@@ -77,6 +77,11 @@ Fleet intentionally leaves product and policy decisions to callers:
 - update, repair, and migration workflows
 - telemetry and user prompts
 
+Downstream orchestrators should keep their own runtime or tool catalog. That
+catalog can point at conda-ship artifacts, downloaded descriptors, or embedded
+locks, but fleet should only receive the resolved `RuntimeSpec` after the
+caller has already decided what to install.
+
 This keeps the first API small while still letting downstream tools share the
 same install mechanics as conda-ship runtime binaries.
 
