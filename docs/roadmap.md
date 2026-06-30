@@ -21,6 +21,33 @@ The repository stays focused on producing runtimes. Distribution
 wrappers such as Homebrew formulae, constructor-based installers, Docker images,
 or enterprise package manager recipes live outside the core builder.
 
+## Experimental conda-fleet API
+
+`conda-fleet` is an experimental Rust API behind the non-default Cargo feature
+`fleet`. It lets orchestrators manage multiple locked conda prefixes while
+reusing conda-ship install mechanics, metadata, offline bundle handling, shared
+rattler cache behavior, ownership checks, and command environment rules.
+
+The first API intentionally stays narrow:
+
+- no solving
+- no catalog
+- no update or repair workflow
+- no global PATH mutation
+- no filesystem-mutating shim writer
+
+See [conda-fleet concepts](explanation/conda-fleet.md) and the
+[API reference](reference/conda-fleet.md).
+
+Follow-up work should happen outside this first API PR:
+
+- define the adapter from conda-ship runtime artifacts or runtime descriptors
+  into `RuntimeSpec`
+- add update, repair, and migration flows for fleet-managed runtimes
+- add install/remove concurrency locking
+- add realistic integration tests with conda-ship-built artifacts
+- clarify shared cache configuration for offline and bundled workflows
+
 ## Manifest And Plugin Work
 
 conda-ship supports conda-workspaces project input for downstream
