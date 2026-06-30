@@ -77,10 +77,18 @@ fn lockfile_records(lock_content: &str) -> miette::Result<(Platform, Vec<RepoDat
 
 /// Install packages from a pre-solved lockfile (fast path, no solve needed).
 pub async fn from_lockfile(prefix: &Path, lock_content: &str) -> miette::Result<()> {
+    from_lockfile_with_specs(prefix, lock_content, &config::embedded_config().packages).await
+}
+
+/// Install packages from a pre-solved lockfile with explicit requested specs.
+pub(crate) async fn from_lockfile_with_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
+) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     let client = make_download_client()?;
 
@@ -103,6 +111,24 @@ pub async fn from_lockfile(prefix: &Path, lock_content: &str) -> miette::Result<
 pub async fn from_lockfile_with_bundle(
     prefix: &Path,
     lock_content: &str,
+    bundle_dir: &Path,
+    offline: bool,
+) -> miette::Result<()> {
+    from_lockfile_with_bundle_and_specs(
+        prefix,
+        lock_content,
+        &config::embedded_config().packages,
+        bundle_dir,
+        offline,
+    )
+    .await
+}
+
+/// Install packages from a lockfile and local bundle using explicit requested specs.
+pub(crate) async fn from_lockfile_with_bundle_and_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
     bundle_dir: &Path,
     offline: bool,
 ) -> miette::Result<()> {
@@ -137,7 +163,7 @@ pub async fn from_lockfile_with_bundle(
         let cache = &package_cache;
         async move {
             cache
-                .get_or_fetch_from_path(path, None)
+                .get_or_fetch_from_path(path, None, None)
                 .await
                 .into_diagnostic()
                 .context(format!(
@@ -153,8 +179,7 @@ pub async fn from_lockfile_with_bundle(
         start.elapsed().as_secs_f64()
     );
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
 
     let mut installer = Installer::new()
@@ -195,14 +220,23 @@ pub async fn from_lockfile_with_bundle(
 
 /// Install packages from a lockfile in offline mode (cache only, no bundle).
 pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette::Result<()> {
+    from_lockfile_offline_with_specs(prefix, lock_content, &config::embedded_config().packages)
+        .await
+}
+
+/// Install packages from a lockfile in offline mode with explicit requested specs.
+pub(crate) async fn from_lockfile_offline_with_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
+) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let cache_dir = default_cache_dir()
         .map_err(|e| miette::miette!("could not determine cache directory: {}", e))?;
     let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
 
     let start = Instant::now();

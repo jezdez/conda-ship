@@ -15,8 +15,22 @@ pub(crate) fn write_prefix_metadata(
     lock_content: &str,
     requested_specs: &[String],
 ) -> miette::Result<()> {
+    write_prefix_metadata_with_command(
+        prefix,
+        lock_content,
+        requested_specs,
+        policy::command_name(),
+    )
+}
+
+pub(crate) fn write_prefix_metadata_with_command(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
+    command_name: &str,
+) -> miette::Result<()> {
     let (platform, records) = install::lockfile_records_for_current_platform(lock_content)?;
-    write_prefix_metadata_from_records(prefix, platform, &records, requested_specs)
+    write_prefix_metadata_from_records(prefix, platform, &records, requested_specs, command_name)
 }
 
 fn write_prefix_metadata_from_records(
@@ -24,6 +38,7 @@ fn write_prefix_metadata_from_records(
     platform: Platform,
     records: &[RepoDataRecord],
     requested_specs: &[String],
+    command_name: &str,
 ) -> miette::Result<()> {
     let conda_meta = prefix.join("conda-meta");
     std::fs::create_dir_all(&conda_meta)
@@ -38,7 +53,7 @@ fn write_prefix_metadata_from_records(
     let history_path = conda_meta.join("history");
     std::fs::write(
         &history_path,
-        render_history(records, requested_specs, &timestamp)?,
+        render_history(records, requested_specs, &timestamp, command_name)?,
     )
     .into_diagnostic()
     .with_context(|| {
@@ -70,12 +85,13 @@ fn render_history(
     records: &[RepoDataRecord],
     requested_specs: &[String],
     timestamp: &str,
+    command_name: &str,
 ) -> miette::Result<String> {
     let mut dists: Vec<_> = records.iter().map(history_dist).collect();
     dists.sort();
 
     let mut content = format!("==> {timestamp} <==\n");
-    content.push_str(&format!("# cmd: {} bootstrap\n", policy::command_name()));
+    content.push_str(&format!("# cmd: {command_name} bootstrap\n"));
     for dist in dists {
         content.push('+');
         content.push_str(&dist);
@@ -209,7 +225,8 @@ mod tests {
             SHA256,
         )];
 
-        let history = render_history(&records, &["conda-spawn".to_string()], "123").unwrap();
+        let history =
+            render_history(&records, &["conda-spawn".to_string()], "123", "cs-template").unwrap();
 
         assert_eq!(
             history,
@@ -297,6 +314,7 @@ https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda#sha256:{SH
             Platform::Linux64,
             &records,
             &["conda".to_string()],
+            "cs-template",
         )
         .unwrap();
 

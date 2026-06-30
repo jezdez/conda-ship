@@ -13,7 +13,7 @@ use crate::policy;
 pub(crate) fn executable_in_prefix(prefix: &Path, executable: &str) -> std::path::PathBuf {
     let executable = executable_filename(executable);
     if cfg!(windows) {
-        for dir in delegate_path_dirs(prefix) {
+        for dir in prefix_path_entries(prefix) {
             let candidate = dir.join(&executable);
             if candidate.exists() {
                 return candidate;
@@ -82,7 +82,7 @@ pub(crate) fn apply_delegate_environment(cmd: &mut Command, prefix: &Path) -> mi
 }
 
 fn delegate_path_env(prefix: &Path) -> miette::Result<OsString> {
-    let mut paths = delegate_path_dirs(prefix);
+    let mut paths = prefix_path_entries(prefix);
     if let Some(existing) = std::env::var_os("PATH") {
         paths.extend(std::env::split_paths(&existing));
     }
@@ -90,7 +90,7 @@ fn delegate_path_env(prefix: &Path) -> miette::Result<OsString> {
         .map_err(|err| miette::miette!("failed to construct delegate PATH: {err}"))
 }
 
-fn delegate_path_dirs(prefix: &Path) -> Vec<PathBuf> {
+pub(crate) fn prefix_path_entries(prefix: &Path) -> Vec<PathBuf> {
     if cfg!(windows) {
         vec![
             prefix.to_path_buf(),
