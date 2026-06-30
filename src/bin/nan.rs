@@ -14,8 +14,8 @@ use miette::{Context, IntoDiagnostic};
 #[derive(Parser)]
 #[command(
     name = "nan",
-    about = "Example CLI for the experimental conda-fleet API",
-    long_about = "nan is an example binary for the experimental conda-fleet API. It is not a product CLI."
+    about = "Low-level harness for the experimental conda-fleet API",
+    long_about = "nan is a low-level test and debugging harness for the experimental conda-fleet API. It is not a product CLI, catalog, or recommended user workflow."
 )]
 struct Cli {
     /// Fleet install root. Required to avoid accidental writes to user-global locations.
@@ -28,9 +28,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum NanCommand {
-    /// Install a runtime from a JSON RuntimeSpec.
+    /// Install a runtime from a JSON RuntimeSpec fixture.
     Install {
-        /// JSON file matching conda_ship::fleet::RuntimeSpec.
+        /// JSON fixture matching conda_ship::fleet::RuntimeSpec.
+        ///
+        /// Real callers usually derive RuntimeSpec from their own catalog,
+        /// runtime descriptor, or conda-ship-generated artifact metadata.
         #[arg(long)]
         spec: PathBuf,
 

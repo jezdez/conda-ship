@@ -3,9 +3,8 @@
 `conda-fleet` is an experimental API behind the non-default Cargo feature
 `fleet`.
 
-```bash
-cargo run --features fleet --bin nan -- --help
-```
+The feature-gated `nan` binary can exercise this API during development, but
+it is a low-level harness rather than a product CLI or a catalog design.
 
 Downstream Rust consumers enable the same feature:
 
@@ -40,7 +39,9 @@ use conda_ship::fleet::{Fleet, FleetConfig};
 let fleet = Fleet::new(FleetConfig::new("/tmp/fleet"));
 ```
 
-`RuntimeSpec` is the complete install input:
+`RuntimeSpec` is the complete install input. Downstream orchestrators normally
+construct it from their own catalog, policy layer, downloaded descriptor, or
+conda-ship-generated runtime metadata:
 
 ```rust
 use conda_ship::fleet::RuntimeSpec;
@@ -55,7 +56,8 @@ let spec = RuntimeSpec {
 };
 ```
 
-The JSON shape used by `nan --spec SPEC.json` maps directly to `RuntimeSpec`:
+For tests and debugging, `nan --spec SPEC.fixture.json` reads a JSON fixture
+that maps directly to `RuntimeSpec`:
 
 ```json
 {
@@ -77,7 +79,8 @@ from `Fleet::status(id)` to decide whether a locked runtime is already current.
 
 If `RuntimeSpec::channels` is empty, fleet derives channels from the default
 environment in the lockfile and writes those to `.condarc`. This lets callers
-that already embed lockfiles avoid duplicating channel lists in their catalog.
+that already have conda-ship runtime metadata or embedded lockfiles avoid
+duplicating channel lists in their catalog.
 
 ## Install
 
@@ -170,12 +173,13 @@ script contents.
 
 ## Downstream Tool Manager Integration Shape
 
-A managed-tool layout maps directly to fleet when the downstream tool manager
-keeps product policy outside this crate:
+A managed-runtime layout maps directly to fleet when the downstream tool
+manager keeps product policy outside this crate:
 
 - `FleetConfig::new(tool_install_root)`
 - each tool id maps to `tool_install_root/<id>`
-- embedded or downloaded lock content maps to `RuntimeSpec::lock_content`
+- conda-ship runtime metadata, embedded lock content, or downloaded lock content
+  maps to `RuntimeSpec::lock_content`
 - global binary exposure remains caller-owned
 - `Fleet::status(id)?.lock_sha256` can replace a separate lock-hash sidecar
   when checking whether a tool is current
@@ -186,11 +190,11 @@ keeps product policy outside this crate:
   caller
 
 Callers can keep their existing catalog entry for the user-facing shim name and
-binary name, build a `RuntimeSpec` from a resolved lock, install through fleet,
-then write the shim or symlink using their existing overwrite and cleanup
-policy.
+binary name, build a `RuntimeSpec` from their runtime descriptor or resolved
+lock, install through fleet, then write the shim or symlink using their
+existing overwrite and cleanup policy.
 
-## Example CLI
+## Test Harness CLI
 
 The `nan` binary is compiled only with `--features fleet`:
 
@@ -198,5 +202,7 @@ The `nan` binary is compiled only with `--features fleet`:
 cargo run --features fleet --bin nan -- --install-root /tmp/fleet list
 ```
 
-`nan` is an example for API exploration and test coverage. It is not a conda
-CLI or conda-ship product surface.
+`nan` is for API exploration and test coverage. It accepts JSON fixtures
+because it intentionally has no catalog, downloader, policy layer, or
+conda-ship artifact discovery. It is not a conda CLI, conda-ship product
+surface, or recommended runtime orchestration interface.

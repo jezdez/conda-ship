@@ -1,8 +1,14 @@
-# Try The `nan` Fleet Example
+# Use The `nan` Fleet Harness
 
-`nan` is a feature-gated example binary for the experimental `conda-fleet` API.
-It is not a product CLI. It exists to show how a caller can install, inspect,
-run, and plan shims for multiple locked runtimes.
+`nan` is a feature-gated, low-level harness for the experimental
+`conda-fleet` API. It is not a product CLI and it is not the user workflow
+fleet is designed around.
+
+Fleet is meant to be called by an orchestrator that already knows which
+conda-ship runtime or locked tool runtime it wants to install. That
+orchestrator should derive `RuntimeSpec` from its own catalog, downloaded
+descriptor, or conda-ship-generated runtime metadata. `nan` reads a JSON
+fixture only because it has no catalog or artifact-discovery layer.
 
 Every command requires `--install-root PATH` so the example never writes to a
 user-global location by accident.
@@ -15,10 +21,11 @@ From the conda-ship repository:
 cargo run --features fleet --bin nan -- --help
 ```
 
-## Create A Runtime Spec
+## Create A RuntimeSpec Fixture
 
-`nan install` reads a JSON file that maps directly to
-`conda_ship::fleet::RuntimeSpec`.
+`nan install` reads a JSON fixture that maps directly to
+`conda_ship::fleet::RuntimeSpec`. This is useful for tests and API debugging,
+but it should not be treated as a proposed end-user spec format.
 
 ```json
 {
@@ -32,14 +39,16 @@ cargo run --features fleet --bin nan -- --help
 ```
 
 In a real test, `lock_content` should contain the full resolved rattler-lock
-document for the runtime. Fleet does not solve environments.
+document for the runtime. Fleet does not solve environments. Production callers
+should normally populate this field from the conda-ship runtime or tool
+descriptor they already selected.
 
 ## Install
 
 ```bash
 cargo run --features fleet --bin nan -- \
   --install-root /tmp/conda-fleet-demo \
-  install --spec SPEC.json
+  install --spec SPEC.fixture.json
 ```
 
 For an offline or bundled install:
@@ -47,7 +56,7 @@ For an offline or bundled install:
 ```bash
 cargo run --features fleet --bin nan -- \
   --install-root /tmp/conda-fleet-demo \
-  install --spec SPEC.json --bundle /path/to/bundle --offline
+  install --spec SPEC.fixture.json --bundle /path/to/bundle --offline
 ```
 
 Use `--force` only to replace an existing managed runtime with the same id.

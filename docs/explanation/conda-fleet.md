@@ -3,10 +3,11 @@
 `conda-fleet` is an experimental Rust API layer inside the `conda-ship` crate.
 It is enabled with the non-default Cargo feature `fleet`.
 
-The API is for orchestrators that need to manage several locked conda prefixes.
-Those orchestrators can install a Miniconda-like runtime and separate tool
-runtimes while keeping catalog lookup, user identity, onboarding, policy, and
-PATH setup outside conda-ship.
+The API is for orchestrators that need to manage several locked conda
+prefixes, including prefixes that back conda-ship-built runtime binaries. Those
+orchestrators can install a Miniconda-like runtime and separate tool runtimes
+while keeping catalog lookup, user identity, onboarding, policy, and PATH setup
+outside conda-ship.
 
 ## How Fleet Differs From Runtime Binaries
 
@@ -41,6 +42,12 @@ id.
 Fleet-installed metadata also records the SHA256 digest of the lock content, so
 an orchestrator can compare its candidate lock with the installed runtime
 without maintaining a separate registry or hash sidecar.
+
+`RuntimeSpec` is the explicit API input to `Fleet::install`, not a user-facing
+specification format. Production callers should derive it from their own
+catalog, downloaded descriptor, or conda-ship-generated runtime metadata. The
+feature-gated `nan` harness reads the same shape from JSON only so the API can
+be exercised without building a real catalog.
 
 ## What Fleet Owns
 
@@ -90,5 +97,6 @@ Projects that already standardize on native TLS can keep that choice explicit:
 conda-ship = { git = "https://github.com/jezdez/conda-ship", default-features = false, features = ["fleet", "native-tls"] }
 ```
 
-The example binary `nan` is also feature-gated and exists only to demonstrate
-the API. It is not a product CLI.
+The `nan` binary is also feature-gated and exists only as a low-level API
+harness for tests and debugging. It is not a product CLI or a recommended
+runtime distribution workflow.
