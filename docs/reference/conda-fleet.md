@@ -28,12 +28,12 @@ database.
 
 ## Core Types
 
-`FleetConfig` selects the install root:
+`Fleet::new` selects the install root:
 
 ```rust
-use conda_ship::fleet::{Fleet, FleetConfig};
+use conda_ship::fleet::Fleet;
 
-let fleet = Fleet::new(FleetConfig::new("/tmp/fleet"));
+let fleet = Fleet::new("/tmp/fleet");
 ```
 
 `RuntimeSpec` is the complete install input. Downstream orchestrators normally
@@ -79,7 +79,6 @@ let installed = fleet.install(spec, InstallOptions::default()).await?;
 - `offline`: install without network access
 - `bundle_dir`: pre-populate the shared rattler package cache from package
   archives
-- `compile_python_bytecode`: compile bytecode when Python is present
 
 Fleet refuses to install into unmanaged non-empty prefixes. When `force` is
 true, it still validates that an existing non-empty prefix is managed by the
@@ -123,15 +122,7 @@ processes or wrapper scripts.
 Fleet provides data-only helpers so callers can implement exposure safely:
 
 ```rust
-use conda_ship::fleet::ShimOptions;
-
-let plan = runtime.shim_plan(
-    "conda",
-    ShimOptions {
-        shim_name: "conda".to_string(),
-        shim_dir: None,
-    },
-)?;
+let plan = runtime.shim_plan("conda", "conda", None)?;
 ```
 
 Recommended caller behavior:
@@ -146,28 +137,6 @@ Recommended caller behavior:
   fleet.
 - Treat `ShimPlan` as a plan. Fleet never writes or removes shim files.
 
-`ShimPlan` includes the shim name, target command, destination path, target
-executable, environment variables, PATH entries, and wrapper script contents.
-
-## Downstream Tool Manager Integration Shape
-
-A managed-runtime layout maps directly to fleet when the downstream tool
-manager keeps product policy outside this crate:
-
-- `FleetConfig::new(tool_install_root)`
-- each tool id maps to `tool_install_root/<id>`
-- conda-ship runtime metadata, embedded lock content, or downloaded lock content
-  maps to `RuntimeSpec::lock_content`
-- global binary exposure remains caller-owned
-- `Fleet::status(id)?.lock_sha256` can replace a separate lock-hash sidecar
-  when checking whether a tool is current
-- `InstalledRuntime::command(binary)` replaces direct `prefix/bin/<binary>`
-  process construction
-- `InstalledRuntime::shim_plan(binary, options)` returns the target,
-  environment, PATH entries, and wrapper contents while leaving filesystem
-  writes in the caller
-
-Callers can keep their existing catalog entry for the user-facing shim name and
-binary name, build a `RuntimeSpec` from their runtime descriptor or resolved
-lock, install through fleet, then write the wrapper using their existing
-overwrite and cleanup policy.
+`ShimPlan` includes the shim name, target command, destination path, and
+`RuntimeCommand` data. The caller owns wrapper script contents and filesystem
+writes.

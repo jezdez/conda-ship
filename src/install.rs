@@ -24,7 +24,7 @@ use rattler_conda_types::{
 use rattler_lock::LockFile;
 use rattler_networking::AuthenticationMiddleware;
 
-use crate::{config, policy};
+use crate::{config, exec, policy};
 
 static GLOBAL_MP: std::sync::LazyLock<MultiProgress> = std::sync::LazyLock::new(|| {
     let mp = MultiProgress::new();
@@ -612,6 +612,33 @@ pub(crate) fn wrap_spinner<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>
     let result = func();
     pb.finish_and_clear();
     result
+}
+
+pub(crate) fn compile_python_bytecode(prefix: &Path) {
+    let python = exec::executable_in_prefix(prefix, "python");
+    if !python.exists() {
+        return;
+    }
+
+    let lib_dir = prefix.join("lib");
+    let result = wrap_spinner("compiling Python bytecode", move || {
+        std::process::Command::new(&python)
+            .args(["-m", "compileall", "-q", "-j", "0"])
+            .arg(&lib_dir)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+    });
+
+    match result {
+        Ok(status) if status.success() => {}
+        _ => {
+            eprintln!(
+                "   {} bytecode compilation finished with errors (non-fatal)",
+                console::style("!").yellow(),
+            );
+        }
+    }
 }
 
 #[cfg(test)]

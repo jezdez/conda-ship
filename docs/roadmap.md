@@ -39,15 +39,6 @@ The first API intentionally stays narrow:
 See [conda-fleet concepts](explanation/conda-fleet.md) and the
 [API reference](reference/conda-fleet.md).
 
-Follow-up work should happen outside this first API PR:
-
-- define the adapter from conda-ship runtime artifacts or runtime descriptors
-  into `RuntimeSpec`
-- add update, repair, and migration flows for fleet-managed runtimes
-- add install/remove concurrency locking
-- add realistic integration tests with conda-ship-built artifacts
-- clarify shared cache configuration for offline and bundled workflows
-
 ## Manifest And Plugin Work
 
 conda-ship supports conda-workspaces project input for downstream

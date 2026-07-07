@@ -18,32 +18,18 @@ use crate::{config, constructor_metadata, exec, hash, install, policy};
 
 const FLEET_COMMAND_NAME: &str = "conda-fleet";
 
-/// Configuration for a [`Fleet`] instance.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FleetConfig {
-    /// Directory that contains one managed runtime prefix per direct child.
-    pub install_root: PathBuf,
-}
-
-impl FleetConfig {
-    /// Create a fleet configuration with the given install root.
-    pub fn new(install_root: impl Into<PathBuf>) -> Self {
-        Self {
-            install_root: install_root.into(),
-        }
-    }
-}
-
 /// Manager for multiple conda-ship-managed runtime prefixes.
 #[derive(Clone, Debug)]
 pub struct Fleet {
-    config: FleetConfig,
+    install_root: PathBuf,
 }
 
 impl Fleet {
     /// Create a new fleet manager.
-    pub fn new(config: FleetConfig) -> Self {
-        Self { config }
+    pub fn new(install_root: impl Into<PathBuf>) -> Self {
+        Self {
+            install_root: install_root.into(),
+        }
     }
 
     /// Install a locked runtime into `install_root/<id>`.
@@ -61,12 +47,12 @@ impl Fleet {
         let channels = channels_from_lock_content(&spec.lock_content)?;
 
         let prefix = self.prefix_for(&spec.id)?;
-        std::fs::create_dir_all(&self.config.install_root)
+        std::fs::create_dir_all(&self.install_root)
             .into_diagnostic()
             .with_context(|| {
                 format!(
                     "failed to create fleet install root {}",
-                    policy::path_for_display(&self.config.install_root)
+                    policy::path_for_display(&self.install_root)
                 )
             })?;
 
@@ -135,9 +121,7 @@ impl Fleet {
             &spec.requested_specs,
         )?;
 
-        if options.compile_python_bytecode {
-            compile_python_bytecode(&prefix);
-        }
+        install::compile_python_bytecode(&prefix);
 
         self.read_installed_runtime(&prefix, &spec.id, "inspect")
     }
@@ -147,17 +131,17 @@ impl Fleet {
     /// Directories without valid metadata are ignored. Fleet does not maintain
     /// a separate registry database.
     pub fn list(&self) -> miette::Result<Vec<InstalledRuntime>> {
-        if !self.config.install_root.is_dir() {
+        if !self.install_root.is_dir() {
             return Ok(Vec::new());
         }
 
         let mut runtimes = Vec::new();
-        let entries = std::fs::read_dir(&self.config.install_root)
+        let entries = std::fs::read_dir(&self.install_root)
             .into_diagnostic()
             .with_context(|| {
                 format!(
                     "failed to read fleet install root {}",
-                    policy::path_for_display(&self.config.install_root)
+                    policy::path_for_display(&self.install_root)
                 )
             })?;
 
@@ -220,7 +204,7 @@ impl Fleet {
 
     fn prefix_for(&self, id: &str) -> miette::Result<PathBuf> {
         validate_runtime_id(id)?;
-        Ok(self.config.install_root.join(id))
+        Ok(self.install_root.join(id))
     }
 
     fn read_installed_runtime(
@@ -264,8 +248,7 @@ impl Fleet {
 /// orchestrator and fleet. It is not a user-facing catalog format: callers are
 /// expected to derive it from their own catalog, policy layer, downloaded
 /// descriptor, or conda-ship-generated runtime metadata.
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuntimeSpec {
     /// Stable runtime id and on-disk directory name under the install root.
     pub id: String,
@@ -276,7 +259,6 @@ pub struct RuntimeSpec {
     /// Resolved rattler-lock content for the runtime environment.
     pub lock_content: String,
     /// Requested specs recorded in `conda-meta/history` and prefix metadata.
-    #[serde(default)]
     pub requested_specs: Vec<String>,
 }
 
@@ -301,7 +283,7 @@ impl RuntimeSpec {
 }
 
 /// Options for installing a runtime.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InstallOptions {
     /// Replace an existing managed runtime with the same id.
     pub force: bool,
@@ -310,24 +292,10 @@ pub struct InstallOptions {
     pub offline: bool,
     /// Optional directory containing `.conda` or `.tar.bz2` package archives.
     pub bundle_dir: Option<PathBuf>,
-    /// Compile Python bytecode after installation when a Python executable is
-    /// present in the runtime.
-    pub compile_python_bytecode: bool,
-}
-
-impl Default for InstallOptions {
-    fn default() -> Self {
-        Self {
-            force: false,
-            offline: false,
-            bundle_dir: None,
-            compile_python_bytecode: true,
-        }
-    }
 }
 
 /// Runtime prefix discovered or installed by [`Fleet`].
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InstalledRuntime {
     /// Runtime id and directory name under the fleet install root.
     pub id: String,
@@ -340,7 +308,6 @@ pub struct InstalledRuntime {
     /// Channels recorded in the runtime `.condarc`.
     pub channels: Vec<String>,
     /// SHA256 digest of the lock content used for installation, when recorded.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lock_sha256: Option<String>,
     /// Requested specs recorded at install time.
     pub requested_specs: Vec<String>,
@@ -408,30 +375,27 @@ impl InstalledRuntime {
     /// Build a data-only plan for exposing a command through a shim.
     ///
     /// Fleet does not write the shim. Callers should review the destination and
-    /// wrapper contents, refuse overwrites by default, and add their own
-    /// ownership metadata when writing files.
-    pub fn shim_plan(&self, command_name: &str, options: ShimOptions) -> miette::Result<ShimPlan> {
+    /// command data, refuse overwrites by default, and add their own ownership
+    /// metadata when writing files.
+    pub fn shim_plan(
+        &self,
+        command_name: &str,
+        shim_name: &str,
+        shim_dir: Option<&Path>,
+    ) -> miette::Result<ShimPlan> {
         validate_command_name(command_name)?;
-        validate_shim_name(&options.shim_name)?;
+        validate_shim_name(shim_name)?;
 
         let command = self.command(command_name)?;
-        let env = os_env_to_strings(&command.env);
-        let destination = options
-            .shim_dir
-            .as_ref()
-            .map(|dir| dir.join(&options.shim_name))
-            .unwrap_or_else(|| PathBuf::from(&options.shim_name));
-        let wrapper_contents =
-            render_wrapper_script(self, &options.shim_name, command_name, &command)?;
+        let destination = shim_dir
+            .map(|dir| dir.join(shim_name))
+            .unwrap_or_else(|| PathBuf::from(shim_name));
 
         Ok(ShimPlan {
-            shim_name: options.shim_name,
+            shim_name: shim_name.to_string(),
             target_command: command_name.to_string(),
             destination,
-            target_executable: command.executable,
-            env,
-            path_entries: command.path_entries,
-            wrapper_contents,
+            command,
         })
     }
 }
@@ -447,19 +411,8 @@ pub struct RuntimeCommand {
     pub path_entries: Vec<PathBuf>,
 }
 
-/// Options for building a [`ShimPlan`].
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct ShimOptions {
-    /// Name of the shim file the caller intends to expose.
-    pub shim_name: String,
-    /// Optional directory where the caller plans to write the shim.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub shim_dir: Option<PathBuf>,
-}
-
 /// Data-only plan for exposing a runtime command.
-#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ShimPlan {
     /// Name of the shim file.
     pub shim_name: String,
@@ -468,14 +421,8 @@ pub struct ShimPlan {
     /// Planned shim path. This may be relative when no shim directory was
     /// provided.
     pub destination: PathBuf,
-    /// Absolute executable path inside the runtime prefix.
-    pub target_executable: PathBuf,
-    /// Environment variables represented as UTF-8 strings for JSON output.
-    pub env: BTreeMap<String, String>,
-    /// Prefix-local directories that should be prepended to `PATH`.
-    pub path_entries: Vec<PathBuf>,
-    /// Suggested wrapper script contents.
-    pub wrapper_contents: String,
+    /// Runtime command data the caller can use when writing a wrapper.
+    pub command: RuntimeCommand,
 }
 
 fn metadata_file_for(id: &str) -> String {
@@ -649,33 +596,6 @@ fn clear_readonly_recursive(path: &Path) -> miette::Result<()> {
     Ok(())
 }
 
-fn compile_python_bytecode(prefix: &Path) {
-    let python = exec::executable_in_prefix(prefix, "python");
-    if !python.exists() {
-        return;
-    }
-
-    let lib_dir = prefix.join("lib");
-    let result = install::wrap_spinner("compiling Python bytecode", move || {
-        std::process::Command::new(&python)
-            .args(["-m", "compileall", "-q", "-j", "0"])
-            .arg(&lib_dir)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-    });
-
-    match result {
-        Ok(status) if status.success() => {}
-        _ => {
-            eprintln!(
-                "   {} bytecode compilation finished with errors (non-fatal)",
-                console::style("!").yellow(),
-            );
-        }
-    }
-}
-
 fn fleet_frozen_message(id: &str) -> String {
     format!(
         "This base environment is managed by conda-fleet runtime {id}.\n\
@@ -685,95 +605,6 @@ To override: pass --override-frozen-env"
     )
 }
 
-fn os_env_to_strings(env: &BTreeMap<String, OsString>) -> BTreeMap<String, String> {
-    env.iter()
-        .map(|(key, value)| (key.clone(), value.to_string_lossy().into_owned()))
-        .collect()
-}
-
-fn render_wrapper_script(
-    runtime: &InstalledRuntime,
-    shim_name: &str,
-    command_name: &str,
-    command: &RuntimeCommand,
-) -> miette::Result<String> {
-    if cfg!(windows) {
-        Ok(render_windows_wrapper(
-            runtime,
-            shim_name,
-            command_name,
-            command,
-        ))
-    } else {
-        render_posix_wrapper(runtime, shim_name, command_name, command)
-    }
-}
-
-fn render_posix_wrapper(
-    runtime: &InstalledRuntime,
-    shim_name: &str,
-    command_name: &str,
-    command: &RuntimeCommand,
-) -> miette::Result<String> {
-    let path = std::env::join_paths(&command.path_entries)
-        .map_err(|err| miette::miette!("failed to construct shim PATH: {err}"))?
-        .to_string_lossy()
-        .into_owned();
-    let mut script = String::new();
-    script.push_str("#!/bin/sh\n");
-    script.push_str("# conda-fleet-shim: v1\n");
-    script.push_str(&format!("# conda-fleet-runtime: {}\n", runtime.id));
-    script.push_str(&format!("# conda-fleet-shim-name: {shim_name}\n"));
-    script.push_str(&format!("# conda-fleet-command: {command_name}\n"));
-    for (key, value) in os_env_to_strings(&command.env) {
-        script.push_str("export ");
-        script.push_str(&key);
-        script.push('=');
-        script.push_str(&shell_quote(&value));
-        script.push('\n');
-    }
-    script.push_str("export PATH=");
-    script.push_str(&shell_quote(&path));
-    script.push_str(":${PATH:-}\n");
-    script.push_str("exec ");
-    let executable = command.executable.to_string_lossy();
-    script.push_str(&shell_quote(executable.as_ref()));
-    script.push_str(" \"$@\"\n");
-    Ok(script)
-}
-
-fn render_windows_wrapper(
-    runtime: &InstalledRuntime,
-    shim_name: &str,
-    command_name: &str,
-    command: &RuntimeCommand,
-) -> String {
-    let path = command
-        .path_entries
-        .iter()
-        .map(|path| path.to_string_lossy())
-        .collect::<Vec<_>>()
-        .join(";");
-    let mut script = String::new();
-    script.push_str("@echo off\r\n");
-    script.push_str("rem conda-fleet-shim: v1\r\n");
-    script.push_str(&format!("rem conda-fleet-runtime: {}\r\n", runtime.id));
-    script.push_str(&format!("rem conda-fleet-shim-name: {shim_name}\r\n"));
-    script.push_str(&format!("rem conda-fleet-command: {command_name}\r\n"));
-    for (key, value) in os_env_to_strings(&command.env) {
-        script.push_str(&format!("set \"{key}={value}\"\r\n"));
-    }
-    script.push_str(&format!("set \"PATH={path};%PATH%\"\r\n"));
-    script.push('"');
-    script.push_str(&command.executable.to_string_lossy());
-    script.push_str("\" %*\r\n");
-    script
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\"'\"'"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -781,7 +612,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn fleet(root: &Path) -> Fleet {
-        Fleet::new(FleetConfig::new(root))
+        Fleet::new(root)
     }
 
     fn empty_lock() -> String {
@@ -871,13 +702,7 @@ packages: []
         let fleet = fleet(&install_root);
 
         let installed = fleet
-            .install(
-                spec("tool"),
-                InstallOptions {
-                    compile_python_bytecode: false,
-                    ..InstallOptions::default()
-                },
-            )
+            .install(spec("tool"), InstallOptions::default())
             .await
             .unwrap();
 
@@ -938,13 +763,7 @@ packages: []
         let fleet = fleet(&install_root);
         let err = tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(fleet.install(
-                spec("tool"),
-                InstallOptions {
-                    compile_python_bytecode: false,
-                    ..InstallOptions::default()
-                },
-            ))
+            .block_on(fleet.install(spec("tool"), InstallOptions::default()))
             .unwrap_err()
             .to_string();
         assert!(err.contains("unmanaged non-empty prefix"), "{err}");
@@ -981,17 +800,12 @@ packages: []
         let activation = runtime.activation_env("runner");
         assert_eq!(activation.get("CONDA_PREFIX"), Some(&prefix.clone().into()));
 
+        let shim_dir = tmp.path().join("bin");
         let plan = runtime
-            .shim_plan(
-                "runner",
-                ShimOptions {
-                    shim_name: "runner-shim".to_string(),
-                    shim_dir: Some(tmp.path().join("bin")),
-                },
-            )
+            .shim_plan("runner", "runner-shim", Some(&shim_dir))
             .unwrap();
         assert_eq!(plan.destination, tmp.path().join("bin").join("runner-shim"));
-        assert_eq!(plan.target_executable, executable);
-        assert!(plan.wrapper_contents.contains("conda-fleet-shim"));
+        assert_eq!(plan.command.executable, executable);
+        assert!(plan.command.path_entries.contains(&prefix.join("condabin")));
     }
 }
