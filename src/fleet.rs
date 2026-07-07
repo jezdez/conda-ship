@@ -1,6 +1,6 @@
 //! Experimental APIs for managing multiple locked conda runtimes.
 //!
-//! `conda-fleet` is an optional API layer for tools that want to install and
+//! Fleet is an optional API layer for tools that want to install and
 //! inspect several conda-ship-managed prefixes. It does not solve
 //! environments, choose catalogs, create shims, or mutate a user's global
 //! `PATH`.
@@ -16,7 +16,7 @@ use rattler_lock::LockFile;
 
 use crate::{config, constructor_metadata, exec, hash, install, policy};
 
-const FLEET_COMMAND_NAME: &str = "conda-fleet";
+const FLEET_COMMAND_NAME: &str = "fleet";
 
 /// Manager for multiple conda-ship-managed runtime prefixes.
 #[derive(Clone, Debug)]
@@ -598,7 +598,7 @@ fn clear_readonly_recursive(path: &Path) -> miette::Result<()> {
 
 fn fleet_frozen_message(id: &str) -> String {
     format!(
-        "This base environment is managed by conda-fleet runtime {id}.\n\
+        "This base environment is managed by fleet runtime {id}.\n\
 Create a new environment instead: conda create -n myenv\n\
 To reinstall: use the fleet caller that installed this runtime\n\
 To override: pass --override-frozen-env"

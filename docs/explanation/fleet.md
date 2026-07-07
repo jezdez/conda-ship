@@ -1,7 +1,7 @@
-# conda-fleet Concepts
+# Fleet Concepts
 
-`conda-fleet` is an experimental Rust API layer inside the `conda-ship` crate.
-It is enabled with the non-default Cargo feature `fleet`.
+Fleet is an experimental Rust API layer inside the `conda-ship` crate. It is
+enabled with the non-default Cargo feature `fleet`.
 
 The API is for orchestrators that need to manage several locked conda
 prefixes, including prefixes that back conda-ship-built runtime binaries. Those

@@ -42,7 +42,7 @@ The generated runtime behavior also lives here: automatic first-run bootstrap,
 execution of the configured delegate, offline bundle handling, and embedded
 bundle handling. conda-ship does not define the delegate's commands or plugins.
 
-The experimental [conda-fleet API](conda-fleet.md) also lives here because it
+The experimental [fleet API](fleet.md) also lives here because it
 reuses conda-ship install mechanics for multiple locked prefixes. Fleet remains
 an API layer: it does not choose catalogs, user-facing command names, global
 PATH policy, login behavior, onboarding, enterprise policy, or shim filesystem

@@ -21,10 +21,10 @@ The repository stays focused on producing runtimes. Distribution
 wrappers such as Homebrew formulae, constructor-based installers, Docker images,
 or enterprise package manager recipes live outside the core builder.
 
-## Experimental conda-fleet API
+## Experimental Fleet API
 
-`conda-fleet` is the experimental Rust API name. The Cargo feature that enables
-it is `fleet`. It lets orchestrators manage multiple locked conda prefixes while
+Fleet is an experimental Rust API. The Cargo feature that enables it is
+`fleet`. It lets orchestrators manage multiple locked conda prefixes while
 reusing conda-ship install mechanics, metadata, offline bundle handling, shared
 rattler cache behavior, ownership checks, and command environment rules.
 
@@ -36,7 +36,7 @@ The first API intentionally stays narrow:
 - no global PATH mutation
 - no filesystem-mutating shim writer
 
-See [conda-fleet concepts](explanation/conda-fleet.md) and the
+See [fleet concepts](explanation/fleet.md) and the
 [API reference](reference/fleet.md).
 
 ## Manifest And Plugin Work
