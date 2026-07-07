@@ -1,9 +1,7 @@
 # conda-fleet API Reference
 
-`conda-fleet` is the experimental API name. The Cargo feature that enables it
-is `fleet`.
-
-Downstream Rust consumers enable the same feature:
+`conda-fleet` is an experimental API for managing multiple locked conda
+prefixes. Enable the `fleet` feature to use it:
 
 ```toml
 [dependencies]
