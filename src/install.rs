@@ -137,7 +137,7 @@ pub async fn from_lockfile_with_bundle(
         let cache = &package_cache;
         async move {
             cache
-                .get_or_fetch_from_path(path, None)
+                .get_or_fetch_from_path(path, None, None)
                 .await
                 .into_diagnostic()
                 .context(format!(
