@@ -1,7 +1,7 @@
 # conda-fleet API Reference
 
-`conda-fleet` is an experimental API behind the non-default Cargo feature
-`fleet`.
+`conda-fleet` is the experimental API name. The Cargo feature that enables it
+is `fleet`.
 
 Downstream Rust consumers enable the same feature:
 

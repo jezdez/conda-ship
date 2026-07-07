@@ -23,8 +23,8 @@ or enterprise package manager recipes live outside the core builder.
 
 ## Experimental conda-fleet API
 
-`conda-fleet` is an experimental Rust API behind the non-default Cargo feature
-`fleet`. It lets orchestrators manage multiple locked conda prefixes while
+`conda-fleet` is the experimental Rust API name. The Cargo feature that enables
+it is `fleet`. It lets orchestrators manage multiple locked conda prefixes while
 reusing conda-ship install mechanics, metadata, offline bundle handling, shared
 rattler cache behavior, ownership checks, and command environment rules.
 
