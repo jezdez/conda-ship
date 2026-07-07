@@ -44,7 +44,7 @@ Then follow the [quickstart](tutorials/quickstart.md).
   [project boundaries](explanation/project-boundaries.md).
 - Building an orchestrator for multiple locked runtimes: read
   [conda-fleet concepts](explanation/conda-fleet.md) and the
-  [conda-fleet API reference](reference/conda-fleet.md).
+  [fleet API reference](reference/fleet.md).
 
 ## Scope
 
@@ -87,7 +87,7 @@ reference/cli
 reference/names
 reference/conda-plugin
 reference/runtime-cli
-reference/conda-fleet
+reference/fleet
 reference/github-action
 reference/configuration
 reference/artifacts

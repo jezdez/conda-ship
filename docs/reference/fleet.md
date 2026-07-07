@@ -1,4 +1,4 @@
-# conda-fleet API Reference
+# Fleet API Reference
 
 `conda-fleet` is an experimental API for managing multiple locked conda
 prefixes. Enable the `fleet` feature to use it:

@@ -37,7 +37,7 @@ The first API intentionally stays narrow:
 - no filesystem-mutating shim writer
 
 See [conda-fleet concepts](explanation/conda-fleet.md) and the
-[API reference](reference/conda-fleet.md).
+[API reference](reference/fleet.md).
 
 ## Manifest And Plugin Work
 
