@@ -2,8 +2,8 @@
 
 ## Executive Summary
 
-conda-ship turns a solved conda environment into a ready-to-run runtime. It
-owns generic build and bootstrap mechanics. It is not a distribution, an
+conda-ship turns a solved conda environment into a ready-to-run runtime.
+It owns generic build and bootstrap mechanics. It is not a distribution, an
 environment manager, or an installer generator.
 
 At a glance:
@@ -17,6 +17,34 @@ At a glance:
   its configured delegate.
 - The downstream project owns package sets, runtime names, user-facing policy,
   installers, documentation, and release channels.
+
+## The Runtime Flow
+
+```{mermaid}
+flowchart LR
+    subgraph downstream["Downstream project"]
+        direction TB
+        intent["Package intent"] --> solver["Solver"] --> source_lock["Source lock"]
+        choices["Runtime and release choices"] -. "configuration" .-> builder
+    end
+
+    subgraph ship["conda-ship"]
+        direction TB
+        builder["Builder"] --> runtime_lock["Runtime lock"]
+        builder --> bundle["Optional package bundle"]
+        builder --> artifacts["Staged artifacts"]
+        runtime_lock --> artifacts
+        bundle --> artifacts
+    end
+
+    subgraph machine["User machine"]
+        direction TB
+        runtime["Generated runtime"] --> prefix["Managed prefix"] --> delegate["Delegate"]
+    end
+
+    source_lock --> builder
+    artifacts --> runtime
+```
 
 The rest of this section explains those boundaries and the data that moves
 through them.

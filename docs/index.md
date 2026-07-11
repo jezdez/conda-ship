@@ -97,7 +97,7 @@ reference/errors
 :caption: Explanation
 :maxdepth: 1
 
-explanation/concepts
+explanation/overview
 explanation/source-locks-and-runtime-locks
 explanation/runtime-template
 explanation/install-locations-and-ownership
