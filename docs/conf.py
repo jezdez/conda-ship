@@ -14,6 +14,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx_copybutton",
     "sphinx_design",
+    "sphinxcontrib.mermaid",
     "sphinx_sitemap",
 ]
 
