@@ -24,6 +24,12 @@ myst_enable_extensions = [
 ]
 
 html_theme = "conda_sphinx_theme"
+html_static_path = ["_static"]
+html_css_files = ["css/custom.css"]
+
+mermaid_height = "auto"
+mermaid_fullscreen = False
+mermaid_light_theme = "neutral"
 
 html_theme_options = {
     "icon_links": [
