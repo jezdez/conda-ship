@@ -1,0 +1,22 @@
+/* Mermaid diagrams */
+
+.bd-content .mermaid-container {
+  margin: 1.5rem 0;
+}
+
+.bd-content .mermaid-container > pre.mermaid {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  overflow: visible;
+  padding: 0;
+}
+
+.bd-content .mermaid-container > pre.mermaid > svg {
+  height: auto !important;
+  max-width: 48rem !important;
+  width: 100% !important;
+}
