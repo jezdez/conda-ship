@@ -21,15 +21,15 @@ At a glance:
 ## The Runtime Flow
 
 ```{mermaid}
-flowchart LR
+flowchart TB
     subgraph downstream["Downstream project"]
-        direction TB
+        direction LR
         intent["Package intent"] --> solver["Solver"] --> source_lock["Source lock"]
         choices["Runtime and release choices"] -. "configuration" .-> builder
     end
 
     subgraph ship["conda-ship"]
-        direction TB
+        direction LR
         builder["Builder"] --> runtime_lock["Runtime lock"]
         builder --> bundle["Optional package bundle"]
         builder --> artifacts["Staged artifacts"]
@@ -38,7 +38,7 @@ flowchart LR
     end
 
     subgraph machine["User machine"]
-        direction TB
+        direction LR
         runtime["Generated runtime"] --> prefix["Managed prefix"] --> delegate["Delegate"]
     end
 
