@@ -25,7 +25,7 @@ flowchart TB
     subgraph downstream["Downstream project"]
         direction LR
         intent["Package intent"] --> solver["Solver (e.g. Pixi, conda)"] --> source_lock["Source lock"]
-        choices["Runtime and release choices"] -. "configuration" .-> builder
+        choices["Runtime and release choices"]
     end
 
     subgraph ship["conda-ship"]
@@ -43,6 +43,7 @@ flowchart TB
     end
 
     source_lock --> builder
+    choices -. "configuration" .-> builder
     artifacts --> runtime
 ```
 
