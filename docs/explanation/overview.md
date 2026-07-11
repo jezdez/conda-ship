@@ -24,7 +24,7 @@ At a glance:
 flowchart TB
     subgraph downstream["Downstream project"]
         direction LR
-        intent["Package intent"] --> solver["Solver"] --> source_lock["Source lock"]
+        intent["Package intent"] --> solver["Solver (e.g. Pixi, conda)"] --> source_lock["Source lock"]
         choices["Runtime and release choices"] -. "configuration" .-> builder
     end
 
