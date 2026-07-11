@@ -1,64 +1,83 @@
-# Concepts
+# Overview
 
-conda-ship separates three concerns:
+## Executive Summary
 
-- resolving and recording a conda runtime package set
-- stamping a generic runtime template into a distribution-specific runtime
-- staging release artifacts that downstream projects can distribute
+conda-ship turns a solved conda environment into a ready-to-run runtime. It
+owns generic build and bootstrap mechanics. It is not a distribution, an
+environment manager, or an installer generator.
 
-The split from conda-express makes that separation explicit. conda-ship owns these
-generic concerns; conda-express owns the `cx` and `cxz` distribution built with
-them.
+At a glance:
+
+- A downstream project uses conda-workspaces or Pixi to solve and commit its
+  package records.
+- The builder selects one solved environment, derives a runtime lock, stamps
+  the generic runtime template, and stages online, external, or embedded
+  artifacts.
+- The generated runtime bootstraps a managed prefix and passes user commands to
+  its configured delegate.
+- The downstream project owns package sets, runtime names, user-facing policy,
+  installers, documentation, and release channels.
+
+The rest of this section explains those boundaries and the data that moves
+through them.
 
 ## Builder
 
-The `cs` CLI is the builder. It reads `conda.toml`/`conda.lock`,
-`pyproject.toml` with `[tool.conda]` plus `conda.lock`, the compatible
-`pixi.toml`/`pixi.lock` pair, or `pyproject.toml` with `[tool.pixi]` plus
-`pixi.lock`, applies `[tool.conda-ship]`, then derives a runtime lock, bundle files,
-runtimes, and artifact metadata.
+The builder turns a project's selected locked environment into release
+artifacts. It reads one of these standard manifest and lockfile pairs:
+
+| Project type | Manifest | Lockfile |
+| --- | --- | --- |
+| Conda Workspaces | `conda.toml` or configured `pyproject.toml` | `conda.lock` |
+| Pixi | `pixi.toml` or configured `pyproject.toml` | `pixi.lock` |
+
+It applies the project's [build configuration](../reference/configuration.md),
+then derives a runtime lock, bundle files, runtimes, and artifact metadata.
 
 The selected source lockfile is the source of the concrete conda package
 records. conda-ship is not a replacement for
-{external+conda-workspaces:doc}`conda-workspaces <index>`, Pixi, or any other
-workspace solver; it consumes a solved environment and turns it into
-runtime artifacts.
+{external+conda-workspaces:doc}`conda-workspaces <index>`, Pixi, or another
+workspace solver. It consumes a solved environment and turns it into runtime
+artifacts.
 
 ## Runtime
 
-A runtime is the executable that users run after conda-ship finishes.
-Examples include `demo`, `cx`, and downstream-specific embedded names such as
-`cxz`.
+A runtime is the generated executable that users run after a build.
 
-The runtime name is the base identity for that runtime. It can come from
-`[tool.conda-ship].runtime-name` or `--runtime-name`, and it is not a conda
-environment name. Builds use the same value as the staged executable and
-artifact name unless `[tool.conda-ship].artifact-name` or `--artifact-name`
-names a distinct artifact.
+Its runtime name is its base identity, not a conda environment name. By
+default, the build uses the same name for the staged executable and artifact.
+Projects can choose a distinct artifact name when a release needs a different
+filename. See the [configuration reference](../reference/configuration.md).
 
-Use "runtime" for the executable conda-ship produces, "delegate" for the
-executable inside the managed prefix that receives pass-through arguments, and
-"artifact" for the release files written to `dist/`.
+Runtime
+: The executable conda-ship produces.
+
+Delegate
+: The executable inside the managed prefix that receives pass-through commands.
+
+Artifact
+: A release file staged by the build.
 
 ## Runtime Template
 
-`cs-template` is an internal generic binary target. It is not a first-party
-distribution. During `cs build`, the builder copies a generic runtime
-template under the resolved runtime name and stamps the copy with the runtime
-name, delegate, install scheme, install name, metadata filename, environment
-variable names, runtime lock, and optional bundle. The stamped copy is the runtime.
+The generic runtime template is an internal binary target. It is not a
+first-party distribution. During a build, the builder copies that template
+under the runtime name and stamps it with the runtime name, delegate, install
+scheme, install name, metadata filename, environment variable names, runtime
+lock, and optional bundle. The stamped copy is the runtime.
+
 Released builds and packaged local builds use prebuilt template assets.
 
 ## Runtime Lock
 
-The runtime lock is derived from the configured source environment, then filtered
-through `[tool.conda-ship].exclude-packages`. conda-ship stamps the derived lock into every
-runtime artifact and stages a copy next to the output binary. It is not a second
-checked-in project lockfile.
+The runtime lock comes from the configured source environment after applying
+the project's package exclusions. conda-ship stamps the derived lock into every
+runtime artifact and stages a copy next to the output binary. It is build
+output, not a second checked-in project lockfile.
 
-`cs inspect` derives the same runtime lock without writing files, so it is
-the local preflight command. `cs build` and `cs run` derive the lock as part
-of their normal work.
+The inspection command derives the same runtime lock without writing files,
+which makes it the local preflight step. Build and run operations derive the
+lock as part of their normal work.
 
 The generated runtime can install from:
 
@@ -69,15 +88,15 @@ The generated runtime can install from:
 ## Bundles
 
 Bundles contain downloaded conda package archives. They are not conda channel
-mirrors; conda-ship already has the channel and package records in the runtime
-lock.
+mirrors. The runtime lock already records the channels and package records.
 
-The `external` layout pairs a runtime with `RUNTIME.bundle.tar.zst`. The
-`embedded` layout includes the compressed bundle inside the runtime and can use
-an explicit artifact name when configured.
+An external artifact stages its bundle alongside the runtime. An embedded
+artifact carries the compressed bundle inside the runtime. See
+[artifact layouts](../how-to/choose-artifact-layout.md) for the exact files and
+configuration choices.
 
-An embedded runtime automatically uses its bundled archives during
-bootstrap. An explicit `--bundle` can still override that bundle.
+An embedded runtime automatically uses its bundled archives during bootstrap.
+Its bundle can be overridden when needed.
 
 The bundle format is intentionally narrow. conda-ship writes top-level `.conda`
 and `.tar.bz2` files, then verifies them against the lockfile at install time.
