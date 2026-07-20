@@ -36,7 +36,7 @@ fn test_runtime_template_refuses_to_run_without_stamp() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "runtime template, not a runnable conda runtime",
+            "runtime template, not a runnable runtime",
         ));
 }
 
@@ -82,7 +82,7 @@ fn test_runtime_nonexistent_prefix_reports_missing(#[case] cmd: MissingPrefixCmd
     }
     c.assert()
         .success()
-        .stderr(predicate::str::contains("No conda installation found"));
+        .stderr(predicate::str::contains("No runtime installation found"));
 }
 
 #[test]

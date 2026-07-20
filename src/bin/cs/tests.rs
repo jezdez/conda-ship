@@ -20,7 +20,7 @@ use super::diagnostic::{DiagnosticKind, ShipDiagnostic};
 use super::project::{
     DerivedRuntimeLock, ManifestKind, ProjectInput, derive_runtime_lock, discover_manifest_path,
     discover_project_input, filter_excluded, find_project_root, is_supported_pyproject_manifest,
-    manifest_kind, validate_required_runtime_packages,
+    manifest_kind,
 };
 use super::{
     BundleLayout, Cli, Command, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionConfig,
@@ -143,13 +143,14 @@ source-environment = "ship"
 }
 
 #[test]
-fn test_derive_runtime_lock_accepts_conda_workspaces_lock_v1() {
+fn test_derive_runtime_lock_accepts_conda_workspaces_lock_v1_without_conda() {
     let tmp = TempDir::new().unwrap();
     std::fs::write(
         tmp.path().join("conda.toml"),
         r#"
 [tool.conda-ship]
 source-environment = "ship"
+delegate-executable = "python"
 "#,
     )
     .unwrap();
@@ -167,15 +168,9 @@ environments:
       - url: https://conda.anaconda.org/conda-forge
     packages:
       linux-64:
-        - conda: https://conda.anaconda.org/conda-forge/linux-64/conda-1.0-0.conda
-        - conda: https://conda.anaconda.org/conda-forge/noarch/conda-rattler-solver-1.0-0.conda
-        - conda: https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda
+        - conda: https://conda.anaconda.org/conda-forge/linux-64/python-1.0-0.conda
 packages:
-  - conda: https://conda.anaconda.org/conda-forge/linux-64/conda-1.0-0.conda
-    sha256: {sha256}
-  - conda: https://conda.anaconda.org/conda-forge/noarch/conda-rattler-solver-1.0-0.conda
-    sha256: {sha256}
-  - conda: https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda
+  - conda: https://conda.anaconda.org/conda-forge/linux-64/python-1.0-0.conda
     sha256: {sha256}
 "#
         ),
@@ -186,15 +181,8 @@ packages:
 
     assert_eq!(derived.source_environment, "ship");
     assert_eq!(derived.platforms, vec![Platform::Linux64]);
-    assert_eq!(
-        derived.runtime_config.packages,
-        vec![
-            "conda".to_string(),
-            "conda-rattler-solver".to_string(),
-            "conda-spawn".to_string(),
-        ]
-    );
-    assert_eq!(derived.total_packages, 3);
+    assert_eq!(derived.runtime_config.packages, vec!["python".to_string()]);
+    assert_eq!(derived.total_packages, 1);
 }
 
 #[test]
@@ -484,30 +472,6 @@ fn test_multiple_simultaneous_excludes() {
     let (filtered, removed) = filter_excluded(&packages, &excludes).unwrap();
     assert_eq!(removed, vec!["a", "b", "only-b", "shared"]);
     assert_eq!(filtered.len(), 1);
-}
-
-#[test]
-fn test_validate_required_runtime_packages_accepts_runtime_contract() {
-    let packages = vec![
-        make_pkg("conda", &[]),
-        make_pkg("conda-spawn", &[]),
-        make_pkg("conda-rattler-solver", &[]),
-    ];
-
-    validate_required_runtime_packages("linux-64", &packages).unwrap();
-}
-
-#[test]
-fn test_validate_required_runtime_packages_rejects_missing_runtime_package() {
-    let packages = vec![
-        make_pkg("conda", &[]),
-        make_pkg("conda-rattler-solver", &[]),
-    ];
-
-    let err = validate_required_runtime_packages("linux-64", &packages)
-        .unwrap_err()
-        .to_string();
-    assert!(err.contains("missing required package(s): conda-spawn"));
 }
 
 #[rstest]

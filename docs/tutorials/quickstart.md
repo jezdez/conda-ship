@@ -28,7 +28,7 @@ conda workspace --help
 
 ## Create A Runtime Project
 
-Create a project and add the packages required by generated conda runtimes:
+Create a project and add the packages chosen for this conda runtime:
 
 ```bash
 mkdir demo-runtime

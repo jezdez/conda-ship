@@ -95,7 +95,7 @@ RUNTIME [--path PATH] status
 ```
 
 The output includes the runtime name, runtime version, install path, configured
-channels, configured package specs, installed package count, and conda
+channels, configured package specs, installed package count, and delegate
 executable path for the managed prefix.
 
 ## `RUNTIME shell`
@@ -114,7 +114,8 @@ exit
 ```
 
 This command delegates to `conda spawn`. It uses the runtime's default install
-path.
+path. It is available when the downstream distribution includes `conda-spawn`
+in its selected source environment.
 
 ## `RUNTIME uninstall`
 
@@ -173,9 +174,10 @@ directories, `Scripts`, `bin`, and `condabin`.
 
 ## Disabled Shell Commands
 
-Generated runtimes use conda-spawn for activation. When the delegate is
-`conda`, these commands are intercepted with runtime-specific guidance instead
-of being passed through:
+Generated runtimes can use conda-spawn for activation when it is included in
+the selected source environment. When the delegate is `conda`, these commands
+are intercepted with runtime-specific guidance instead of being passed
+through:
 
 - `RUNTIME activate`
 - `RUNTIME deactivate`

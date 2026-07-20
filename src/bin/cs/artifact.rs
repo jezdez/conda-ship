@@ -14,9 +14,8 @@ use super::project::{
     write_generated_runtime_lock,
 };
 use super::{
-    BUNDLE_ARCHIVE_FILE, BundleLayout, REQUIRED_RUNTIME_PACKAGES, RUNTIME_LOCK_FILE,
-    RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionSource, SHIP_STATE_DIR, ShipConfig,
-    runtime_data,
+    BUNDLE_ARCHIVE_FILE, BundleLayout, RUNTIME_LOCK_FILE, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig,
+    RuntimeVersionSource, SHIP_STATE_DIR, ShipConfig, runtime_data,
 };
 
 #[derive(Debug)]
@@ -94,7 +93,6 @@ struct InspectRuntimeInput {
 struct InspectValidation {
     source_lockfile: String,
     runtime_lock_derivation: String,
-    required_packages: Vec<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -457,10 +455,6 @@ fn inspect_report(
         validation: InspectValidation {
             source_lockfile: "ok".to_string(),
             runtime_lock_derivation: "ok".to_string(),
-            required_packages: REQUIRED_RUNTIME_PACKAGES
-                .iter()
-                .map(|name| (*name).to_string())
-                .collect(),
         },
         exclusions: InspectExclusions {
             configured: derived.runtime_config.exclude_packages.clone(),
@@ -502,11 +496,6 @@ fn print_inspect_report(
     writeln!(writer, "Validation")?;
     writeln!(writer, "  source lockfile: ok")?;
     writeln!(writer, "  runtime lock derivation: ok")?;
-    writeln!(
-        writer,
-        "  required packages: {}",
-        REQUIRED_RUNTIME_PACKAGES.join(", ")
-    )?;
     writeln!(writer)?;
     writeln!(writer, "Exclusions")?;
     writeln!(

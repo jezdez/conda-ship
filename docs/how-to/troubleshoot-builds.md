@@ -107,22 +107,6 @@ Fix:
 - refresh the matching lockfile
 - rerun `cs inspect`
 
-## Required Runtime Packages Missing
-
-Error shape:
-
-```text
-selected source environment ... is missing required package(s)
-```
-
-The selected source environment must include:
-
-- `conda`
-- `conda-rattler-solver`
-- `conda-spawn`
-
-Add the missing packages to the source environment and refresh the lockfile.
-
 ## Runtime Template Not Found
 
 Error shape:

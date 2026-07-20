@@ -40,7 +40,7 @@ conda-ship owns the reusable build and runtime machinery:
 
 The generated runtime behavior also lives here: `bootstrap`, `status`, `shell`,
 `uninstall`, pass-through to the configured delegate, offline bundle handling, embedded bundle
-handling, and conda-spawn based activation.
+handling, and optional conda-spawn based activation.
 
 ## What Downstream Distributions Own
 

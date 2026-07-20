@@ -62,7 +62,7 @@ pub(crate) async fn ensure_bootstrapped(prefix: &Path) -> miette::Result<()> {
         require_managed_prefix(prefix, "use")?;
     } else {
         eprintln!(
-            "{} No conda installation found. Bootstrapping now...",
+            "{} No runtime installation found. Bootstrapping now...",
             console::style(">>").cyan().bold()
         );
         bootstrap(prefix, false, None, false, Verbosity::Quiet).await?;
@@ -158,7 +158,7 @@ pub(crate) async fn bootstrap(
 
     if verbosity != Verbosity::Quiet {
         eprintln!(
-            "{} Bootstrapping conda into {}",
+            "{} Bootstrapping runtime into {}",
             console::style(">>").cyan().bold(),
             policy::path_for_display(prefix)
         );
@@ -264,7 +264,7 @@ fn compile_python_bytecode(prefix: &Path) {
 pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
     if !is_bootstrapped(prefix) {
         eprintln!(
-            "No conda installation found at {}",
+            "No runtime installation found at {}",
             policy::path_for_display(prefix)
         );
         return Ok(());
@@ -305,7 +305,7 @@ pub(crate) fn status(prefix: &Path) -> miette::Result<()> {
 pub(crate) fn uninstall(prefix: &Path, yes: bool, verbosity: Verbosity) -> miette::Result<()> {
     if !is_bootstrapped(prefix) {
         eprintln!(
-            "{} No conda installation found at {}",
+            "{} No runtime installation found at {}",
             console::style("!").yellow().bold(),
             policy::path_for_display(prefix)
         );

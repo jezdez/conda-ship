@@ -137,7 +137,7 @@ async fn async_main() -> miette::Result<()> {
             let prefix = resolve_install_path(path)?;
             if !is_bootstrapped(&prefix) {
                 eprintln!(
-                    "{} No conda installation found. Run `{} bootstrap` first.",
+                    "{} No runtime installation found. Run `{} bootstrap` first.",
                     console::style("!").yellow().bold(),
                     policy::command_name()
                 );
@@ -170,7 +170,7 @@ fn ensure_stamped_runtime() -> miette::Result<()> {
     }
 
     Err(miette::miette!(
-        "{} is a runtime template, not a runnable conda runtime. Build a stamped runtime with `cs build`.",
+        "{} is a runtime template, not a runnable runtime. Build a stamped runtime with `cs build`.",
         policy::display_name(),
     ))
 }

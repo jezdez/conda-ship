@@ -40,8 +40,8 @@ fn test_derived_lockfile_package_composition() {
         );
     }
 
-    let required = ["conda", "conda-rattler-solver", "conda-spawn"];
-    for pkg in &required {
+    let configured = ["conda", "conda-rattler-solver", "conda-spawn"];
+    for pkg in &configured {
         assert!(
             names.contains(&pkg.to_string()),
             "derived runtime lock should contain {pkg}"

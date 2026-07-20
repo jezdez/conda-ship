@@ -10,7 +10,7 @@ After bootstrap, commands are passed through to the configured delegate executab
 Usage: cs-template [OPTIONS] [COMMAND]
 
 Commands:
-  bootstrap  Bootstrap a fresh conda installation into the install path
+  bootstrap  Bootstrap the selected runtime packages into the install path
   status     Print runtime status (install path, channels, packages)
   shell      Activate an environment via subshell (alias for conda spawn)
   uninstall  Uninstall this runtime: remove the install path and environments
