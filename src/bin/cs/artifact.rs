@@ -1381,6 +1381,8 @@ fn stamp_runtime_data(
         runtime_config: runtime_data::RuntimeConfig {
             channels: derived.runtime_config.channels.clone(),
             packages: derived.runtime_config.packages.clone(),
+            condarc: derived.runtime_config.condarc.clone(),
+            freeze_base: derived.runtime_config.freeze_base,
         },
         runtime_lock: derived.content.clone(),
     };

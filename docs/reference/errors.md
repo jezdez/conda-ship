@@ -30,6 +30,17 @@ conda without depending on terminal formatting.
   `runtime-version = { from = "project-metadata" }` through the Python
   `conda ship` adapter for dynamic Python project versions.
 
+`failed to read condarc-file`
+: Check `[tool.conda-ship].condarc-file`. Relative paths start from the selected
+  manifest directory.
+
+`failed to parse condarc-file as YAML`
+: Fix the referenced YAML file.
+
+`condarc-file must contain a YAML mapping`
+: Use normal condarc key and value entries rather than a top-level scalar or
+  sequence.
+
 ## Package Archives
 
 `cannot bundle packages without SHA256 hashes`

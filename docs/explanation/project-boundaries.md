@@ -50,6 +50,7 @@ Downstream projects decide what their users get:
 - package sets
 - channels
 - package exclusions
+- installed condarc contents and frozen-base policy
 - default release channels
 - documentation URLs
 - Homebrew formulae

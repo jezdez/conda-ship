@@ -24,6 +24,7 @@ binary:
 - documentation URL
 - metadata filename
 - bundle, offline, and prefix environment variable names
+- optional condarc contents and base-freezing setting
 
 That is what turns the same generic bootstrap code into a specific runtime
 with its own runtime name, delegate, package set, and install location.
@@ -67,8 +68,9 @@ the alias from
 [conda-spawn PR #59](https://github.com/conda/conda-spawn/pull/59) can expose
 `RUNTIME shell` as a command provided by conda-spawn.
 
-The base prefix is protected with a CEP 22 frozen marker. Users create named
-environments for regular package work.
+Downstream distributions can stamp native condarc contents and protect the base
+prefix with a CEP 22 frozen marker. Without those opt-ins, conda-ship leaves
+conda configuration and package-created frozen markers untouched.
 
 ## What Each Project Chooses
 

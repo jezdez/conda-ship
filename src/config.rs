@@ -1,4 +1,4 @@
-//! Configuration, metadata, and `.condarc` management.
+//! Configuration and runtime metadata management.
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
@@ -143,29 +143,8 @@ pub fn write_frozen(prefix: &Path) -> miette::Result<()> {
     Ok(())
 }
 
-// .condarc.
-
-pub fn write_condarc(prefix: &Path, channels: &[String]) -> miette::Result<()> {
+pub fn write_condarc(prefix: &Path, contents: &str) -> miette::Result<()> {
     let condarc_path = prefix.join(".condarc");
-    let mut contents = "\
-solver: rattler
-auto_activate_base: false
-notify_outdated_conda: false
-show_channel_urls: true
-"
-    .to_string();
-
-    if channels.is_empty() {
-        contents.push_str("channels: []\n");
-    } else {
-        contents.push_str("channels:\n");
-        for channel in channels {
-            contents.push_str("  - ");
-            contents.push_str(&serde_json::to_string(channel).into_diagnostic()?);
-            contents.push('\n');
-        }
-    }
-
     std::fs::create_dir_all(prefix).into_diagnostic()?;
     std::fs::write(&condarc_path, contents).into_diagnostic()?;
     eprintln!("   Wrote {}", policy::path_for_display(&condarc_path));
@@ -198,6 +177,8 @@ mod tests {
             serde_json::json!({
                 "channels": config.channels,
                 "packages": config.packages,
+                "condarc": config.condarc,
+                "freeze_base": config.freeze_base,
             })
         );
     }
@@ -235,36 +216,14 @@ mod tests {
     }
 
     #[test]
-    fn test_write_condarc_snapshot() {
+    fn test_write_condarc_preserves_exact_contents() {
         let tmp = TempDir::new().unwrap();
-        write_condarc(
-            tmp.path(),
-            &[
-                "conda-forge".to_string(),
-                "https://repo.example.test/conda".to_string(),
-            ],
-        )
-        .unwrap();
+        let expected = "# downstream policy\nchannels:\n  - conda-forge\n";
+
+        write_condarc(tmp.path(), expected).unwrap();
 
         let contents = std::fs::read_to_string(tmp.path().join(".condarc")).unwrap();
-        insta::assert_snapshot!("condarc", contents);
-    }
-
-    #[test]
-    fn test_write_condarc_idempotent() {
-        let tmp = TempDir::new().unwrap();
-        let channels = ["conda-forge".to_string()];
-
-        write_condarc(tmp.path(), &channels).unwrap();
-        let first = std::fs::read_to_string(tmp.path().join(".condarc")).unwrap();
-
-        write_condarc(tmp.path(), &channels).unwrap();
-        let second = std::fs::read_to_string(tmp.path().join(".condarc")).unwrap();
-
-        assert_eq!(
-            first, second,
-            "writing condarc twice should produce identical content"
-        );
+        assert_eq!(contents, expected);
     }
 
     #[test]

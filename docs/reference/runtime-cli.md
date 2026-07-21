@@ -33,9 +33,11 @@ Online artifacts download packages from the stamped runtime lock. External
 artifacts read archives from the configured bundle directory. Embedded
 artifacts automatically extract their built-in bundle.
 
-During bootstrap, the runtime writes conda-ship ownership metadata,
-`.condarc`, the CEP 22 frozen marker, and the prefix metadata expected by conda
-tools in `conda-meta/history` and `conda-meta/initial-state.explicit.txt`.
+During bootstrap, the runtime writes conda-ship ownership metadata and the
+prefix metadata expected by conda tools in `conda-meta/history` and
+`conda-meta/initial-state.explicit.txt`. It writes `.condarc` only when the
+build configured `condarc-file`, and writes the CEP 22 frozen marker only when
+the build configured `freeze-base = true`.
 
 ## Delegate Execution
 

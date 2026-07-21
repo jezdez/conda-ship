@@ -92,6 +92,8 @@ docs-url = "https://example.com/demo/"
 install-scheme = "conda-home"
 install-name = "demo"
 installer = "homebrew"
+condarc-file = "runtime.condarc"
+freeze-base = true
 ```
 
 For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
@@ -174,6 +176,21 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   Release workflows can override this with `cs build --installer INSTALLER` or
   the GitHub Action `installer` input.
 
+`condarc-file`
+: Optional path to a YAML condarc file. Relative paths are resolved from
+  the selected project manifest. The builder requires a YAML mapping and stamps
+  the file's exact text content into the runtime. During bootstrap, the runtime
+  writes that content to `<prefix>/.condarc`.
+
+  When omitted, conda-ship does not create, replace, or remove `.condarc`.
+  The runtime lock still records the channels used to build the prefix.
+  conda-ship does not merge them into persistent conda configuration.
+
+`freeze-base`
+: Whether bootstrap writes the existing CEP 22 marker to
+  `<prefix>/conda-meta/frozen`. Defaults to `false`. When false, conda-ship
+  leaves any marker created by an installed package untouched.
+
 Generated runtimes write ownership metadata into every bootstrapped prefix.
 That metadata records the schema version, display name derived from
 `runtime-name`, install name, and metadata filename expected by the runtime.
@@ -190,9 +207,10 @@ stamped runtime lock. When `conda-self` is installed in the runtime, it uses
 that file as the installer snapshot for the `installer-updated` and
 `installer-exact` reset modes.
 
-Package and channel intent belongs in the selected source environment, not in
-`[tool.conda-ship]`. conda-ship records the resolved package names and channel
-URLs from the source lockfile environment into generated runtime metadata.
+Keep package selection and lockfile channels in the selected source environment.
+conda-ship records the resolved package names and channel URLs in runtime
+metadata. It writes persistent conda configuration only when `condarc-file` is
+set.
 
 ## Stamped Runtime Metadata
 
@@ -210,6 +228,8 @@ URLs from the source lockfile environment into generated runtime metadata.
 - install scheme: `conda-home`, or the configured `install-scheme`
 - install name: `RUNTIME_NAME`, or the configured `install-name`
 - installer: the configured `installer`, when present
+- condarc contents: the exact text from `condarc-file`, when configured
+- frozen base policy: the configured `freeze-base` value, defaulting to `false`
 - metadata file: `.RUNTIME_NAME.json`
 - bundle environment variable: uppercased `RUNTIME_NAME` plus `_BUNDLE`
 - offline environment variable: uppercased `RUNTIME_NAME` plus `_OFFLINE`
@@ -228,6 +248,9 @@ The bootstrap also writes standard conda prefix metadata:
 
 These files are not stamped into the runtime binary. They are rendered from the
 runtime lock when the prefix is bootstrapped.
+
+The runtime writes `.condarc` and the CEP 22 frozen marker only when their
+corresponding options are set.
 
 Non-alphanumeric characters in environment variable names become underscores.
 

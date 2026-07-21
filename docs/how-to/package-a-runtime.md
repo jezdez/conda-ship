@@ -128,9 +128,9 @@ demo info
 ```
 
 The installer should not unpack the managed conda prefix by itself. Let the
-runtime bootstrap so ownership metadata, `.condarc`, the frozen marker,
-constructor-compatible prefix metadata, and package verification are applied
-consistently.
+runtime bootstrap so ownership metadata, configured condarc and frozen-base
+policy, constructor-compatible prefix metadata, and package verification are
+applied consistently.
 
 ```{warning}
 Do not preinstall the managed prefix behind the runtime's back. Runtime

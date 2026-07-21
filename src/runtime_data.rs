@@ -22,12 +22,19 @@ pub struct RuntimeConfig {
     pub channels: Vec<String>,
     #[serde(default)]
     pub packages: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condarc: Option<String>,
+    #[serde(default)]
+    pub freeze_base: bool,
 }
 
 impl RuntimeConfig {
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
-        self.channels.is_empty() && self.packages.is_empty()
+        self.channels.is_empty()
+            && self.packages.is_empty()
+            && self.condarc.is_none()
+            && !self.freeze_base
     }
 }
 
@@ -375,6 +382,8 @@ mod tests {
         let mut header = RuntimeDataHeader::for_name("snek");
         header.runtime_lock = "lock data".to_string();
         header.runtime_config.channels = vec!["conda-forge".to_string()];
+        header.runtime_config.condarc = Some("channels: []\n".to_string());
+        header.runtime_config.freeze_base = true;
 
         append_to_binary(tmp.path(), &header, None).unwrap();
         let data = read_from_path(tmp.path()).unwrap().unwrap();
@@ -385,6 +394,11 @@ mod tests {
         assert_eq!(data.header.install_scheme, InstallScheme::CondaHome);
         assert_eq!(data.header.install_name, "snek");
         assert_eq!(data.header.runtime_lock, "lock data");
+        assert_eq!(
+            data.header.runtime_config.condarc.as_deref(),
+            Some("channels: []\n")
+        );
+        assert!(data.header.runtime_config.freeze_base);
         assert!(data.bundle.is_none());
         assert!(data.stamped);
     }

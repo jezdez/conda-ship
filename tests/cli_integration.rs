@@ -199,4 +199,6 @@ fn test_first_delegate_command_auto_bootstraps_stamped_runtime() {
 
     assert!(prefix.join("conda-meta").is_dir());
     assert!(prefix.join(".demo.json").is_file());
+    assert!(!prefix.join(".condarc").exists());
+    assert!(!prefix.join("conda-meta").join("frozen").exists());
 }
