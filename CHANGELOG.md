@@ -2,6 +2,48 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## 0.5.0 - 2026-07-21
+
+### Added
+
+- Added `condarc-file` and `freeze-base` build settings. Both are disabled by
+  default and let downstream distributions choose whether bootstrap writes a
+  `.condarc` or CEP 22 frozen marker.
+- Added Constructor-compatible `.installer.info` prefix metadata when a build
+  configures `installer`.
+- Added `cs run --install-path` and a runtime-specific `_PREFIX` environment
+  variable for choosing a managed prefix during local runs or deployment.
+- Added the opt-in `conda_ship::fleet` Rust API behind the non-default `fleet`
+  Cargo feature. It installs and runs multiple locked prefixes without changing
+  the stamped binary-template workflow.
+
+### Changed
+
+- The selected source environment now defines the complete runtime package set.
+  conda-ship no longer requires `conda`, `conda-rattler-solver`, or
+  `conda-spawn`. It only requires the configured delegate executable.
+- A generated runtime now bootstraps automatically on first invocation and
+  passes every argument to its configured delegate unchanged. The runtime no
+  longer reserves private `bootstrap`, `status`, `shell`, or `uninstall`
+  commands.
+- Delegate execution no longer sets conda activation variables or rewrites
+  delegate output. Prefix executables remain available through `PATH`.
+- Bootstrap now uses an adjacent process lock and an internal ownership marker.
+  A later invocation can recover an interrupted bootstrap by reinstalling the
+  complete locked package set without deleting unrelated prefix contents.
+
+### Migration
+
+- Include the delegate and every optional command in the selected source
+  environment. Conda-based distributions that want `shell` can include a
+  conda-spawn version with its `shell` alias. Include conda-self when the
+  distribution should expose its reset or self-management commands.
+- Replace use of the removed private runtime commands with the delegate's
+  commands. For a conda delegate, use `RUNTIME info` for runtime information
+  and the applicable conda or conda-self command for management operations.
+- Set `condarc-file` or `freeze-base = true` explicitly if a distribution wants
+  the configuration files that earlier conda-ship versions wrote by default.
+
 ## 0.4.0 - 2026-06-16
 
 ### Added
