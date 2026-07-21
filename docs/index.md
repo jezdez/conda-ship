@@ -43,8 +43,8 @@ Then follow the [quickstart](tutorials/quickstart.md).
 - Unsure what belongs here versus downstream: read
   [project boundaries](explanation/project-boundaries.md).
 - Building an orchestrator for multiple locked runtimes: read
-  [fleet concepts](explanation/fleet.md) and the
-  [fleet API reference](reference/fleet.md).
+  [Fleet concepts](explanation/fleet.md) and the
+  [Fleet API reference](reference/fleet.md).
 
 ## Scope
 

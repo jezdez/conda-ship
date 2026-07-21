@@ -1,28 +1,23 @@
 # Fleet API Reference
 
-Fleet is an experimental API for managing multiple locked conda prefixes.
-Enable the `fleet` feature to use it:
+Fleet is an experimental Rust API for downstream orchestrators that manage
+multiple locked prefixes. Enable it explicitly:
 
 ```toml
 [dependencies]
-conda-ship = { git = "https://github.com/jezdez/conda-ship", features = ["fleet"] }
+conda-ship = { git = "https://github.com/jezdez/conda-ship", rev = "<pinned-commit>", features = ["fleet"] }
 ```
 
-When embedding fleet in a native-TLS CLI, prefer:
+For a native-TLS caller:
 
 ```toml
 [dependencies]
-conda-ship = { git = "https://github.com/jezdez/conda-ship", default-features = false, features = ["fleet", "native-tls"] }
+conda-ship = { git = "https://github.com/jezdez/conda-ship", rev = "<pinned-commit>", default-features = false, features = ["fleet", "native-tls"] }
 ```
 
-## Scope
-
-Fleet installs and inspects locked conda prefixes. It does not solve, update,
-repair, publish catalogs, write global shims, or edit shell startup files.
-
-Every runtime is installed under `install_root/<id>`. Fleet reads conda-ship
-prefix metadata from `install_root/<id>/.<id>.json` and has no separate registry
-database.
+Fleet does not solve environments, publish catalogs, add a runtime command
+namespace, write global launchers, or edit shell startup files. Stamped runtime
+artifacts remain conda-ship's primary build output.
 
 ## Core Types
 
@@ -34,36 +29,40 @@ use conda_ship::fleet::Fleet;
 let fleet = Fleet::new("/tmp/fleet");
 ```
 
-`RuntimeSpec` is the complete install input. Downstream orchestrators normally
-construct it from their own catalog, policy layer, downloaded descriptor, or
-conda-ship-generated runtime metadata:
+Each runtime is installed under `install_root/<id>`. `RuntimeSpec` contains the
+complete resolved input selected by the downstream caller:
 
 ```rust
 use conda_ship::fleet::RuntimeSpec;
 
 let spec = RuntimeSpec {
-    id: "conda".to_string(),
-    version: "2026.6.0".to_string(),
-    delegate_executable: "conda".to_string(),
+    id: "demo".to_string(),
+    version: "2026.7.0".to_string(),
+    delegate_executable: "demo".to_string(),
     lock_content: std::fs::read_to_string("runtime.lock")?,
-    requested_specs: vec!["conda".to_string()],
+    requested_specs: vec!["demo".to_string()],
+    condarc: None,
+    freeze_base: false,
+    installer: None,
 };
 ```
 
-`RuntimeSpec::validate()` checks the runtime id, delegate executable, version,
-and lock content before installation.
+The delegate is required and has no `conda` default. `RuntimeSpec::validate()`
+checks the runtime id, delegate name, version, lock content, optional condarc
+mapping, and optional installer type.
 
-`RuntimeSpec::lock_sha256()` returns the digest fleet records in prefix
-metadata. Callers can compare this value with `InstalledRuntime::lock_sha256`
-from `Fleet::status(id)` to decide whether a locked runtime is already current.
+`condarc` contains exact downstream-owned YAML. `None` means the final Fleet
+runtime has no `.condarc`. `freeze_base` controls the CEP 22 marker.
+`installer` controls Constructor-compatible `.installer.info` provenance. All
+three default to disabled and none of them are inferred from the lock.
 
-Fleet derives `.condarc` channels from the default environment in the lockfile.
-This lets callers that already have conda-ship runtime metadata or embedded
-lockfiles avoid duplicating channel lists in their catalog.
+`RuntimeSpec::lock_sha256()` returns the digest written to prefix metadata.
+Channels from the default lock environment are recorded separately as
+provenance. They do not become condarc policy.
 
-## Install
+## Install And Recovery
 
-Use `Fleet::install(spec, options)` with a resolved lockfile:
+Install a selected lock with:
 
 ```rust
 use conda_ship::fleet::InstallOptions;
@@ -73,68 +72,104 @@ let installed = fleet.install(spec, InstallOptions::default()).await?;
 
 `InstallOptions` controls:
 
-- `force`: replace an existing managed runtime with the same id
-- `offline`: install without network access
-- `bundle_dir`: pre-populate the shared rattler package cache from package
-  archives
+- `force`: reinstall every selected locked package in an existing prefix owned
+  by the same Fleet runtime id
+- `offline`: disable package downloads
+- `bundle_dir`: add local `.conda` and `.tar.bz2` archives to the shared package
+  cache before installation
 
-Fleet refuses to install into unmanaged non-empty prefixes. When `force` is
-true, it still validates that an existing non-empty prefix is managed by the
-same runtime id before removing it.
+Fleet serializes prefix mutations with the same adjacent cross-process lock as
+stamped runtimes. It writes an owned installing marker before package work and
+commits ready metadata only after package installation, policy outputs,
+constructor metadata, bytecode compilation, and delegate validation succeed.
 
-## List, Status, And Remove
+If an owned install was interrupted, the next install retries it by
+reinstalling every package in the selected lock. A forced install uses the same
+in-place transaction. Both preserve named environments and unrelated files.
+Fleet never turns `force` into recursive prefix deletion.
+
+Fleet refuses unknown non-empty prefixes and prefix symlinks. It also refuses
+metadata and managed policy paths that are symlinks or other nonregular entries.
+
+The exact Fleet-managed replacement outputs are:
+
+- `<prefix>/.condarc`
+- `<prefix>/conda-meta/frozen`
+- `<prefix>/.installer.info`
+
+Before package mutation, Fleet verifies that existing entries at those paths
+are regular files. It removes them after the installing marker is committed,
+rechecks them after package installation, then rewrites only the outputs enabled
+by the new `RuntimeSpec`. This covers enabled-to-disabled policy transitions
+without retaining stale configuration or installer provenance.
+
+## List, Get, And Remove
 
 ```rust
 let runtimes = fleet.list()?;
-let maybe_conda = fleet.status("conda")?;
-fleet.remove("conda")?;
+let maybe_demo = fleet.get("demo")?;
+fleet.remove("demo")?;
 ```
 
-`Fleet::list()` scans direct children of the install root and ignores
-directories without valid fleet metadata. `Fleet::status(id)` validates the
-metadata for one runtime and returns `None` when the metadata file is absent.
+`Fleet::list()` scans direct children of the install root and returns prefixes
+with valid Fleet metadata. `Fleet::get(id)` waits for the prefix mutation lock,
+then validates the exact regular ready metadata file and recorded delegate. It
+returns `None` when the metadata file is absent.
 
-`Fleet::remove(id)` removes only managed prefixes or empty directories. It
-refuses unmanaged non-empty prefixes.
+`Fleet::remove(id)` is the only recursive prefix deletion operation. It uses the
+same mutation lock and removes only an empty directory, a prefix with matching
+ready metadata, or an incomplete prefix with a matching installing marker. A
+metadata symlink is never accepted as ownership evidence.
 
-## Installed Runtime Inspection
+## Installed Runtime And Commands
 
-`InstalledRuntime` contains the runtime id, version, prefix, delegate
-executable, channels, lock SHA256, and requested specs. It also provides helper
-methods for running or exposing binaries:
+`InstalledRuntime` contains the id, version, prefix, explicit delegate,
+lockfile channels, lock SHA256, and requested specs.
 
 ```rust
-let runtime = fleet.status("conda")?.expect("installed");
-let conda = runtime.command("conda")?;
-let executable = runtime.executable_path("conda");
-let env = runtime.activation_env("conda");
+let runtime = fleet.get("demo")?.expect("installed");
+let command = runtime.command("demo")?;
+let executable = runtime.executable_path("demo");
 let path_entries = runtime.path_entries();
 ```
 
-`activation_env()` returns conda environment variables but intentionally omits
-`PATH`. Callers should prepend `path_entries()` to the existing `PATH` for child
-processes or wrapper scripts.
+`RuntimeCommand` contains only the executable and prefix-local PATH entries.
+Fleet does not set conda activation variables. Callers can prepend the returned
+entries to the existing child PATH just as a stamped runtime does.
 
-## Binary And Shim Best Practices
+## Shim Plans And Launcher Ownership
 
-Fleet provides data-only helpers so callers can implement exposure safely:
+Fleet can return a data-only shim plan:
 
 ```rust
-let plan = runtime.shim_plan("conda", "conda", None)?;
+let plan = runtime.shim_plan("demo", "demo", None)?;
 ```
 
-Recommended caller behavior:
+`ShimPlan` contains a destination, target command, executable, and PATH entries.
+Fleet never writes or removes the launcher. The downstream orchestrator owns
+file contents, overwrite checks, PATH setup, and removal.
 
-- Prefer wrapper scripts for conda commands because wrappers can
-  set `CONDA_PREFIX`, `CONDA_ROOT_PREFIX`, `CONDA_DEFAULT_ENV`,
-  `CONDA_SHLVL`, `CONDA_COMPLETION_COMMAND_NAME`, and PATH entries.
-- Do not overwrite existing files by default.
-- Write self-identifying shim metadata so later removal can distinguish caller
-  owned files from user files.
-- Keep the user-facing shim name in the caller catalog or policy layer, not in
-  fleet.
-- Treat `ShimPlan` as a plan. Fleet never writes or removes shim files.
+Launchers created by Fleet callers are externally managed. They do not receive
+the direct-install receipt described in
+[launcher receipts](launcher-receipts.md). Calling `plan_launcher_update` for
+such a launcher returns `MissingReceipt`. An orchestrator that also supports
+directly installed stamped launchers must keep that receipt-gated flow separate
+from Fleet.
 
-`ShimPlan` includes the shim name, target command, destination path, and
-`RuntimeCommand` data. The caller owns wrapper script contents and filesystem
-writes.
+## Cache, Bundle, And Offline Behavior
+
+All Fleet runtimes use rattler's standard shared package cache. Installing a
+second runtime can reuse package archives and extracted cache entries already
+present from the first runtime.
+
+`bundle_dir` indexes flat `.conda` and `.tar.bz2` archives, verifies that they
+match locked records, and populates the same cache before running the install
+transaction. With `offline = true`, every locked package must already be in the
+cache or supplied bundle. Missing packages fail the install and leave the owned
+installing state available for a later retry.
+
+Fleet does not own cache retention, cleanup schedules, enterprise mirroring, or
+bundle publication. CI and managed deployments should populate a deterministic
+bundle or cache before selecting offline mode. A stamped artifact with an
+embedded bundle remains a stamped-artifact workflow. A Fleet caller supplies a
+bundle directory explicitly.

@@ -62,6 +62,7 @@ fn ready_bootstrap_phase() -> BootstrapPhase {
     BootstrapPhase::Ready
 }
 
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct PrefixMetadataIdentity<'a> {
     pub display_name: &'a str,
     pub install_name: &'a str,
@@ -71,6 +72,7 @@ pub(crate) struct PrefixMetadataIdentity<'a> {
     pub lock_sha256: Option<&'a str>,
 }
 
+#[cfg(test)]
 pub(crate) fn metadata_path(prefix: &Path) -> PathBuf {
     metadata_path_for(prefix, policy::metadata_file())
 }
@@ -79,8 +81,8 @@ pub(crate) fn metadata_path_for(prefix: &Path, metadata_file: &str) -> PathBuf {
     prefix.join(metadata_file)
 }
 
-fn temporary_metadata_path(prefix: &Path) -> PathBuf {
-    metadata_path(prefix).with_extension("tmp")
+fn temporary_metadata_path_for(prefix: &Path, metadata_file: &str) -> PathBuf {
+    metadata_path_for(prefix, metadata_file).with_extension("tmp")
 }
 
 fn remove_regular_file_if_present(path: &Path) -> miette::Result<()> {
@@ -105,8 +107,12 @@ fn remove_regular_file_if_present(path: &Path) -> miette::Result<()> {
 }
 
 pub(crate) fn invalidate_metadata(prefix: &Path) -> miette::Result<()> {
-    remove_regular_file_if_present(&metadata_path(prefix))?;
-    remove_regular_file_if_present(&temporary_metadata_path(prefix))
+    invalidate_metadata_for(prefix, policy::metadata_file())
+}
+
+pub(crate) fn invalidate_metadata_for(prefix: &Path, metadata_file: &str) -> miette::Result<()> {
+    remove_regular_file_if_present(&metadata_path_for(prefix, metadata_file))?;
+    remove_regular_file_if_present(&temporary_metadata_path_for(prefix, metadata_file))
 }
 
 pub fn write_metadata(
@@ -114,34 +120,14 @@ pub fn write_metadata(
     channels: &[String],
     packages: &[String],
 ) -> miette::Result<()> {
-    write_metadata_with_identity(
-        prefix,
-        policy::display_name(),
-        policy::install_name(),
-        policy::metadata_file(),
-        policy::runtime_version(),
-        channels,
-        packages,
-    )
-}
-
-pub(crate) fn write_metadata_with_identity(
-    prefix: &Path,
-    display_name: &str,
-    install_name: &str,
-    metadata_file: &str,
-    version: &str,
-    channels: &[String],
-    packages: &[String],
-) -> miette::Result<()> {
     write_metadata_for_identity(
         prefix,
         PrefixMetadataIdentity {
-            display_name,
-            install_name,
-            metadata_file,
-            version,
-            delegate_executable: None,
+            display_name: policy::display_name(),
+            install_name: policy::install_name(),
+            metadata_file: policy::metadata_file(),
+            version: policy::runtime_version(),
+            delegate_executable: Some(policy::delegate_executable()),
             lock_sha256: None,
         },
         channels,
@@ -167,8 +153,8 @@ pub(crate) fn write_metadata_for_identity(
         packages: packages.to_vec(),
         bootstrap_state: BootstrapPhase::Ready,
     };
-    let path = metadata_path(prefix);
-    let temporary_path = temporary_metadata_path(prefix);
+    let path = metadata_path_for(prefix, identity.metadata_file);
+    let temporary_path = temporary_metadata_path_for(prefix, identity.metadata_file);
     remove_regular_file_if_present(&temporary_path)?;
     let mut temporary = std::fs::File::create(&temporary_path)
         .into_diagnostic()
@@ -203,11 +189,11 @@ pub(crate) fn write_metadata_for_identity(
     Ok(())
 }
 
+#[cfg(test)]
 pub fn read_metadata(prefix: &Path) -> miette::Result<PrefixMetadata> {
     read_metadata_from_path(&metadata_path(prefix))
 }
 
-#[cfg(feature = "fleet")]
 pub(crate) fn read_metadata_for(
     prefix: &Path,
     metadata_file: &str,
@@ -234,6 +220,7 @@ pub(crate) fn read_metadata_from_path(path: &Path) -> miette::Result<PrefixMetad
         })
 }
 
+#[cfg(test)]
 pub(crate) fn validate_metadata_identity(meta: &PrefixMetadata) -> miette::Result<()> {
     validate_metadata_identity_for(
         meta,
@@ -279,8 +266,23 @@ pub(crate) fn validate_metadata_identity_for(
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn validate_metadata_ready(meta: &PrefixMetadata) -> miette::Result<()> {
     validate_metadata_identity(meta)?;
+    validate_ready_phase(meta)
+}
+
+pub(crate) fn validate_metadata_ready_for(
+    meta: &PrefixMetadata,
+    display_name: &str,
+    install_name: &str,
+    metadata_file: &str,
+) -> miette::Result<()> {
+    validate_metadata_identity_for(meta, display_name, install_name, metadata_file)?;
+    validate_ready_phase(meta)
+}
+
+fn validate_ready_phase(meta: &PrefixMetadata) -> miette::Result<()> {
     if meta.bootstrap_state != BootstrapPhase::Ready {
         return Err(miette::miette!(
             "runtime metadata does not mark bootstrap complete"

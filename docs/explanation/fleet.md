@@ -1,100 +1,119 @@
 # Fleet Concepts
 
-Fleet is an experimental Rust API layer inside the `conda-ship` crate. It is
-enabled with the non-default Cargo feature `fleet`.
+Fleet is an experimental Rust API inside the `conda-ship` crate. It is enabled
+only with the non-default Cargo feature `fleet`.
 
-The API is for orchestrators that need to manage several locked conda
-prefixes, including prefixes that back conda-ship-built runtime binaries. Those
-orchestrators can install a Miniconda-like runtime and separate tool runtimes
-while keeping catalog lookup, user identity, onboarding, policy, and PATH setup
-outside conda-ship.
+Stamped runtime artifacts remain the primary conda-ship output. On first
+invocation, a stamped artifact bootstraps one prefix and then passes the
+original arguments to its configured delegate. The delegate can be `conda` or
+any other installed entry point. The artifact does not reserve bootstrap,
+status, repair, update, or uninstall commands.
 
-## How Fleet Differs From Runtime Binaries
-
-conda-ship runtime binaries are single bootstrappable artifacts. A generated
-runtime owns one install prefix, one delegate executable, and one package set.
-Users interact with that runtime through commands such as `bootstrap`, `status`,
-`shell`, and `uninstall`.
-
-Fleet is a library API. It does not produce a new end-user distribution and it
-does not reserve a new CLI surface. It installs each runtime into:
+Fleet is a separate, optional library surface for downstream orchestrators that
+need several locked prefixes. It does not create a new conda-ship distribution
+or CLI. Each runtime is installed under:
 
 ```text
 install_root/<id>
 ```
 
-The runtime id is also used for the conda-ship metadata file:
+The runtime id also selects its conda-ship metadata file:
 
 ```text
 install_root/<id>/.<id>.json
 ```
 
+## Shared Bootstrap Mechanics
+
+Fleet and stamped artifacts use the same adjacent process lock, installing
+marker, ready metadata commit, delegate validation, and full-lock reinstall
+path. An interrupted owned install is retried by reinstalling every package in
+the selected lock. This reruns link scripts while preserving named environments
+and unrelated files under the prefix.
+
+`Fleet::install` refuses unknown non-empty prefixes. `force = true` means an
+in-place full-lock reinstall of a prefix already owned by the same Fleet runtime
+id. It does not recursively replace the prefix. Recursive deletion happens only
+through an explicit `Fleet::remove` call.
+
 ## Source Of Truth
 
-Fleet uses conda-ship prefix metadata as the source of truth. There is no
-separate registry database in the first experimental API.
+Fleet has no separate registry database. `Fleet::list()` scans direct children
+of the install root. `Fleet::get(id)` validates the exact regular metadata file,
+its ready state, its runtime identity, and its recorded delegate.
 
-`Fleet::list()` scans direct children of the install root and returns only
-prefixes with valid fleet metadata. Directories without valid metadata are
-ignored. `Fleet::status(id)` validates the exact metadata file for that runtime
-id.
+Fleet metadata records the explicit delegate and the SHA256 digest of the lock
+content. It also records lockfile channels as provenance. Those channels are
+not turned into an implicit `.condarc`.
 
-Fleet-installed metadata also records the SHA256 digest of the lock content, so
-an orchestrator can compare its candidate lock with the installed runtime
-without maintaining a separate registry or hash sidecar.
+`RuntimeSpec` is the explicit programmatic input to `Fleet::install`, not a new
+user-facing catalog format. A downstream orchestrator should derive it from its
+own selected descriptor, catalog entry, or conda-ship stamped artifact data.
 
-`RuntimeSpec` is the explicit API input to `Fleet::install`, not a user-facing
-specification format. Production callers should derive it from their own
-catalog, downloaded descriptor, or conda-ship-generated runtime metadata.
+## Explicit Downstream Policy
 
-## What Fleet Owns
+The caller decides whether each runtime receives:
 
-Fleet owns reusable mechanics that belong close to conda-ship:
+- exact downstream-owned `.condarc` content
+- a CEP 22 frozen-base marker
+- Constructor-compatible `.installer.info` provenance
 
-- installing a resolved lockfile into a known prefix
-- using rattler's package cache and optional bundle or offline install modes
-- writing `.condarc`
-- deriving `.condarc` channels from the default lockfile environment
-- writing CEP 22 `conda-meta/frozen`
-- writing constructor-compatible `conda-meta/history`
-- writing `conda-meta/initial-state.explicit.txt`
-- writing conda-ship prefix metadata
-- refusing unmanaged non-empty prefixes
-- returning data-only command and shim plans
+All three are disabled by default. During a Fleet install or forced reinstall,
+the three paths are exact managed outputs. Fleet safely removes the prior
+regular files and rewrites only the enabled outputs. Symbolic links and other
+nonregular entries are refused before package installation begins.
 
-## What Callers Own
+`.installer.info` is distribution provenance. It is not launcher ownership
+evidence.
 
-Fleet intentionally leaves product and policy decisions to callers:
+## Command And Launcher Boundary
+
+Fleet returns executable paths and prefix-local PATH entries. It does not
+fabricate `CONDA_PREFIX`, `CONDA_ROOT_PREFIX`, `CONDA_DEFAULT_ENV`,
+`CONDA_SHLVL`, or completion variables. A delegate receives the same minimal
+PATH treatment as a stamped runtime.
+
+Shim plans are data only. Downstream orchestrators own shim contents, file
+writes, overwrite policy, PATH setup, and removal. A launcher created by a
+Fleet caller is externally managed and does not receive a conda-ship
+direct-install launcher receipt. A receipt lookup for it therefore returns
+`MissingReceipt`.
+
+## Ownership Boundary
+
+Fleet owns reusable mechanics close to conda-ship:
+
+- installing a resolved lock into a known prefix
+- shared package-cache, bundle, and offline behavior
+- interrupted-install recovery and mutation locking
+- constructor history and initial-state files
+- ready prefix metadata and lock provenance
+- explicit condarc, frozen-base, and installer-provenance outputs
+- data-only command and shim plans
+
+Downstream callers own product behavior:
 
 - catalog lookup and runtime selection
-- user-facing command names
-- global PATH setup
-- shim file creation, overwrite policy, and removal
-- login, onboarding, and enterprise policy
-- update, repair, and migration workflows
-- telemetry and user prompts
-
-Downstream orchestrators should keep their own runtime or tool catalog. That
-catalog can point at conda-ship artifacts, downloaded descriptors, or embedded
-locks, but fleet should only receive the resolved `RuntimeSpec` after the
-caller has already decided what to install.
-
-This keeps the first API small while still letting downstream tools share the
-same install mechanics as conda-ship runtime binaries.
+- solving and lock production
+- user-facing command and shim names
+- global PATH and shell setup
+- login, onboarding, enterprise policy, telemetry, and prompts
+- update, uninstall, and migration workflows
+- launcher installation and external package-manager guidance
 
 ## Experimental Status
 
-The API has no stability promise yet. Downstream consumers should depend on the
-repository by git revision and enable the `fleet` feature explicitly:
+The API has no stability promise. Consumers should pin a repository revision
+and enable the feature explicitly:
 
 ```toml
 [dependencies]
-conda-ship = { git = "https://github.com/jezdez/conda-ship", features = ["fleet"] }
+conda-ship = { git = "https://github.com/jezdez/conda-ship", rev = "<pinned-commit>", features = ["fleet"] }
 ```
 
-Projects that already standardize on native TLS can keep that choice explicit:
+Projects that use native TLS can keep that choice explicit:
 
 ```toml
 [dependencies]
-conda-ship = { git = "https://github.com/jezdez/conda-ship", default-features = false, features = ["fleet", "native-tls"] }
+conda-ship = { git = "https://github.com/jezdez/conda-ship", rev = "<pinned-commit>", default-features = false, features = ["fleet", "native-tls"] }
 ```

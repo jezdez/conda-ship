@@ -19,27 +19,48 @@ struct InstallerInfo<'a> {
     installer_type: &'a str,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct InstallerMetadata<'a> {
+    pub name: &'a str,
+    pub version: &'a str,
+    pub installer_type: &'a str,
+}
+
 pub(crate) fn write_prefix_metadata(
     prefix: &Path,
     lock_content: &str,
     requested_specs: &[String],
 ) -> miette::Result<()> {
-    write_prefix_metadata_with_command(
+    let installer = policy::installer().map(|installer_type| InstallerMetadata {
+        name: policy::runtime_name(),
+        version: policy::runtime_version(),
+        installer_type,
+    });
+    write_prefix_metadata_for(
         prefix,
         lock_content,
         requested_specs,
         policy::command_name(),
+        installer,
     )
 }
 
-pub(crate) fn write_prefix_metadata_with_command(
+pub(crate) fn write_prefix_metadata_for(
     prefix: &Path,
     lock_content: &str,
     requested_specs: &[String],
     command_name: &str,
+    installer: Option<InstallerMetadata<'_>>,
 ) -> miette::Result<()> {
     let (platform, records) = install::lockfile_records_for_current_platform(lock_content)?;
-    write_prefix_metadata_from_records(prefix, platform, &records, requested_specs, command_name)
+    write_prefix_metadata_from_records(
+        prefix,
+        platform,
+        &records,
+        requested_specs,
+        command_name,
+        installer,
+    )
 }
 
 fn write_prefix_metadata_from_records(
@@ -48,6 +69,7 @@ fn write_prefix_metadata_from_records(
     records: &[RepoDataRecord],
     requested_specs: &[String],
     command_name: &str,
+    installer: Option<InstallerMetadata<'_>>,
 ) -> miette::Result<()> {
     let conda_meta = prefix.join("conda-meta");
     std::fs::create_dir_all(&conda_meta)
@@ -87,37 +109,24 @@ fn write_prefix_metadata_from_records(
     })?;
     eprintln!("   Wrote {}", policy::path_for_display(&explicit_path));
 
-    write_configured_installer_info(prefix, platform)?;
+    if let Some(installer) = installer {
+        write_installer_info(prefix, platform, installer)?;
+    }
 
     Ok(())
 }
 
-fn write_configured_installer_info(prefix: &Path, platform: Platform) -> miette::Result<()> {
-    let Some(installer_type) = policy::installer() else {
-        return Ok(());
-    };
-    write_installer_info(
-        prefix,
-        policy::runtime_name(),
-        policy::runtime_version(),
-        platform,
-        installer_type,
-    )
-}
-
 fn write_installer_info(
     prefix: &Path,
-    name: &str,
-    version: &str,
     platform: Platform,
-    installer_type: &str,
+    installer: InstallerMetadata<'_>,
 ) -> miette::Result<()> {
     let path = prefix.join(".installer.info");
     let contents = serde_json::to_string(&InstallerInfo {
-        name,
-        version,
+        name: installer.name,
+        version: installer.version,
         platform: platform.to_string(),
-        installer_type,
+        installer_type: installer.installer_type,
     })
     .into_diagnostic()
     .context("failed to render Constructor installer metadata")?;
@@ -138,10 +147,7 @@ fn render_history(
     dists.sort();
 
     let mut content = format!("==> {timestamp} <==\n");
-    content.push_str(&format!(
-        "# cmd: {} [automatic bootstrap]\n",
-        policy::command_name()
-    ));
+    content.push_str(&format!("# cmd: {command_name} [automatic bootstrap]\n"));
     for dist in dists {
         content.push('+');
         content.push_str(&dist);
@@ -365,6 +371,7 @@ https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda#sha256:{SH
             &records,
             &["conda".to_string()],
             "cs-template",
+            None,
         )
         .unwrap();
 
@@ -398,10 +405,12 @@ https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda#sha256:{SH
 
         write_installer_info(
             tmp.path(),
-            "Demo Distribution",
-            "1.2.3",
             Platform::Linux64,
-            "homebrew",
+            InstallerMetadata {
+                name: "Demo Distribution",
+                version: "1.2.3",
+                installer_type: "homebrew",
+            },
         )
         .unwrap();
 

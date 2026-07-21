@@ -22,7 +22,6 @@ include = [
   "/pyproject.toml",
   "/python/conda_ship/*.py",
   "/README.md",
-  "/src/lib.rs",
   "/src/*.rs",
   "/src/bin/*.rs",
   "/src/bin/cs/*.rs",

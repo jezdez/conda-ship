@@ -1,8 +1,8 @@
 ---
 source: src/config.rs
-assertion_line: 362
+assertion_line: 422
 expression: contents
 ---
 {
-  "message": "This base environment is managed by cs-template.\nCreate a new environment instead: conda create -n myenv\nTo re-bootstrap: cs-template bootstrap --force\nTo override: pass --override-frozen-env"
+  "message": "This base environment is managed by cs-template.\nCreate a new environment instead: conda create -n myenv\nTo override: pass --override-frozen"
 }

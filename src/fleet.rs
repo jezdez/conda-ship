@@ -5,18 +5,17 @@
 //! environments, choose catalogs, create shims, or mutate a user's global
 //! `PATH`.
 
-use std::{
-    collections::BTreeMap,
-    ffi::OsString,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_lock::LockFile;
 
+use crate::bootstrap_lock::BootstrapLock;
+use crate::bootstrap_state::{self, BootstrapIdentity};
+use crate::commands::{self, ManagedPrefixIdentity, PrefixDisposition};
+use crate::config::PrefixMetadataIdentity;
+use crate::constructor_metadata::InstallerMetadata;
 use crate::{config, constructor_metadata, exec, hash, install, policy};
-
-const FLEET_COMMAND_NAME: &str = "fleet";
 
 /// Manager for multiple conda-ship-managed runtime prefixes.
 #[derive(Clone, Debug)]
@@ -45,6 +44,8 @@ impl Fleet {
         validate_bundle_options(options.bundle_dir.as_deref())?;
         let lock_sha256 = lock_sha256(&spec.lock_content);
         let channels = channels_from_lock_content(&spec.lock_content)?;
+        let metadata_file = metadata_file_for(&spec.id);
+        let identity = managed_identity(&spec.id, &metadata_file);
 
         let prefix = self.prefix_for(&spec.id)?;
         std::fs::create_dir_all(&self.install_root)
@@ -56,27 +57,31 @@ impl Fleet {
                 )
             })?;
 
-        if prefix.exists() {
-            if is_bootstrapped(&prefix) {
-                if !options.force {
-                    return self.read_installed_runtime(&prefix, &spec.id, "use");
-                }
-                self.read_installed_runtime(&prefix, &spec.id, "replace")?;
-            } else if !is_empty_dir(&prefix)? {
-                return Err(miette::miette!(
-                    "refusing to install into unmanaged non-empty prefix: {}",
-                    policy::path_for_display(&prefix)
-                ));
+        let _lock = BootstrapLock::acquire(&prefix)?;
+        let disposition = commands::prefix_disposition_for(&prefix, identity, !options.force)?;
+        let reinstall = match disposition {
+            PrefixDisposition::Ready if !options.force => {
+                return self.read_installed_runtime(&prefix, &spec.id, "use");
             }
+            PrefixDisposition::Ready => true,
+            PrefixDisposition::Bootstrap { reinstall } => reinstall,
+        };
+
+        if reinstall {
+            eprintln!("   Reinstalling every package from the selected lock");
         }
 
-        if options.force && prefix.exists() {
-            reject_dangerous_prefix(&prefix)?;
-            if !is_empty_dir(&prefix)? {
-                self.read_installed_runtime(&prefix, &spec.id, "remove")?;
-            }
-            remove_install_path(&prefix)?;
-        }
+        validate_managed_policy_outputs(&prefix)?;
+        bootstrap_state::write_installing_for(
+            &prefix,
+            BootstrapIdentity {
+                display_name: &spec.id,
+                install_name: &spec.id,
+                metadata_file: &metadata_file,
+            },
+        )?;
+        config::invalidate_metadata_for(&prefix, &metadata_file)?;
+        reset_managed_policy_outputs(&prefix)?;
 
         if let Some(ref bundle_dir) = options.bundle_dir {
             install::from_lockfile_with_bundle_and_specs(
@@ -85,6 +90,7 @@ impl Fleet {
                 &spec.requested_specs,
                 bundle_dir,
                 options.offline,
+                reinstall,
             )
             .await?;
         } else if options.offline {
@@ -92,27 +98,44 @@ impl Fleet {
                 &prefix,
                 &spec.lock_content,
                 &spec.requested_specs,
+                reinstall,
             )
             .await?;
         } else {
-            install::from_lockfile_with_specs(&prefix, &spec.lock_content, &spec.requested_specs)
-                .await?;
+            install::from_lockfile_with_specs(
+                &prefix,
+                &spec.lock_content,
+                &spec.requested_specs,
+                reinstall,
+            )
+            .await?;
         }
 
-        constructor_metadata::write_prefix_metadata_with_command(
+        reset_managed_policy_outputs(&prefix)?;
+        let installer = spec
+            .installer
+            .as_deref()
+            .map(|installer_type| InstallerMetadata {
+                name: &spec.id,
+                version: &spec.version,
+                installer_type,
+            });
+        constructor_metadata::write_prefix_metadata_for(
             &prefix,
             &spec.lock_content,
             &spec.requested_specs,
-            FLEET_COMMAND_NAME,
+            &spec.delegate_executable,
+            installer,
         )?;
-        config::write_condarc(&prefix, &channels)?;
-        config::write_frozen_with_message(&prefix, &fleet_frozen_message(&spec.id))?;
+        write_configured_policy(&prefix, &spec)?;
+        install::compile_python_bytecode(&prefix);
+        exec::validate_delegate(&prefix, &spec.delegate_executable)?;
         config::write_metadata_for_identity(
             &prefix,
-            config::PrefixMetadataIdentity {
+            PrefixMetadataIdentity {
                 display_name: &spec.id,
                 install_name: &spec.id,
-                metadata_file: &metadata_file_for(&spec.id),
+                metadata_file: &metadata_file,
                 version: &spec.version,
                 delegate_executable: Some(&spec.delegate_executable),
                 lock_sha256: Some(&lock_sha256),
@@ -120,8 +143,7 @@ impl Fleet {
             &channels,
             &spec.requested_specs,
         )?;
-
-        install::compile_python_bytecode(&prefix);
+        bootstrap_state::remove(&prefix)?;
 
         self.read_installed_runtime(&prefix, &spec.id, "inspect")
     }
@@ -157,7 +179,7 @@ impl Fleet {
             if validate_runtime_id(&id).is_err() {
                 continue;
             }
-            if let Ok(Some(runtime)) = self.status(&id) {
+            if let Ok(Some(runtime)) = self.get(&id) {
                 runtimes.push(runtime);
             }
         }
@@ -166,14 +188,18 @@ impl Fleet {
         Ok(runtimes)
     }
 
-    /// Return status for a managed runtime by id.
-    pub fn status(&self, id: &str) -> miette::Result<Option<InstalledRuntime>> {
+    /// Return a managed runtime by id.
+    pub fn get(&self, id: &str) -> miette::Result<Option<InstalledRuntime>> {
         validate_runtime_id(id)?;
         let prefix = self.prefix_for(id)?;
         let metadata_file = metadata_file_for(id);
+        let _lock = BootstrapLock::acquire(&prefix)?;
+        commands::validate_prefix_path(&prefix)?;
         let metadata_path = config::metadata_path_for(&prefix, &metadata_file);
-        if !metadata_path.is_file() {
-            return Ok(None);
+        match std::fs::symlink_metadata(&metadata_path) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error).into_diagnostic(),
         }
         self.read_installed_runtime(&prefix, id, "inspect")
             .map(Some)
@@ -185,18 +211,30 @@ impl Fleet {
     pub fn remove(&self, id: &str) -> miette::Result<()> {
         validate_runtime_id(id)?;
         let prefix = self.prefix_for(id)?;
-        if !prefix.exists() {
-            return Ok(());
+        let metadata_file = metadata_file_for(id);
+        match std::fs::symlink_metadata(&prefix) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error).into_diagnostic(),
         }
 
+        let _lock = BootstrapLock::acquire(&prefix)?;
         reject_dangerous_prefix(&prefix)?;
-        if is_bootstrapped(&prefix) {
-            self.read_installed_runtime(&prefix, id, "remove")?;
-        } else if !is_empty_dir(&prefix)? {
-            return Err(miette::miette!(
-                "refusing to remove unmanaged non-empty prefix: {}",
-                policy::path_for_display(&prefix)
-            ));
+        if let Some(state) = bootstrap_state::read(&prefix)? {
+            bootstrap_state::validate_identity_for(
+                &state,
+                BootstrapIdentity {
+                    display_name: id,
+                    install_name: id,
+                    metadata_file: &metadata_file,
+                },
+            )?;
+        } else if !commands::is_empty_dir(&prefix)? {
+            commands::read_managed_metadata_for(
+                &prefix,
+                managed_identity(id, &metadata_file),
+                "remove",
+            )?;
         }
 
         remove_install_path(&prefix)
@@ -214,31 +252,21 @@ impl Fleet {
         action: &str,
     ) -> miette::Result<InstalledRuntime> {
         let metadata_file = metadata_file_for(id);
-        let metadata_path = config::metadata_path_for(prefix, &metadata_file);
-        if !metadata_path.is_file() {
-            return Err(miette::miette!(
-                "refusing to {action} unmanaged fleet prefix: {}\n  Expected runtime metadata file: {}",
-                policy::path_for_display(prefix),
-                policy::path_for_display(&metadata_path)
-            ));
-        }
+        let meta = commands::read_managed_metadata_for(
+            prefix,
+            managed_identity(id, &metadata_file),
+            action,
+        )?;
 
-        let meta = config::read_metadata_for(prefix, &metadata_file).map_err(|err| {
+        let delegate = meta.delegate_executable.as_deref().ok_or_else(|| {
             miette::miette!(
-                "refusing to {action} unmanaged fleet prefix: {}\n  Invalid runtime metadata file: {}\n  {err}",
-                policy::path_for_display(prefix),
-                policy::path_for_display(&metadata_path)
+                "refusing to {action} fleet prefix without an explicit delegate: {}",
+                policy::path_for_display(prefix)
             )
         })?;
-        config::validate_metadata_identity_for(&meta, id, id, &metadata_file).map_err(|err| {
-            miette::miette!(
-                "refusing to {action} fleet prefix owned by a different runtime: {}\n  Invalid runtime metadata file: {}\n  {err}",
-                policy::path_for_display(prefix),
-                policy::path_for_display(&metadata_path)
-            )
-        })?;
+        exec::validate_delegate(prefix, delegate)?;
 
-        Ok(InstalledRuntime::from_metadata(prefix.to_path_buf(), meta))
+        InstalledRuntime::from_metadata(prefix.to_path_buf(), meta)
     }
 }
 
@@ -260,6 +288,12 @@ pub struct RuntimeSpec {
     pub lock_content: String,
     /// Requested specs recorded in `conda-meta/history` and prefix metadata.
     pub requested_specs: Vec<String>,
+    /// Exact downstream-owned `.condarc` content to write, when configured.
+    pub condarc: Option<String>,
+    /// Whether to write the CEP 22 frozen marker for the base prefix.
+    pub freeze_base: bool,
+    /// Optional Constructor-compatible installer provenance type.
+    pub installer: Option<String>,
 }
 
 impl RuntimeSpec {
@@ -273,6 +307,18 @@ impl RuntimeSpec {
         if self.lock_content.trim().is_empty() {
             return Err(miette::miette!("runtime lock_content must not be empty"));
         }
+        install::lockfile_records_for_current_platform(&self.lock_content)?;
+        install::parse_specs(&self.requested_specs)?;
+        if let Some(contents) = self.condarc.as_deref() {
+            validate_condarc(contents)?;
+        }
+        if self
+            .installer
+            .as_deref()
+            .is_some_and(|installer| installer.trim().is_empty())
+        {
+            return Err(miette::miette!("installer type must not be empty"));
+        }
         Ok(())
     }
 
@@ -285,7 +331,9 @@ impl RuntimeSpec {
 /// Options for installing a runtime.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct InstallOptions {
-    /// Replace an existing managed runtime with the same id.
+    /// Reinstall every locked package in an existing managed runtime.
+    ///
+    /// Named environments and unrelated files under the prefix are preserved.
     pub force: bool,
     /// Install without network access. Packages must already be in the shared
     /// rattler cache or in `bundle_dir`.
@@ -305,7 +353,7 @@ pub struct InstalledRuntime {
     pub prefix: PathBuf,
     /// Default executable that callers usually expose for this runtime.
     pub delegate_executable: String,
-    /// Channels recorded in the runtime `.condarc`.
+    /// Channels recorded as lockfile provenance.
     pub channels: Vec<String>,
     /// SHA256 digest of the lock content used for installation, when recorded.
     pub lock_sha256: Option<String>,
@@ -314,18 +362,19 @@ pub struct InstalledRuntime {
 }
 
 impl InstalledRuntime {
-    fn from_metadata(prefix: PathBuf, meta: config::PrefixMetadata) -> Self {
-        Self {
+    fn from_metadata(prefix: PathBuf, meta: config::PrefixMetadata) -> miette::Result<Self> {
+        let delegate_executable = meta.delegate_executable.ok_or_else(|| {
+            miette::miette!("fleet runtime metadata has no explicit delegate executable")
+        })?;
+        Ok(Self {
             id: meta.install_name,
             version: meta.version,
             prefix,
-            delegate_executable: meta
-                .delegate_executable
-                .unwrap_or_else(|| "conda".to_string()),
+            delegate_executable,
             channels: meta.channels,
             lock_sha256: meta.lock_sha256,
             requested_specs: meta.packages,
-        }
+        })
     }
 
     /// Build a command description for an executable inside this runtime.
@@ -340,7 +389,6 @@ impl InstalledRuntime {
         }
         Ok(RuntimeCommand {
             executable,
-            env: self.activation_env(command_name),
             path_entries: self.path_entries(),
         })
     }
@@ -348,23 +396,6 @@ impl InstalledRuntime {
     /// Return the expected executable path inside this runtime.
     pub fn executable_path(&self, command_name: &str) -> PathBuf {
         exec::executable_in_prefix(&self.prefix, command_name)
-    }
-
-    /// Return activation-like environment variables for running a command.
-    ///
-    /// `PATH` is intentionally not included. Callers should prepend
-    /// [`InstalledRuntime::path_entries`] to the existing process `PATH`.
-    pub fn activation_env(&self, command_name: &str) -> BTreeMap<String, OsString> {
-        let mut env = BTreeMap::new();
-        env.insert("CONDA_ROOT_PREFIX".to_string(), self.prefix.clone().into());
-        env.insert("CONDA_PREFIX".to_string(), self.prefix.clone().into());
-        env.insert("CONDA_DEFAULT_ENV".to_string(), OsString::from("base"));
-        env.insert("CONDA_SHLVL".to_string(), OsString::from("1"));
-        env.insert(
-            "CONDA_COMPLETION_COMMAND_NAME".to_string(),
-            OsString::from(command_name),
-        );
-        env
     }
 
     /// Return prefix-local directories that should be prepended to `PATH`.
@@ -405,8 +436,6 @@ impl InstalledRuntime {
 pub struct RuntimeCommand {
     /// Absolute executable path inside the runtime prefix.
     pub executable: PathBuf,
-    /// Environment variables to set on the child process.
-    pub env: BTreeMap<String, OsString>,
     /// Prefix-local directories that should be prepended to `PATH`.
     pub path_entries: Vec<PathBuf>,
 }
@@ -427,6 +456,95 @@ pub struct ShimPlan {
 
 fn metadata_file_for(id: &str) -> String {
     format!(".{id}.json")
+}
+
+fn managed_identity<'a>(id: &'a str, metadata_file: &'a str) -> ManagedPrefixIdentity<'a> {
+    ManagedPrefixIdentity {
+        display_name: id,
+        install_name: id,
+        metadata_file,
+        expected_delegate: None,
+    }
+}
+
+fn write_configured_policy(prefix: &Path, spec: &RuntimeSpec) -> miette::Result<()> {
+    if let Some(contents) = spec.condarc.as_deref() {
+        config::write_condarc(prefix, contents)?;
+    }
+    if spec.freeze_base {
+        config::write_frozen_with_message(prefix, &fleet_frozen_message(&spec.id))?;
+    }
+    Ok(())
+}
+
+fn reset_managed_policy_outputs(prefix: &Path) -> miette::Result<()> {
+    for path in managed_policy_output_paths(prefix) {
+        remove_managed_policy_output(&path)?;
+    }
+    Ok(())
+}
+
+fn validate_managed_policy_outputs(prefix: &Path) -> miette::Result<()> {
+    for path in managed_policy_output_paths(prefix) {
+        validate_managed_policy_output(&path)?;
+    }
+    Ok(())
+}
+
+fn managed_policy_output_paths(prefix: &Path) -> [PathBuf; 3] {
+    [
+        prefix.join(".condarc"),
+        prefix.join("conda-meta").join("frozen"),
+        prefix.join(".installer.info"),
+    ]
+}
+
+fn validate_managed_policy_output(path: &Path) -> miette::Result<()> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            Err(miette::miette!(
+                "refusing to replace Fleet-managed output that is not a regular file: {}",
+                policy::path_for_display(path)
+            ))
+        }
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).into_diagnostic(),
+    }
+}
+
+fn remove_managed_policy_output(path: &Path) -> miette::Result<()> {
+    validate_managed_policy_output(path)?;
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            Err(miette::miette!(
+                "refusing to replace Fleet-managed output that is not a regular file: {}",
+                policy::path_for_display(path)
+            ))
+        }
+        Ok(_) => std::fs::remove_file(path)
+            .into_diagnostic()
+            .with_context(|| {
+                format!(
+                    "failed to remove Fleet-managed output at {}",
+                    policy::path_for_display(path)
+                )
+            }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).into_diagnostic(),
+    }
+}
+
+fn validate_condarc(contents: &str) -> miette::Result<()> {
+    let parsed: serde_yaml::Value = serde_yaml::from_str(contents)
+        .into_diagnostic()
+        .context("failed to parse RuntimeSpec condarc")?;
+    if !parsed.is_mapping() {
+        return Err(miette::miette!(
+            "RuntimeSpec condarc must be a YAML mapping"
+        ));
+    }
+    Ok(())
 }
 
 fn lock_sha256(lock_content: &str) -> String {
@@ -492,20 +610,6 @@ fn validate_safe_name(value: &str, kind: &str) -> miette::Result<()> {
         return Err(miette::miette!("{kind} must not be {value:?}"));
     }
     Ok(())
-}
-
-fn is_bootstrapped(prefix: &Path) -> bool {
-    prefix.join("conda-meta").is_dir()
-}
-
-fn is_empty_dir(prefix: &Path) -> miette::Result<bool> {
-    if !prefix.is_dir() {
-        return Ok(false);
-    }
-    Ok(std::fs::read_dir(prefix)
-        .into_diagnostic()?
-        .next()
-        .is_none())
 }
 
 fn reject_dangerous_prefix(prefix: &Path) -> miette::Result<()> {
@@ -598,10 +702,10 @@ fn clear_readonly_recursive(path: &Path) -> miette::Result<()> {
 
 fn fleet_frozen_message(id: &str) -> String {
     format!(
-        "This base environment is managed by fleet runtime {id}.\n\
+        "This base environment is managed by Fleet runtime {id}.\n\
 Create a new environment instead: conda create -n myenv\n\
 To reinstall: use the fleet caller that installed this runtime\n\
-To override: pass --override-frozen-env"
+To override: pass --override-frozen"
     )
 }
 
@@ -615,8 +719,7 @@ mod tests {
         Fleet::new(root)
     }
 
-    fn empty_lock() -> String {
-        let platform = Platform::current();
+    fn empty_lock_for(platform: Platform) -> String {
         format!(
             r#"
 ---
@@ -632,24 +735,53 @@ packages: []
         )
     }
 
+    fn empty_lock() -> String {
+        empty_lock_for(Platform::current())
+    }
+
     fn spec(id: &str) -> RuntimeSpec {
         RuntimeSpec {
             id: id.to_string(),
             version: "1.0.0".to_string(),
-            delegate_executable: "conda".to_string(),
+            delegate_executable: "runner".to_string(),
             lock_content: empty_lock(),
-            requested_specs: vec!["conda".to_string()],
+            requested_specs: vec!["runner".to_string()],
+            condarc: None,
+            freeze_base: false,
+            installer: None,
         }
+    }
+
+    fn write_delegate(prefix: &Path, delegate: &str) -> PathBuf {
+        let executable = exec::executable_in_prefix(prefix, delegate);
+        std::fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        std::fs::write(&executable, "stub").unwrap();
+        executable
+    }
+
+    fn mark_installing(prefix: &Path, id: &str) {
+        let metadata_file = metadata_file_for(id);
+        bootstrap_state::write_installing_for(
+            prefix,
+            BootstrapIdentity {
+                display_name: id,
+                install_name: id,
+                metadata_file: &metadata_file,
+            },
+        )
+        .unwrap();
     }
 
     fn write_managed_runtime(prefix: &Path, id: &str, delegate: &str) {
         std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
+        write_delegate(prefix, delegate);
+        let metadata_file = metadata_file_for(id);
         config::write_metadata_for_identity(
             prefix,
             config::PrefixMetadataIdentity {
                 display_name: id,
                 install_name: id,
-                metadata_file: &metadata_file_for(id),
+                metadata_file: &metadata_file,
                 version: "1.0.0",
                 delegate_executable: Some(delegate),
                 lock_sha256: Some("abc123"),
@@ -670,12 +802,33 @@ packages: []
         runtime.delegate_executable = "bin/tool".to_string();
         assert!(runtime.validate().is_err());
 
-        runtime.delegate_executable = "conda".to_string();
+        runtime.delegate_executable = "runner".to_string();
         runtime.lock_content.clear();
+        assert!(runtime.validate().is_err());
+
+        runtime.lock_content = empty_lock();
+        runtime.requested_specs = vec![">=>=not_a_package!!!".to_string()];
+        assert!(runtime.validate().is_err());
+
+        runtime.requested_specs = vec!["runner".to_string()];
+        runtime.condarc = Some("- not-a-mapping\n".to_string());
+        assert!(runtime.validate().is_err());
+
+        runtime.condarc = None;
+        runtime.installer = Some(" ".to_string());
         assert!(runtime.validate().is_err());
 
         let runtime = spec("tool");
         assert_eq!(runtime.lock_sha256(), lock_sha256(&runtime.lock_content));
+
+        let other_platform = if Platform::current() == Platform::Linux64 {
+            Platform::Win64
+        } else {
+            Platform::Linux64
+        };
+        let mut runtime = spec("tool");
+        runtime.lock_content = empty_lock_for(other_platform);
+        assert!(runtime.validate().is_err());
     }
 
     #[test]
@@ -696,10 +849,16 @@ packages: []
     }
 
     #[tokio::test]
-    async fn test_install_list_status_remove_empty_locked_runtime() {
+    async fn test_install_reinstall_get_and_remove_empty_locked_runtime() {
         let tmp = TempDir::new().unwrap();
         let install_root = tmp.path().join("fleet");
         let fleet = fleet(&install_root);
+        let prefix = install_root.join("tool");
+        write_delegate(&prefix, "runner");
+        let sentinel = prefix.join("envs").join("named").join("keep.txt");
+        std::fs::create_dir_all(sentinel.parent().unwrap()).unwrap();
+        std::fs::write(&sentinel, "keep").unwrap();
+        mark_installing(&prefix, "tool");
 
         let installed = fleet
             .install(spec("tool"), InstallOptions::default())
@@ -707,8 +866,9 @@ packages: []
             .unwrap();
 
         assert_eq!(installed.prefix, install_root.join("tool"));
-        assert!(installed.prefix.join(".condarc").is_file());
-        assert!(installed.prefix.join("conda-meta").join("frozen").is_file());
+        assert!(!installed.prefix.join(".condarc").exists());
+        assert!(!installed.prefix.join("conda-meta").join("frozen").exists());
+        assert!(!installed.prefix.join(".installer.info").exists());
         assert!(
             installed
                 .prefix
@@ -724,6 +884,64 @@ packages: []
                 .is_file()
         );
         assert!(installed.prefix.join(".tool.json").is_file());
+        assert!(!bootstrap_state::path(&installed.prefix).exists());
+        assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "keep");
+
+        let mut configured = spec("tool");
+        configured.condarc = Some("channels:\n  - conda-forge\n".to_string());
+        configured.freeze_base = true;
+        configured.installer = Some("homebrew".to_string());
+        let configured = fleet
+            .install(
+                configured,
+                InstallOptions {
+                    force: true,
+                    ..InstallOptions::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(configured.prefix.join(".condarc")).unwrap(),
+            "channels:\n  - conda-forge\n"
+        );
+        assert!(
+            configured
+                .prefix
+                .join("conda-meta")
+                .join("frozen")
+                .is_file()
+        );
+        let installer: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(configured.prefix.join(".installer.info")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(installer["type"], "homebrew");
+        assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "keep");
+
+        let installed = fleet
+            .install(
+                spec("tool"),
+                InstallOptions {
+                    force: true,
+                    ..InstallOptions::default()
+                },
+            )
+            .await
+            .unwrap();
+        assert!(!installed.prefix.join(".condarc").exists());
+        assert!(!installed.prefix.join("conda-meta").join("frozen").exists());
+        assert!(!installed.prefix.join(".installer.info").exists());
+        assert_eq!(std::fs::read_to_string(&sentinel).unwrap(), "keep");
+        let history =
+            std::fs::read_to_string(installed.prefix.join("conda-meta").join("history")).unwrap();
+        assert!(history.contains("# cmd: runner [automatic bootstrap]"));
+        assert!(!history.contains("fleet bootstrap"));
+        let receipt_path = crate::launcher_receipt::receipt_path_for_launcher(
+            &installed.executable_path("runner"),
+        )
+        .unwrap();
+        assert!(!receipt_path.exists());
 
         let listed = fleet.list().unwrap();
         assert_eq!(listed, vec![installed.clone()]);
@@ -733,8 +951,8 @@ packages: []
         );
         assert_eq!(installed.lock_sha256, Some(lock_sha256(&empty_lock())));
 
-        let status = fleet.status("tool").unwrap().unwrap();
-        assert_eq!(status, installed);
+        let found = fleet.get("tool").unwrap().unwrap();
+        assert_eq!(found, installed);
 
         fleet.remove("tool").unwrap();
         assert!(!install_root.join("tool").exists());
@@ -745,7 +963,7 @@ packages: []
         let tmp = TempDir::new().unwrap();
         let install_root = tmp.path().join("fleet");
         std::fs::create_dir_all(install_root.join("ignored").join("conda-meta")).unwrap();
-        write_managed_runtime(&install_root.join("tool"), "tool", "conda");
+        write_managed_runtime(&install_root.join("tool"), "tool", "runner");
 
         let listed = fleet(&install_root).list().unwrap();
         assert_eq!(listed.len(), 1);
@@ -766,10 +984,127 @@ packages: []
             .block_on(fleet.install(spec("tool"), InstallOptions::default()))
             .unwrap_err()
             .to_string();
-        assert!(err.contains("unmanaged non-empty prefix"), "{err}");
+        assert!(err.contains("existing non-empty path"), "{err}");
 
         let err = fleet.remove("tool").unwrap_err().to_string();
-        assert!(err.contains("unmanaged non-empty prefix"), "{err}");
+        assert!(err.contains("unmanaged install path"), "{err}");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_remove_refuses_metadata_symlink() {
+        let tmp = TempDir::new().unwrap();
+        let install_root = tmp.path().join("fleet");
+        let prefix = install_root.join("tool");
+        let external = tmp.path().join("external");
+        write_managed_runtime(&external, "tool", "runner");
+        std::fs::create_dir_all(&prefix).unwrap();
+        write_delegate(&prefix, "runner");
+        std::os::unix::fs::symlink(external.join(".tool.json"), prefix.join(".tool.json")).unwrap();
+
+        let error = fleet(&install_root).remove("tool").unwrap_err().to_string();
+
+        assert!(error.contains("not a regular file"), "{error}");
+        assert!(prefix.exists());
+        assert!(external.join(".tool.json").is_file());
+    }
+
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn test_reinstall_refuses_policy_symlink_without_invalidating_ready_state() {
+        let tmp = TempDir::new().unwrap();
+        let install_root = tmp.path().join("fleet");
+        let prefix = install_root.join("tool");
+        let external = tmp.path().join("external-condarc");
+        std::fs::write(&external, "owned elsewhere").unwrap();
+        write_managed_runtime(&prefix, "tool", "runner");
+        std::os::unix::fs::symlink(&external, prefix.join(".condarc")).unwrap();
+
+        let error = fleet(&install_root)
+            .install(
+                spec("tool"),
+                InstallOptions {
+                    force: true,
+                    ..InstallOptions::default()
+                },
+            )
+            .await
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("Fleet-managed output"), "{error}");
+        assert_eq!(
+            std::fs::read_to_string(external).unwrap(),
+            "owned elsewhere"
+        );
+        assert!(!bootstrap_state::path(&prefix).exists());
+        assert!(prefix.join(".tool.json").is_file());
+        assert!(!prefix.join("conda-meta").join("history").exists());
+    }
+
+    #[tokio::test]
+    async fn test_invalid_specs_do_not_demote_ready_runtime() {
+        let tmp = TempDir::new().unwrap();
+        let install_root = tmp.path().join("fleet");
+        let prefix = install_root.join("tool");
+        write_managed_runtime(&prefix, "tool", "runner");
+        std::fs::write(prefix.join(".condarc"), "channels: []\n").unwrap();
+        let metadata_before = std::fs::read(prefix.join(".tool.json")).unwrap();
+
+        let mut invalid = spec("tool");
+        invalid.requested_specs = vec![">=>=not_a_package!!!".to_string()];
+        let error = fleet(&install_root)
+            .install(
+                invalid,
+                InstallOptions {
+                    force: true,
+                    ..InstallOptions::default()
+                },
+            )
+            .await
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("failed to parse package specs"), "{error}");
+        assert_eq!(
+            std::fs::read(prefix.join(".tool.json")).unwrap(),
+            metadata_before
+        );
+        assert_eq!(
+            std::fs::read_to_string(prefix.join(".condarc")).unwrap(),
+            "channels: []\n"
+        );
+        assert!(!bootstrap_state::path(&prefix).exists());
+    }
+
+    #[tokio::test]
+    async fn test_force_restores_runtime_with_missing_recorded_delegate() {
+        let tmp = TempDir::new().unwrap();
+        let install_root = tmp.path().join("fleet");
+        let prefix = install_root.join("tool");
+        write_managed_runtime(&prefix, "tool", "missing-runner");
+        std::fs::remove_file(exec::executable_in_prefix(&prefix, "missing-runner")).unwrap();
+        write_delegate(&prefix, "replacement-runner");
+        assert!(fleet(&install_root).get("tool").is_err());
+
+        let mut replacement = spec("tool");
+        replacement.delegate_executable = "replacement-runner".to_string();
+        replacement.requested_specs = vec!["replacement-runner".to_string()];
+        let installed = fleet(&install_root)
+            .install(
+                replacement,
+                InstallOptions {
+                    force: true,
+                    ..InstallOptions::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(installed.delegate_executable, "replacement-runner");
+        assert!(installed.executable_path("replacement-runner").is_file());
+        assert!(!bootstrap_state::path(&prefix).exists());
+        assert!(prefix.join(".tool.json").is_file());
     }
 
     #[test]
@@ -783,7 +1118,7 @@ packages: []
         std::fs::write(&executable, "stub").unwrap();
 
         let runtime = fleet(&tmp.path().join("fleet"))
-            .status("tool")
+            .get("tool")
             .unwrap()
             .unwrap();
         assert_eq!(runtime.executable_path("runner"), executable);
@@ -792,13 +1127,6 @@ packages: []
         let command = runtime.command("runner").unwrap();
         assert_eq!(command.executable, executable);
         assert!(command.path_entries.contains(&prefix.join("condabin")));
-        assert_eq!(
-            command.env.get("CONDA_DEFAULT_ENV"),
-            Some(&OsString::from("base"))
-        );
-
-        let activation = runtime.activation_env("runner");
-        assert_eq!(activation.get("CONDA_PREFIX"), Some(&prefix.clone().into()));
 
         let shim_dir = tmp.path().join("bin");
         let plan = runtime

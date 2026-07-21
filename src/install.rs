@@ -81,6 +81,22 @@ pub async fn from_lockfile(
     lock_content: &str,
     reinstall: bool,
 ) -> miette::Result<()> {
+    from_lockfile_with_specs(
+        prefix,
+        lock_content,
+        &config::embedded_config().packages,
+        reinstall,
+    )
+    .await
+}
+
+/// Install packages from a pre-solved lockfile with explicit requested specs.
+pub(crate) async fn from_lockfile_with_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
+    reinstall: bool,
+) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let match_specs = parse_specs(requested_specs)?;
@@ -117,6 +133,7 @@ pub async fn from_lockfile_with_bundle(
         &config::embedded_config().packages,
         bundle_dir,
         offline,
+        reinstall,
     )
     .await
 }
@@ -128,6 +145,7 @@ pub(crate) async fn from_lockfile_with_bundle_and_specs(
     requested_specs: &[String],
     bundle_dir: &Path,
     offline: bool,
+    reinstall: bool,
 ) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
@@ -222,6 +240,22 @@ pub(crate) async fn from_lockfile_with_bundle_and_specs(
 pub async fn from_lockfile_offline(
     prefix: &Path,
     lock_content: &str,
+    reinstall: bool,
+) -> miette::Result<()> {
+    from_lockfile_offline_with_specs(
+        prefix,
+        lock_content,
+        &config::embedded_config().packages,
+        reinstall,
+    )
+    .await
+}
+
+/// Install packages from a lockfile in offline mode with explicit requested specs.
+pub(crate) async fn from_lockfile_offline_with_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
     reinstall: bool,
 ) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
