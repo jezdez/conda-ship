@@ -74,8 +74,7 @@ PATH treatment as a stamped runtime.
 
 Fleet returns shim plans but does not write files. Callers handle shim contents,
 overwrite policy, PATH setup, and removal. A launcher created by a Fleet caller
-is externally managed and does not receive a conda-ship direct-install launcher
-receipt. A receipt lookup for it therefore returns `MissingReceipt`.
+is externally managed. conda-ship does not own its update or removal flow.
 
 ## Responsibilities
 

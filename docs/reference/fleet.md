@@ -150,12 +150,8 @@ let plan = runtime.shim_plan("demo", "demo", None)?;
 Fleet never writes or removes the launcher. The downstream orchestrator owns
 file contents, overwrite checks, PATH setup, and removal.
 
-Launchers created by Fleet callers are externally managed. They do not receive
-the direct-install receipt described in
-[launcher receipts](launcher-receipts.md). Calling `plan_launcher_update` for
-such a launcher returns `MissingReceipt`. An orchestrator that also supports
-directly installed stamped launchers must keep that receipt-gated flow separate
-from Fleet.
+Launchers created by Fleet callers are externally managed. The downstream
+orchestrator owns their update and removal policy.
 
 ## Cache, Bundle, And Offline Behavior
 

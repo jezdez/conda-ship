@@ -38,7 +38,7 @@ The initial API includes:
 - no synthetic conda activation environment
 - no global PATH mutation
 - no filesystem-mutating shim writer
-- no direct-install receipt for launchers created by Fleet callers
+- no conda-ship-owned update flow for launchers created by Fleet callers
 
 See [fleet concepts](explanation/fleet.md) and the
 [API reference](reference/fleet.md).

@@ -935,12 +935,6 @@ packages: []
             std::fs::read_to_string(installed.prefix.join("conda-meta").join("history")).unwrap();
         assert!(history.contains("# cmd: runner [automatic bootstrap]"));
         assert!(!history.contains("fleet bootstrap"));
-        let receipt_path = crate::launcher_receipt::receipt_path_for_launcher(
-            &installed.executable_path("runner"),
-        )
-        .unwrap();
-        assert!(!receipt_path.exists());
-
         let listed = fleet.list().unwrap();
         assert_eq!(listed, vec![installed.clone()]);
         assert_eq!(

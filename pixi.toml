@@ -33,12 +33,12 @@ RUSTC_WRAPPER = "sccache"
 build = "cargo build --release --bin cs"
 build-debug = "cargo build --bin cs"
 check-lock = "cargo run -p conda-ship -- inspect --json > /dev/null"
-test = "cargo test --release --features runtime-template"
-test-all = "cargo test --release --features runtime-template,online_tests"
+test = "cargo test --release --features runtime-template,fleet"
+test-all = "cargo test --release --features runtime-template,fleet,online_tests"
 coverage = "cargo llvm-cov --features runtime-template --lcov --output-path lcov.info"
 coverage-html = "cargo llvm-cov --features runtime-template --html"
 fmt-check = "cargo fmt --check"
-clippy = "cargo clippy --all-targets --features runtime-template -- -D warnings"
+clippy = "cargo clippy --all-targets --features runtime-template,fleet -- -D warnings"
 demos = { cmd = """bash -c 'if [ -n "$1" ]; then vhs "demos/$1.tape"; else for tape in demos/*.tape; do [[ "$(basename "$tape")" == _* ]] && continue; vhs "$tape"; done; fi' -- {{ name }}""", args = [{ arg = "name", default = "" }], description = "Record demo GIFs" }
 
 [feature.lint]
