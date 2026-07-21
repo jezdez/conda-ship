@@ -30,7 +30,7 @@ let fleet = Fleet::new("/tmp/fleet");
 ```
 
 Each runtime is installed under `install_root/<id>`. `RuntimeSpec` contains the
-complete resolved input selected by the downstream caller:
+inputs for one runtime:
 
 ```rust
 use conda_ship::fleet::RuntimeSpec;
@@ -51,8 +51,8 @@ The delegate is required and has no `conda` default. `RuntimeSpec::validate()`
 checks the runtime id, delegate name, version, lock content, optional condarc
 mapping, and optional installer type.
 
-`condarc` contains exact downstream-owned YAML. `None` means the final Fleet
-runtime has no `.condarc`. `freeze_base` controls the CEP 22 marker.
+`condarc` contains exact `.condarc` text supplied by the caller. `None` means
+the final Fleet runtime has no `.condarc`. `freeze_base` controls the CEP 22 marker.
 `installer` controls Constructor-compatible `.installer.info` provenance. All
 three default to disabled and none of them are inferred from the lock.
 
@@ -79,9 +79,10 @@ let installed = fleet.install(spec, InstallOptions::default()).await?;
   cache before installation
 
 Fleet serializes prefix mutations with the same adjacent cross-process lock as
-stamped runtimes. It writes an owned installing marker before package work and
-commits ready metadata only after package installation, policy outputs,
-constructor metadata, bytecode compilation, and delegate validation succeed.
+stamped runtimes. It writes an installing marker before installing packages. It
+writes the ready metadata through a synced temporary file and rename only after
+package installation, configured `.condarc` and CEP 22 files, Constructor
+metadata, bytecode compilation, and delegate validation succeed.
 
 If an owned install was interrupted, the next install retries it by
 reinstalling every package in the selected lock. A forced install uses the same
@@ -91,7 +92,7 @@ Fleet never turns `force` into recursive prefix deletion.
 Fleet refuses unknown non-empty prefixes and prefix symlinks. It also refuses
 metadata and managed policy paths that are symlinks or other nonregular entries.
 
-The exact Fleet-managed replacement outputs are:
+Fleet manages these files:
 
 - `<prefix>/.condarc`
 - `<prefix>/conda-meta/frozen`
@@ -100,8 +101,8 @@ The exact Fleet-managed replacement outputs are:
 Before package mutation, Fleet verifies that existing entries at those paths
 are regular files. It removes them after the installing marker is committed,
 rechecks them after package installation, then rewrites only the outputs enabled
-by the new `RuntimeSpec`. This covers enabled-to-disabled policy transitions
-without retaining stale configuration or installer provenance.
+by the new `RuntimeSpec`. This removes files when an option changes from enabled
+to disabled.
 
 ## List, Get, And Remove
 
@@ -113,13 +114,13 @@ fleet.remove("demo")?;
 
 `Fleet::list()` scans direct children of the install root and returns prefixes
 with valid Fleet metadata. `Fleet::get(id)` waits for the prefix mutation lock,
-then validates the exact regular ready metadata file and recorded delegate. It
+then validates the ready metadata file and recorded delegate. It
 returns `None` when the metadata file is absent.
 
 `Fleet::remove(id)` is the only recursive prefix deletion operation. It uses the
 same mutation lock and removes only an empty directory, a prefix with matching
 ready metadata, or an incomplete prefix with a matching installing marker. A
-metadata symlink is never accepted as ownership evidence.
+metadata symlink is rejected.
 
 ## Installed Runtime And Commands
 
@@ -139,7 +140,7 @@ entries to the existing child PATH just as a stamped runtime does.
 
 ## Shim Plans And Launcher Ownership
 
-Fleet can return a data-only shim plan:
+Fleet can return a shim plan:
 
 ```rust
 let plan = runtime.shim_plan("demo", "demo", None)?;

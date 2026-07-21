@@ -25,11 +25,11 @@ or enterprise package manager recipes live outside the core builder.
 
 Fleet is an experimental Rust API. The Cargo feature that enables it is
 `fleet`. It lets orchestrators manage multiple locked conda prefixes while
-reusing conda-ship install mechanics, metadata, offline bundle handling, shared
-rattler cache behavior, prefix mutation locking, and interrupted-install
-recovery. Stamped runtime artifacts remain the primary conda-ship output.
+reusing conda-ship package installation, metadata, offline bundle code, shared
+package cache, prefix mutation locking, and interrupted-install recovery.
+Stamped runtime artifacts remain the primary conda-ship output.
 
-The first API intentionally stays narrow:
+The initial API includes:
 
 - no solving
 - no catalog

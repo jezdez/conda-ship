@@ -1,6 +1,6 @@
 //! Experimental APIs for managing multiple locked conda runtimes.
 //!
-//! Fleet is an optional API layer for tools that want to install and
+//! Fleet is an optional Rust API for tools that want to install and
 //! inspect several conda-ship-managed prefixes. It does not solve
 //! environments, choose catalogs, create shims, or mutate a user's global
 //! `PATH`.
@@ -270,12 +270,10 @@ impl Fleet {
     }
 }
 
-/// Fully resolved runtime input accepted by [`Fleet::install`].
+/// Resolved runtime input accepted by [`Fleet::install`].
 ///
-/// `RuntimeSpec` is the programmatic boundary between a downstream
-/// orchestrator and fleet. It is not a user-facing catalog format: callers are
-/// expected to derive it from their own catalog, policy layer, downloaded
-/// descriptor, or conda-ship-generated runtime metadata.
+/// `RuntimeSpec` is not a user-facing catalog format. Callers construct it from
+/// their catalog or conda-ship stamped runtime data.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RuntimeSpec {
     /// Stable runtime id and on-disk directory name under the install root.
@@ -288,7 +286,7 @@ pub struct RuntimeSpec {
     pub lock_content: String,
     /// Requested specs recorded in `conda-meta/history` and prefix metadata.
     pub requested_specs: Vec<String>,
-    /// Exact downstream-owned `.condarc` content to write, when configured.
+    /// Exact `.condarc` text supplied by the caller, when configured.
     pub condarc: Option<String>,
     /// Whether to write the CEP 22 frozen marker for the base prefix.
     pub freeze_base: bool,
@@ -403,7 +401,7 @@ impl InstalledRuntime {
         exec::prefix_path_entries(&self.prefix)
     }
 
-    /// Build a data-only plan for exposing a command through a shim.
+    /// Build a plan for exposing a command through a shim.
     ///
     /// Fleet does not write the shim. Callers should review the destination and
     /// command data, refuse overwrites by default, and add their own ownership

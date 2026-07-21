@@ -43,11 +43,12 @@ execution of the configured delegate, offline bundle handling, and embedded
 bundle handling. conda-ship does not define the delegate's commands or plugins.
 
 The experimental [Fleet API](fleet.md) also lives here because it reuses the
-same prefix mutation lock, interrupted-bootstrap recovery, full-lock reinstall,
-metadata, bundle, and offline mechanics for multiple locked prefixes. Fleet is
-an opt-in library layer. It does not replace stamped runtime artifacts or choose
-catalogs, delegates, condarc contents, frozen-base policy, installer provenance,
-user-facing command names, global PATH policy, or shim filesystem writes.
+same prefix mutation lock, recovery of interrupted installs, full-lock
+reinstall, metadata, and offline bundle code for multiple locked prefixes.
+Fleet is an optional Rust API. It does not replace stamped runtime artifacts or
+choose catalogs, delegates, condarc contents, frozen-base policy, installer
+provenance, user-facing command names, global PATH policy, or shim filesystem
+writes.
 
 ## What Downstream Distributions Own
 
