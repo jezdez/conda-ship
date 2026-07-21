@@ -44,14 +44,14 @@ Non-alphanumeric characters become underscores and letters are uppercased.
 ## Delegate Environment
 
 The runtime executes the configured delegate from the managed prefix without
-presenting that prefix as an activated conda environment. It does not fabricate
+presenting that prefix as an activated conda environment. It does not set
 `CONDA_PREFIX`, `CONDA_DEFAULT_ENV`, or `CONDA_SHLVL`. Delegate arguments and
 the inherited process streams remain unchanged.
 
 `PATH`
 : Managed-prefix executable directories are prepended to the inherited value so
   the delegate and its child processes can find installed commands and shared
-  libraries. This executable discovery does not represent conda activation.
+  libraries. This changes `PATH` only. It does not activate the prefix.
 
 ## Test And Development Variable
 

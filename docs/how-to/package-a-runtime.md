@@ -112,7 +112,7 @@ Installer generators can include either:
 - an embedded runtime
 
 For `external`, place the extracted bundle where the installer or first-run
-script can expose it through the runtime-name-derived variables:
+script can expose it through the variables derived from the runtime name:
 
 ```bash
 DEMO_BUNDLE=/path/to/bundle DEMO_OFFLINE=1 demo info

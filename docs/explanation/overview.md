@@ -3,7 +3,7 @@
 ## Executive Summary
 
 conda-ship turns a solved conda environment into a ready-to-run runtime.
-It owns generic build and bootstrap mechanics. It is not a distribution, an
+It contains generic build and bootstrap code. It is not a distribution, an
 environment manager, or an installer generator.
 
 At a glance:
@@ -126,8 +126,8 @@ artifact carries the compressed bundle inside the runtime. See
 configuration choices.
 
 An embedded runtime automatically uses its bundled archives during first-run
-bootstrap. Its bundle can be overridden with the runtime-name-derived bundle
-environment variable when needed.
+bootstrap. Its bundle can be overridden with the bundle environment variable
+derived from the runtime name when needed.
 
 The bundle format is intentionally narrow. conda-ship writes top-level `.conda`
 and `.tar.bz2` files, then verifies them against the lockfile at install time.

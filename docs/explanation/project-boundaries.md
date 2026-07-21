@@ -39,9 +39,8 @@ conda-ship owns the reusable build and runtime machinery:
 - exposing the composite GitHub Action and local builder CLI
 
 The generated runtime behavior also lives here: automatic first-run bootstrap,
-transparent execution of the configured delegate, offline bundle handling, and
-embedded bundle handling. Delegate commands and plugins remain owned by the
-delegate's project.
+execution of the configured delegate, offline bundle handling, and embedded
+bundle handling. conda-ship does not define the delegate's commands or plugins.
 
 ## What Downstream Distributions Own
 

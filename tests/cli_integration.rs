@@ -1,4 +1,4 @@
-//! Integration tests for transparent stamped-runtime delegation.
+//! Integration tests for direct stamped-runtime delegation.
 #![cfg(feature = "runtime-template")]
 
 use std::ffi::OsString;

@@ -162,5 +162,5 @@ rm -rf -- "$PWD/.tmp/pydemo"
 The `delegate-executable` is the executable that receives every argument after
 the runtime is automatically bootstrapped. Use `delegate-executable = "conda"`
 for conda-like distributions, and another executable when the runtime should
-present a smaller or different command surface. The selected source environment
+provide fewer or different commands. The selected source environment
 only needs to include that delegate and its runtime dependencies.

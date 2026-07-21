@@ -64,9 +64,9 @@ example `[tool.conda.feature.ship.dependencies]`. Pixi sections live below
 
 conda-ship does not require specific packages in the selected environment. The
 environment must provide the configured delegate executable. Conda-like
-distributions include `conda` and the plugins they use. `RUNTIME shell` is a
-delegate-native command when the selected conda-spawn version includes the
-alias from [conda-spawn PR #59](https://github.com/conda/conda-spawn/pull/59).
+distributions include `conda` and the plugins they use. `RUNTIME shell` is
+available when the selected conda-spawn version provides the alias from
+[conda-spawn PR #59](https://github.com/conda/conda-spawn/pull/59).
 Generated runtimes automatically install the selected environment
 as the managed base prefix, then pass every argument to the configured delegate
 executable inside that prefix.
@@ -134,7 +134,7 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
 : Executable inside the managed prefix that receives every argument after
   automatic bootstrap. Use `conda` for conda-like runtimes such as `cx`. Other
   values, such as `python`, are supported when a runtime should expose a
-  different command surface.
+  different commands.
 
 `artifact-layout`
 : Artifact layout to build. Supported values are `online`, `external`, and

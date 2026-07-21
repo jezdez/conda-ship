@@ -51,7 +51,7 @@ install-name = "express"
 
 That builds a runtime named `cx` whose default install path resolves to
 `~/.conda/express` on the user's machine. Users can still override the resolved
-path with the runtime-name-derived prefix variable, such as
+path with the prefix variable derived from the runtime name, such as
 `CX_PREFIX=/tmp/express cx info`.
 
 Use `install-scheme = "user-data"` when the runtime should install below the
@@ -73,7 +73,7 @@ The selected source environment is the complete runtime package set.
 conda-ship does not add or require packages by name. Include the configured
 delegate executable and everything that delegate needs. A conda distribution
 usually includes `python`, `conda`, its selected solver plugin, and
-`conda-spawn` when it exposes the delegate-native `conda shell` alias.
+`conda-spawn` when it exposes the `conda shell` alias.
 
 Record the complete package set in the selected source environment and commit
 the matching lockfile.

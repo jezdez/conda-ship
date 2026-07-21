@@ -63,8 +63,8 @@ This stages:
 - metadata files
 
 Use this layout when an installer, archive, or enterprise deployment system can
-place the runtime and bundle side by side. Set the runtime-name-derived bundle
-and offline variables on first invocation:
+place the runtime and bundle side by side. Set the bundle and offline variables
+derived from the runtime name on first invocation:
 
 ```bash
 DEMO_BUNDLE=./bundle-dir DEMO_OFFLINE=1 demo info

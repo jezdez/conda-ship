@@ -36,8 +36,8 @@ With the `conda-home` scheme, that runtime installs below `~/.conda/express`.
 
 ## Runtime Prefix Override
 
-Users can override the resolved install path with the runtime-name-derived
-prefix environment variable:
+Users can override the resolved install path with the prefix environment
+variable derived from the runtime name:
 
 ```bash
 DEMO_PREFIX=/tmp/demo demo info
@@ -103,8 +103,8 @@ reusing an existing prefix.
 The generated runtime does not own `status`, `repair`, or `uninstall` commands.
 Those names are passed to the configured delegate like every other argument.
 
-For conda delegates, use `conda info` for status. Healthy-prefix diagnosis and
-repair belong to `conda doctor` and its supported fixes. Installer snapshot and
-self-management commands can come from conda-self when a distribution includes
-it. Removal of the runtime binary remains the responsibility of the package
-manager or installer that placed it.
+For conda delegates, use `conda info` for status. Use `conda doctor` and its
+supported fixes to diagnose and repair an installed prefix. Installer snapshot
+and self-management commands can come from conda-self when a distribution
+includes it. Removal of the runtime binary remains the responsibility of the
+package manager or installer that placed it.

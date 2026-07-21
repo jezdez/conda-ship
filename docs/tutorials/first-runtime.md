@@ -178,8 +178,8 @@ rm -rf -- "$PWD/.tmp/demo-embedded"
 ## What You Learned
 
 You created a small workspace project, solved it, built an online runtime, and
-used that binary to automatically install its conda prefix before transparently
-executing the configured delegate.
+used that binary to install its conda prefix automatically before running the
+configured delegate.
 
 For a real downstream distribution, choose a runtime name owned by that
 distribution, keep its package choices in the source manifest, and publish the

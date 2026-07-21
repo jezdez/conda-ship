@@ -37,7 +37,7 @@ During bootstrap, the runtime writes conda-ship ownership metadata,
 `.condarc`, the CEP 22 frozen marker, and the prefix metadata expected by conda
 tools in `conda-meta/history` and `conda-meta/initial-state.explicit.txt`.
 
-## Transparent Delegation
+## Delegate Execution
 
 After the prefix is available, every argument belongs to the delegate. The
 runtime does not reserve or rewrite any of these names:
@@ -48,9 +48,9 @@ runtime does not reserve or rewrite any of these names:
 - `activate`, `deactivate`, and `init`
 - delegate verbosity and quiet options
 
-Standard input, standard output, standard error, signals, and the delegate exit
-status remain transparent. The runtime does not filter delegate output or
-fabricate `CONDA_PREFIX`, `CONDA_DEFAULT_ENV`, or `CONDA_SHLVL`.
+Standard input, output, and error pass through unchanged, and the runtime
+preserves the delegate's signal and exit behavior. It does not filter delegate
+output or set `CONDA_PREFIX`, `CONDA_DEFAULT_ENV`, or `CONDA_SHLVL`.
 
 For a conda delegate, normal commands therefore look like direct conda
 commands:
@@ -68,12 +68,11 @@ RUNTIME --version
 `RUNTIME info` is the normal status command for a conda delegate. If the
 distribution includes conda-spawn with the alias implemented by
 [conda-spawn PR #59](https://github.com/conda/conda-spawn/pull/59),
-`RUNTIME shell` is the delegate-native alias for `conda spawn`.
+`RUNTIME shell` uses the conda-spawn alias for `conda spawn`.
 
-Healthy conda-prefix diagnosis and repair remain delegate concerns. Use
-`conda doctor` and its supported fixes for diagnosed health checks. Use the
-commands supplied by conda-self for installer snapshots and self-management
-when the distribution includes that plugin.
+Use `conda doctor` and its supported fixes to diagnose and repair an installed
+prefix. Use the commands supplied by conda-self for installer snapshots and
+self-management when the distribution includes that plugin.
 
 ## Bootstrap Controls
 

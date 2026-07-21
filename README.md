@@ -74,8 +74,8 @@ conda-ship stages a runtime binary plus release metadata:
 
 On first invocation, the runtime automatically bootstraps its managed prefix.
 It then passes every argument to the configured delegate executable, usually
-`conda`. Help, version, status, shell, and lifecycle commands therefore belong
-to the delegate and its plugins rather than conda-ship.
+`conda`. The delegate and its plugins handle `--help`, `--version`, and every
+subcommand. conda-ship does not reserve those arguments.
 
 During bootstrap, generated runtimes also write constructor-compatible conda
 prefix metadata. The managed prefix gets `conda-meta/history` and
@@ -159,8 +159,7 @@ before handing them to downstream packaging or signing.
 ![Verify staged conda-ship artifacts](demos/verify.gif)
 
 The staged runtime is a stamped copy of the generic runtime template. It
-automatically bootstraps its managed prefix when needed and otherwise behaves
-like its configured delegate.
+bootstraps the managed prefix if needed, then runs the configured delegate.
 
 ## GitHub Actions
 

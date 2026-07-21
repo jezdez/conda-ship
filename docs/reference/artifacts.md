@@ -84,8 +84,8 @@ install path.
 
 conda-ship appends a runtime data block to every staged runtime. The block
 contains the runtime lock, runtime name, delegate executable, install scheme,
-install name, docs URL, bootstrap control metadata, and the embedded
-bundle bytes for `embedded` builds.
+install name, docs URL, bundle, offline, and prefix environment variable names,
+and the embedded bundle bytes for `embedded` builds.
 
 The data block ends with:
 
