@@ -28,6 +28,10 @@ pub(crate) fn delegate_executable() -> &'static str {
     &runtime_data::current().header.delegate_executable
 }
 
+pub(crate) fn installer() -> Option<&'static str> {
+    runtime_data::current().header.installer.as_deref()
+}
+
 pub(crate) fn display_name() -> &'static str {
     runtime_name()
 }

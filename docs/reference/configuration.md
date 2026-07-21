@@ -176,6 +176,12 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   Release workflows can override this with `cs build --installer INSTALLER` or
   the GitHub Action `installer` input.
 
+  When configured, automatic bootstrap writes Constructor-compatible
+  `<prefix>/.installer.info` JSON with the exact fields `name`, `version`,
+  `platform`, and `type`. The configured `installer` value becomes `type`.
+  This metadata records how the prefix was distributed. Update and uninstall
+  code must not use it as a launcher ownership record.
+
 `condarc-file`
 : Optional path to a YAML condarc file. Relative paths are resolved from
   the selected project manifest. The builder requires a YAML mapping and stamps

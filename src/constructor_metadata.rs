@@ -10,6 +10,15 @@ use rattler_conda_types::{Platform, RepoDataRecord};
 
 use crate::{install, policy};
 
+#[derive(serde::Serialize)]
+struct InstallerInfo<'a> {
+    name: &'a str,
+    version: &'a str,
+    platform: String,
+    #[serde(rename = "type")]
+    installer_type: &'a str,
+}
+
 pub(crate) fn write_prefix_metadata(
     prefix: &Path,
     lock_content: &str,
@@ -63,6 +72,44 @@ fn write_prefix_metadata_from_records(
     })?;
     eprintln!("   Wrote {}", policy::path_for_display(&explicit_path));
 
+    write_configured_installer_info(prefix, platform)?;
+
+    Ok(())
+}
+
+fn write_configured_installer_info(prefix: &Path, platform: Platform) -> miette::Result<()> {
+    let Some(installer_type) = policy::installer() else {
+        return Ok(());
+    };
+    write_installer_info(
+        prefix,
+        policy::runtime_name(),
+        policy::runtime_version(),
+        platform,
+        installer_type,
+    )
+}
+
+fn write_installer_info(
+    prefix: &Path,
+    name: &str,
+    version: &str,
+    platform: Platform,
+    installer_type: &str,
+) -> miette::Result<()> {
+    let path = prefix.join(".installer.info");
+    let contents = serde_json::to_string(&InstallerInfo {
+        name,
+        version,
+        platform: platform.to_string(),
+        installer_type,
+    })
+    .into_diagnostic()
+    .context("failed to render Constructor installer metadata")?;
+    std::fs::write(&path, contents)
+        .into_diagnostic()
+        .with_context(|| format!("failed to write {}", policy::path_for_display(&path)))?;
+    eprintln!("   Wrote {}", policy::path_for_display(&path));
     Ok(())
 }
 
@@ -323,6 +370,27 @@ https://conda.anaconda.org/conda-forge/noarch/conda-spawn-1.0-0.conda#sha256:{SH
                 "https://conda.anaconda.org/conda-forge/linux-64/conda-1.0-0.conda#sha256:{SHA256}"
             )),
             "{explicit}"
+        );
+        assert!(!tmp.path().join(".installer.info").exists());
+    }
+
+    #[test]
+    fn test_write_installer_info_matches_constructor_json() {
+        let tmp = TempDir::new().unwrap();
+
+        write_installer_info(
+            tmp.path(),
+            "Demo Distribution",
+            "1.2.3",
+            Platform::Linux64,
+            "homebrew",
+        )
+        .unwrap();
+
+        let contents = std::fs::read_to_string(tmp.path().join(".installer.info")).unwrap();
+        assert_eq!(
+            contents,
+            r#"{"name":"Demo Distribution","version":"1.2.3","platform":"linux-64","type":"homebrew"}"#
         );
     }
 
