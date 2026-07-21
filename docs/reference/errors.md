@@ -100,3 +100,7 @@ conda without depending on terminal formatting.
 
 `refusing to use unmanaged install path`
 : The prefix does not contain ownership metadata for this runtime.
+
+`refusing to use install path with invalid bootstrap state`
+: The internal installing marker is malformed or does not belong to this
+  runtime. conda-ship does not guess ownership of a non-empty prefix.

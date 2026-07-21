@@ -39,6 +39,18 @@ prefix metadata expected by conda tools in `conda-meta/history` and
 build configured `condarc-file`, and writes the CEP 22 frozen marker only when
 the build configured `freeze-base = true`.
 
+Bootstrap is serialized with a process lock next to the managed prefix. An
+internal `installing` marker identifies an incomplete prefix owned by this
+runtime. The runtime metadata file is written after package installation,
+post-link scripts, prefix metadata, configured policy, bytecode compilation,
+and delegate validation finish. Its `ready` state marks bootstrap complete.
+
+If bootstrap is interrupted, the next invocation automatically retries only
+when that internal marker belongs to the same stamped runtime. Recovery forces
+every locked package through Rattler's reinstall path so post-link scripts run
+again. It does not delete the prefix, named environments, or unrelated paths.
+An unknown non-empty prefix is still refused.
+
 ## Delegate Execution
 
 After the prefix is available, every argument belongs to the delegate. The

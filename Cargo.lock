@@ -516,6 +516,7 @@ dependencies = [
  "clap",
  "console",
  "dirs",
+ "fs4",
  "futures",
  "indicatif",
  "insta",
