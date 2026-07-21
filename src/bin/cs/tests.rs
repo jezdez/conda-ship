@@ -1058,22 +1058,27 @@ fn test_build_rejects_path_option() {
 }
 
 #[test]
-fn test_run_rejects_path_option_before_runtime_args() {
-    let result = Cli::try_parse_from([
+fn test_run_accepts_install_path_for_smoke_test() {
+    let cli = Cli::try_parse_from([
         "cs",
         "run",
         "--runtime-name",
         "demo",
-        "--path",
+        "--install-path",
         "/tmp/demo",
         "--",
-        "status",
-    ]);
+        "info",
+    ])
+    .unwrap();
 
-    assert!(
-        result.is_err(),
-        "run-time --path must be passed after `--` to the staged runtime"
-    );
+    let Command::Run {
+        install_path, args, ..
+    } = cli.command
+    else {
+        panic!("expected run command");
+    };
+    assert_eq!(install_path, Some(std::path::PathBuf::from("/tmp/demo")));
+    assert_eq!(args, vec![std::ffi::OsString::from("info")]);
 }
 
 #[test]

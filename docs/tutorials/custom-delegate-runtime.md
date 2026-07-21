@@ -1,6 +1,6 @@
 # Build A Runtime With A Custom Delegate
 
-This tutorial builds a runtime whose pass-through command is `python` instead of
+This tutorial builds a runtime whose configured delegate is `python` instead of
 `conda`.
 
 The managed prefix only needs Python and its dependencies. conda-ship does not
@@ -119,16 +119,13 @@ cs build
 
 The runtime is staged as `dist/pydemo` on Unix and `dist/pydemo.exe` on Windows.
 
-## Bootstrap It
+## Choose A Temporary Prefix
 
-Use a temporary install path for the tutorial:
+Create a temporary parent directory for the tutorial prefix:
 
 ```bash
 mkdir -p .tmp
-./dist/pydemo --path "$PWD/.tmp/pydemo" bootstrap
 ```
-
-The runtime installs the selected Python environment into the managed prefix.
 
 ## Run Python Through The Runtime
 
@@ -145,25 +142,25 @@ PY
 Run it through the runtime:
 
 ```bash
-./dist/pydemo --path "$PWD/.tmp/pydemo" hello.py
+PYDEMO_PREFIX="$PWD/.tmp/pydemo" ./dist/pydemo hello.py
 ```
 
-`pydemo` bootstraps or reuses its managed prefix, prepares the delegate
-environment, and passes `hello.py` to the `python` executable inside that
-prefix.
+On the first invocation, `pydemo` automatically installs the selected Python
+environment into the managed prefix and then passes `hello.py` unchanged to the
+Python executable. Later invocations reuse that prefix.
 
 ## Clean Up
 
 Remove the tutorial install path:
 
 ```bash
-./dist/pydemo --path "$PWD/.tmp/pydemo" uninstall --yes
+rm -rf -- "$PWD/.tmp/pydemo"
 ```
 
 ## What You Learned
 
-The `delegate-executable` is the executable that receives pass-through
-arguments after the runtime is bootstrapped. Use `delegate-executable = "conda"`
+The `delegate-executable` is the executable that receives every argument after
+the runtime is automatically bootstrapped. Use `delegate-executable = "conda"`
 for conda-like distributions, and another executable when the runtime should
-present a smaller or different command surface. The selected source environment
+provide fewer or different commands. The selected source environment
 only needs to include that delegate and its runtime dependencies.

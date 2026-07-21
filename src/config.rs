@@ -35,14 +35,6 @@ pub fn embedded_bundle() -> Option<&'static runtime_data::EmbeddedBundle> {
     runtime_data::current().bundle.as_ref()
 }
 
-pub fn embedded_bundle_len() -> Option<u64> {
-    embedded_bundle().map(runtime_data::EmbeddedBundle::len)
-}
-
-pub(crate) fn installer() -> Option<&'static str> {
-    runtime_data::current().header.installer.as_deref()
-}
-
 // Prefix metadata.
 
 const PREFIX_METADATA_SCHEMA_VERSION: u8 = 1;

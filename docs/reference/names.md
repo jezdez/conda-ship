@@ -21,7 +21,7 @@ source-environment = "ship"
 
 This stages `dist/demo`, stamps `demo` into runtime metadata, writes install
 metadata such as `.demo.json`, and uses runtime-specific environment variables
-such as `DEMO_BUNDLE`.
+such as `DEMO_PREFIX`, `DEMO_BUNDLE`, and `DEMO_OFFLINE`.
 
 Add `artifact-name` only when the release command or file stem should differ
 from the base runtime identity:
@@ -69,7 +69,7 @@ install scheme path for `express`, such as `~/.conda/express` with the default
 ## Related Fields
 
 `delegate-executable`
-: Executable inside the managed prefix that receives pass-through arguments.
+: Executable inside the managed prefix that receives every runtime argument.
   It is an executable name, not a path.
 
 `artifact-layout`
@@ -79,8 +79,8 @@ install scheme path for `express`, such as `~/.conda/express` with the default
 : Package names removed from the derived runtime lock.
 
 `installer`
-: Package manager or installer hint for uninstall guidance. It is not part of
-  the install-location controls.
+: Package manager or installer metadata. It is not part of the install-location
+  controls.
 
 ## Runtime Version
 
@@ -89,8 +89,9 @@ runtime metadata. It is not derived from `runtime-name`, and changing one does
 not change the other.
 
 Use `runtime-name` to choose the runtime identity and default file stem. Use
-`runtime-version` to choose what the generated runtime reports from
-`RUNTIME --version` and records in prefix ownership metadata.
+`runtime-version` to choose the version recorded in runtime and prefix ownership
+metadata. A runtime invocation such as `RUNTIME --version` belongs to the
+delegate.
 
 `runtime-version` can come from:
 

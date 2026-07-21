@@ -34,23 +34,29 @@ install-name = "express"
 
 With the `conda-home` scheme, that runtime installs below `~/.conda/express`.
 
-## Runtime `--path`
+## Runtime Prefix Override
 
-Users can override the resolved install path at runtime:
+Users can override the resolved install path with the prefix environment
+variable derived from the runtime name:
 
 ```bash
-RUNTIME --path /tmp/demo bootstrap
-RUNTIME --path /tmp/demo status
-RUNTIME --path /tmp/demo uninstall --yes
+DEMO_PREFIX=/tmp/demo demo info
 ```
 
-This is intentionally a runtime option, not a build-time path. Build artifacts
-should remain cross-platform. A path that makes sense on one build machine may
-not make sense for users on another operating system.
+For a runtime named `demo`, the variable is `DEMO_PREFIX`. Non-alphanumeric
+characters in the runtime name become underscores and letters are uppercased.
+The override remains a runtime choice so build artifacts stay cross-platform.
+
+For a local `cs run` smoke test, use the builder-side option instead:
+
+```bash
+cs run --install-path /tmp/demo -- info
+```
 
 ## Ownership Metadata
 
-After bootstrap, the runtime writes a metadata file inside the managed prefix.
+After automatic bootstrap, the runtime writes a metadata file inside the
+managed prefix.
 It records:
 
 - schema version
@@ -61,7 +67,7 @@ It records:
 - channels
 - package names
 
-Later operations check that metadata before using or removing a prefix.
+Later runtime invocations check that metadata before reusing a prefix.
 
 This ownership file is conda-ship-specific. The runtime also writes standard
 conda prefix metadata:
@@ -87,16 +93,18 @@ be:
 - an unrelated directory
 
 conda-ship-generated runtimes refuse to operate on non-empty unmanaged prefixes.
-This protects existing conda installations from accidental mutation or deletion.
+This protects existing conda installations from accidental mutation.
 
-`bootstrap --force`, pass-through commands, `status`, and `uninstall` all use
-ownership checks before touching an existing prefix.
+Automatic bootstrap and later delegate invocations use ownership checks before
+reusing an existing prefix.
 
-## Uninstall
+## Lifecycle Commands
 
-`RUNTIME uninstall` removes the managed install path. It does not remove the
-runtime binary itself because that binary may be owned by Homebrew, a conda
-package, a constructor installer, Docker, or another channel.
+The generated runtime does not own `status`, `repair`, or `uninstall` commands.
+Those names are passed to the configured delegate like every other argument.
 
-If `installer` was stamped into the runtime, uninstall prints it as a hint
-for removing the runtime binary after the managed prefix is gone.
+For conda delegates, use `conda info` for status. Use `conda doctor` and its
+supported fixes to diagnose and repair an installed prefix. Installer snapshot
+and self-management commands can come from conda-self when a distribution
+includes it. Removal of the runtime binary remains the responsibility of the
+package manager or installer that placed it.

@@ -4,7 +4,6 @@ use std::env;
 
 use miette::IntoDiagnostic;
 
-mod cli;
 mod commands;
 mod config;
 mod constructor_metadata;
@@ -16,12 +15,7 @@ mod policy;
 mod runtime_data;
 mod tls;
 
-use cli::{Cli, Command};
-use commands::{
-    bootstrap, ensure_bootstrapped, is_bootstrapped, print_disabled_init,
-    print_disabled_shell_command, require_managed_prefix, status, uninstall,
-    validate_bootstrap_flags,
-};
+use commands::ensure_bootstrapped;
 
 fn main() -> miette::Result<()> {
     tls::install_default_provider();
@@ -42,124 +36,13 @@ fn main() -> miette::Result<()> {
 
 async fn async_main() -> miette::Result<()> {
     init_tracing()?;
-
     ensure_stamped_runtime()?;
 
-    let cli = Cli::parse_runtime();
-    if cli.version {
-        println!("{} {}", policy::command_name(), policy::runtime_version());
-        return Ok(());
-    }
-    let verbosity = cli.verbosity();
-    let path = cli.path.as_ref();
+    let prefix = policy::install_path()?;
+    ensure_bootstrapped(&prefix).await?;
 
-    match cli.command {
-        Some(Command::Bootstrap {
-            force,
-            bundle,
-            offline,
-        }) => {
-            let prefix = resolve_install_path(path)?;
-            let bundle = bundle.or_else(|| {
-                env::var(policy::bundle_env_var())
-                    .ok()
-                    .filter(|v| !v.is_empty())
-                    .map(std::path::PathBuf::from)
-            });
-            let offline = offline
-                || env::var(policy::offline_env_var())
-                    .ok()
-                    .filter(|v| !v.is_empty())
-                    .is_some_and(|v| v != "0" && v.to_lowercase() != "false");
-
-            validate_bootstrap_flags(&bundle)?;
-
-            return bootstrap(&prefix, force, bundle, offline, verbosity).await;
-        }
-        Some(Command::Status) => {
-            let prefix = resolve_install_path(path)?;
-            return status(&prefix);
-        }
-        Some(Command::Uninstall { yes }) => {
-            let prefix = resolve_install_path(path)?;
-            return uninstall(&prefix, yes, verbosity);
-        }
-        Some(Command::Shell { env, args }) => {
-            let prefix = resolve_install_path(path)?;
-            ensure_bootstrapped(&prefix).await?;
-            let mut conda_args = vec!["spawn".to_string()];
-            if let Some(ref name) = env {
-                conda_args.push(name.clone());
-            }
-            let extra: Vec<String> = args
-                .iter()
-                .map(|arg| arg.to_string_lossy().into_owned())
-                .collect();
-            conda_args.extend(extra);
-            let conda_arg_refs: Vec<&str> = conda_args.iter().map(String::as_str).collect();
-            return exec::replace_process_with_conda(&prefix, &conda_arg_refs);
-        }
-        Some(Command::Help) => {
-            Cli::parse_runtime_from([policy::command_name(), "--help"]);
-        }
-        Some(Command::Passthrough(args)) => {
-            let prefix = resolve_install_path(path)?;
-            let delegate_args: Vec<String> = args
-                .iter()
-                .map(|arg| arg.to_string_lossy().into_owned())
-                .collect();
-            if policy::delegate_executable() == "conda" {
-                let first_arg = delegate_args.first().map(String::as_str);
-                match first_arg {
-                    Some(command @ ("activate" | "deactivate")) => {
-                        print_disabled_shell_command(command);
-                    }
-                    Some("init") => {
-                        print_disabled_init();
-                    }
-                    _ => {}
-                }
-            }
-            ensure_bootstrapped(&prefix).await?;
-            let delegate_arg_refs: Vec<&str> = delegate_args.iter().map(String::as_str).collect();
-            if policy::delegate_executable() == "conda"
-                && exec::should_filter_conda_output(&delegate_arg_refs)
-            {
-                return exec::run_conda_filtered(&prefix, &delegate_arg_refs);
-            }
-            return exec::replace_process_with_delegate(
-                &prefix,
-                policy::delegate_executable(),
-                &delegate_arg_refs,
-            );
-        }
-        None => {
-            let prefix = resolve_install_path(path)?;
-            if !is_bootstrapped(&prefix) {
-                eprintln!(
-                    "{} No runtime installation found. Run `{} bootstrap` first.",
-                    console::style("!").yellow().bold(),
-                    policy::command_name()
-                );
-                std::process::exit(1);
-            }
-            require_managed_prefix(&prefix, "use")?;
-            return exec::replace_process_with_delegate(
-                &prefix,
-                policy::delegate_executable(),
-                &["--help"],
-            );
-        }
-    }
-    Ok(())
-}
-
-fn resolve_install_path(path: Option<&std::path::PathBuf>) -> miette::Result<std::path::PathBuf> {
-    if let Some(path) = path {
-        policy::expand_install_path(path)
-    } else {
-        policy::default_install_path()
-    }
+    let args: Vec<_> = env::args_os().skip(1).collect();
+    exec::replace_process_with_delegate(&prefix, policy::delegate_executable(), &args)
 }
 
 fn ensure_stamped_runtime() -> miette::Result<()> {
@@ -170,7 +53,7 @@ fn ensure_stamped_runtime() -> miette::Result<()> {
     }
 
     Err(miette::miette!(
-        "{} is a runtime template, not a runnable runtime. Build a stamped runtime with `cs build`.",
+        "{} is a runtime template, not a runnable conda runtime. Build a stamped runtime with `cs build`.",
         policy::display_name(),
     ))
 }

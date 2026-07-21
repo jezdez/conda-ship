@@ -2,7 +2,7 @@
 
 Use this page when you want the shortest local path from an empty directory to a
 staged runtime artifact. It uses conda-workspaces. The full first-runtime
-tutorial also covers bootstrap, status, uninstall, and embedded builds.
+tutorial also covers automatic first-run bootstrap and embedded builds.
 
 ## Install The Builder
 
@@ -68,18 +68,13 @@ cs build --dry-run
 cs build
 ```
 
-```{figure} ../../demos/quickstart.gif
-:alt: Terminal recording of the conda-ship quickstart inspect, dry-run, build, and version checks.
-
-Quickstart: inspect, preview, build, and run a stamped runtime.
-```
-
 The online runtime is staged at `dist/demo` on Unix and `dist/demo.exe` on
-Windows. Check the stamped runtime metadata:
+Windows. Invoke the conda delegate. The first invocation automatically
+bootstraps the managed prefix before running `conda info`:
 
 ```bash
-./dist/demo --version
+./dist/demo info
 ```
 
-Next, follow the [first runtime tutorial](first-runtime.md) to bootstrap the
-runtime into a temporary install path and clean it up again.
+Next, follow the [first runtime tutorial](first-runtime.md) to use a temporary
+install path for smoke testing.

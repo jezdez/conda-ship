@@ -16,16 +16,16 @@ Type "# Run the generated runtime binary"
 Enter
 Sleep 500ms
 
-Type@80ms `"$DEMO_HOME/runtime/demo" --version`
+Type@80ms `DEMO_PREFIX="$DEMO_HOME/runtime-prefix" "$DEMO_HOME/runtime/demo" --version`
 Enter
 Wait /\$/
 Sleep 1s
 
-Type "# conda activation gets runtime-specific guidance"
+Type "# Later invocations go directly to the configured delegate"
 Enter
 Sleep 500ms
 
-Type@80ms `"$DEMO_HOME/runtime/demo" activate`
+Type@80ms `DEMO_PREFIX="$DEMO_HOME/runtime-prefix" "$DEMO_HOME/runtime/demo" info --base`
 Enter
 Wait /\$/
 Sleep 5s

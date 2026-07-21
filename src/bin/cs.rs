@@ -216,6 +216,10 @@ enum Command {
         #[arg(long, default_value = "dist")]
         out_dir: PathBuf,
 
+        /// Managed prefix used by the staged runtime during this smoke test
+        #[arg(long)]
+        install_path: Option<PathBuf>,
+
         /// Prebuilt generic runtime template binary to stamp
         #[arg(long)]
         template: Option<PathBuf>,
@@ -392,6 +396,7 @@ fn run(cli: Cli) -> miette::Result<()> {
             runtime_version,
             platform,
             out_dir,
+            install_path,
             template,
             docs_url,
             install_scheme,
@@ -407,6 +412,7 @@ fn run(cli: Cli) -> miette::Result<()> {
             runtime_version,
             platform,
             out_dir,
+            install_path,
             template,
             docs_url,
             install_scheme,

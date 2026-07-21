@@ -51,14 +51,15 @@ install-name = "express"
 
 That builds a runtime named `cx` whose default install path resolves to
 `~/.conda/express` on the user's machine. Users can still override the resolved
-path with `RUNTIME --path PATH bootstrap` or `RUNTIME --path PATH status`.
+path with the prefix variable derived from the runtime name, such as
+`CX_PREFIX=/tmp/express cx info`.
 
 Use `install-scheme = "user-data"` when the runtime should install below the
 platform user data directory instead of `~/.conda`.
 
 If a package manager owns the runtime binary, set `installer` in the manifest
-or pass it from the release job. The generated runtime uses that value after
-`uninstall` to tell users how to remove the runtime binary itself:
+or pass it from the release job so the provider is retained in runtime
+metadata:
 
 ```toml
 [tool.conda-ship]
@@ -72,7 +73,7 @@ The selected source environment is the complete runtime package set.
 conda-ship does not add or require packages by name. Include the configured
 delegate executable and everything that delegate needs. A conda distribution
 usually includes `python`, `conda`, its selected solver plugin, and
-`conda-spawn` when it exposes `RUNTIME shell`.
+`conda-spawn` when it exposes the `conda shell` alias.
 
 Record the complete package set in the selected source environment and commit
 the matching lockfile.
@@ -180,5 +181,6 @@ The embedded runtime uses `runtime-name` by default. Set
 `artifact-name = "demo-offline"` or pass `--artifact-name demo-offline` when a
 release artifact should have a distinct command name.
 
-The embedded runtime detects its built-in bundle automatically during
-`bootstrap`; users do not need to pass `--bundle` or `--offline`.
+The embedded runtime detects its built-in bundle automatically during the first
+invocation. Users do not need to set the bundle or offline environment
+variables.

@@ -28,7 +28,7 @@ body:
         Provide minimal steps to reproduce the behavior.
 
         ```bash
-        <runtime> bootstrap
+        <runtime> <delegate-command>
         # ...
         ```
       render: shell
@@ -40,7 +40,8 @@ body:
         Please run the following and paste the output below.
 
         ```bash
-        <runtime> --version && <runtime> status
+        <runtime> --version
+        <runtime> info
         ```
       render: shell
   - type: textarea

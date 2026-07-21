@@ -33,15 +33,15 @@ The stamped header records:
   an optional `artifact-name`.
 
 `runtime_version`
-: Version shown by the generated runtime and written to prefix ownership
-  metadata. This is independent from `runtime-name`; see {doc}`names`.
+: Version written to runtime and prefix ownership metadata. This is independent
+  from `runtime-name`. See {doc}`names`.
 
 `embedded_artifact_name`
 : Artifact executable name used when the artifact carries an embedded bundle.
   This is explicit build metadata, not a derived suffix.
 
 `delegate_executable`
-: Executable inside the managed prefix that receives pass-through arguments.
+: Executable inside the managed prefix that receives every runtime argument.
 
 `install_scheme`
 : Stamped install scheme, such as `conda-home` or `user-data`.
@@ -59,14 +59,13 @@ The stamped header records:
 : Runtime-specific environment variable for offline bootstrap mode.
 
 `docs_url`
-: Documentation URL shown in runtime help.
+: Documentation URL retained in stamped runtime metadata.
 
 `installer`
-: Optional package manager or installer hint used after `uninstall`.
+: Optional package manager or installer metadata.
 
 `runtime_config`
-: Resolved runtime channels and package names used for metadata and status
-  output.
+: Resolved runtime channels and package names used for bootstrap metadata.
 
 `runtime_lock`
 : Runtime lock used for bootstrap.

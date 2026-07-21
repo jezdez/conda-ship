@@ -64,10 +64,12 @@ example `[tool.conda.feature.ship.dependencies]`. Pixi sections live below
 
 conda-ship does not require specific packages in the selected environment. The
 environment must provide the configured delegate executable. Conda-like
-distributions include `conda` and the plugins they use. `RUNTIME shell`
-requires `conda-spawn`. Generated runtimes install the selected environment as
-the managed base prefix, and pass-through commands go to the configured
-delegate executable inside that prefix.
+distributions include `conda` and the plugins they use. `RUNTIME shell` is
+available when the selected conda-spawn version provides the alias from
+[conda-spawn PR #59](https://github.com/conda/conda-spawn/pull/59).
+Generated runtimes automatically install the selected environment
+as the managed base prefix, then pass every argument to the configured delegate
+executable inside that prefix.
 
 `conda-self` is optional. Include it in the selected source environment when
 the runtime should expose `conda self reset` for the managed base prefix.
@@ -107,7 +109,7 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   `runtime-name = "cx"` for install metadata and environment variable names.
 
 `runtime-version`
-: Version shown by the generated runtime when users run `RUNTIME --version`.
+: Version stamped into runtime and prefix ownership metadata.
   When omitted from `[tool.conda-ship]`, conda-ship uses static
   `[project].version` from the selected `pyproject.toml` if it exists. Release
   workflows can override this with `cs build --runtime-version VERSION` or the
@@ -129,10 +131,10 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   `conda ship`.
 
 `delegate-executable`
-: Executable inside the managed prefix that receives pass-through arguments
-  after bootstrap. Use `conda` for conda-like runtimes such as `cx`. Other
+: Executable inside the managed prefix that receives every argument after
+  automatic bootstrap. Use `conda` for conda-like runtimes such as `cx`. Other
   values, such as `python`, are supported when a runtime should expose a
-  different command surface.
+  different commands.
 
 `artifact-layout`
 : Artifact layout to build. Supported values are `online`, `external`, and
@@ -148,7 +150,7 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   used only by excluded packages.
 
 `docs-url`
-: Documentation URL stamped into generated runtime help output. Must start
+: Documentation URL stamped into generated runtime metadata. Must start
   with `https://` or `http://` and must not contain whitespace or control
   characters.
 
@@ -169,18 +171,15 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
 
 `installer`
 : Optional package manager or installer hint stamped into the generated runtime.
-  `uninstall` uses it to tell users how to remove the runtime binary after the
-  managed prefix has been removed. Known values such as `homebrew` get a
-  concrete command; other values are printed as informational text. Release
-  workflows can override this with `cs build --installer INSTALLER` or the
-  GitHub Action `installer` input.
+  Release workflows can override this with `cs build --installer INSTALLER` or
+  the GitHub Action `installer` input.
 
 Generated runtimes write ownership metadata into every bootstrapped prefix.
 That metadata records the schema version, display name derived from
 `runtime-name`, install name, and metadata filename expected by the runtime.
-`status`, `bootstrap --force`, `uninstall`, and pass-through commands refuse to
-operate on an existing conda prefix when that ownership metadata is missing,
-invalid, or belongs to another stamped runtime.
+Automatic bootstrap refuses to use an existing non-empty conda prefix when
+that ownership metadata is missing, invalid, or belongs to another stamped
+runtime.
 
 Generated runtimes also write constructor-compatible prefix metadata into
 `conda-meta/history` and `conda-meta/initial-state.explicit.txt`. Conda uses
@@ -214,6 +213,9 @@ URLs from the source lockfile environment into generated runtime metadata.
 - metadata file: `.RUNTIME_NAME.json`
 - bundle environment variable: uppercased `RUNTIME_NAME` plus `_BUNDLE`
 - offline environment variable: uppercased `RUNTIME_NAME` plus `_OFFLINE`
+
+The runtime also derives its prefix environment variable from the stamped
+runtime name as uppercased `RUNTIME_NAME` plus `_PREFIX`.
 
 At bootstrap time, the generated runtime writes a separate prefix metadata file
 inside the managed prefix. That file is used for ownership checks before later

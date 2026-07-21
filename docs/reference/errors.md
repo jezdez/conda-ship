@@ -73,23 +73,19 @@ conda without depending on terminal formatting.
 `runtime has no stamped lockfile`
 : The binary is not a properly stamped runtime. Rebuild it with `cs build`.
 
-`--offline requires a stamped runtime lock`
+`offline bootstrap requires a stamped runtime lock`
 : Offline bootstrap requires a runtime built by `cs build`.
 
-`--bundle path is not a directory`
-: Pass a directory containing package archive files, not the compressed
-  `.bundle.tar.zst` file itself.
+`runtime bundle path is not a directory`
+: Point the runtime-specific `_BUNDLE` environment variable at a directory
+  containing package archive files, not the compressed `.bundle.tar.zst` file
+  itself.
 
 ## Prefix Ownership
 
 `refusing to bootstrap into existing non-empty path`
-: Choose another `--path` or remove the existing directory yourself.
+: Choose another runtime-specific `_PREFIX` value or remove the existing
+  directory yourself.
 
 `refusing to use unmanaged install path`
 : The prefix does not contain ownership metadata for this runtime.
-
-`refusing to remove symbolic-link install path`
-: The runtime will not recursively remove a symlink path.
-
-`refusing to remove dangerous path`
-: The resolved path is too broad, such as a home directory or filesystem root.

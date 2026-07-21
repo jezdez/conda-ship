@@ -23,6 +23,13 @@ runtimes.
 
 ## Runtime Variables
 
+The actual names of these variables are derived from `runtime-name`.
+Non-alphanumeric characters become underscores and letters are uppercased.
+
+`RUNTIME_PREFIX`
+: Override the managed prefix path. For a runtime named `demo`, the variable is
+  `DEMO_PREFIX`.
+
 `RUNTIME_BUNDLE`
 : Runtime-specific path to an external package bundle directory. The actual
   variable name is based on the runtime name. Non-alphanumeric characters become
@@ -34,44 +41,17 @@ runtimes.
   `DEMO_OFFLINE`. Empty, `0`, and `false` disable the flag; other non-empty
   values enable it.
 
-## Runtime Delegate Environment
+## Delegate Environment
 
-When a runtime runs its delegate, it sets a conda-like base environment:
-
-`CONDA_ROOT_PREFIX`
-: Managed prefix path.
-
-`CONDA_PREFIX`
-: Managed prefix path.
-
-`CONDA_DEFAULT_ENV`
-: `base`.
-
-`CONDA_SHLVL`
-: `1`.
-
-`CONDA_COMPLETION_COMMAND_NAME`
-: Runtime executable name. Shell completion integrations can use this to
-  register the wrapper command instead of the delegate executable. For a
-  runtime named `cx`, this is `cx`.
+The runtime executes the configured delegate from the managed prefix without
+presenting that prefix as an activated conda environment. It does not set
+`CONDA_PREFIX`, `CONDA_DEFAULT_ENV`, or `CONDA_SHLVL`. Delegate arguments and
+the inherited process streams remain unchanged.
 
 `PATH`
-: Managed prefix executable directories first, followed by the existing `PATH`.
-
-On Unix, the runtime prepends:
-
-- `bin`
-- `condabin`
-
-On Windows, the runtime prepends:
-
-- the root prefix
-- `Library/mingw-w64/bin`
-- `Library/usr/bin`
-- `Library/bin`
-- `Scripts`
-- `bin`
-- `condabin`
+: Managed-prefix executable directories are prepended to the inherited value so
+  the delegate and its child processes can find installed commands and shared
+  libraries. This changes `PATH` only. It does not activate the prefix.
 
 ## Test And Development Variable
 

@@ -56,7 +56,7 @@ inputs do not set up Python.
 
 `delegate-executable`
 : Delegate executable override. Set this when the release job intentionally
-  changes which executable receives pass-through arguments.
+  changes which executable receives runtime arguments.
 
 `runtime-version`
 : Runtime version override. Set this when the release job intentionally stamps
@@ -81,7 +81,7 @@ inputs do not set up Python.
   Embedded artifacts carry package archives inside the runtime.
 
 `docs-url`
-: Documentation URL stamped into generated runtime help output. Must start
+: Documentation URL stamped into generated runtime metadata. Must start
   with `https://` or `http://` and must not contain whitespace or control
   characters.
 
@@ -95,7 +95,7 @@ inputs do not set up Python.
   resolved runtime name.
 
 `installer`
-: Package manager or installer stamped into the runtime for uninstall guidance.
+: Package manager or installer stamped into runtime metadata.
 
 The action does not duplicate `cs build` validation in shell. It passes
 non-empty inputs to `cs build --dry-run` and then to `cs build`; invalid values
