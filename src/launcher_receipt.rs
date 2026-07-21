@@ -1,10 +1,9 @@
-//! Installer-owned receipts for stamped launcher executables.
+//! Installer receipts for stamped launcher executables.
 //!
 //! A receipt is an adjacent JSON sidecar written after an installer places a
-//! launcher at its final path. It binds installer policy to that canonical path
-//! and the launcher's SHA-256. The update planner validates the binding and
-//! returns data that a downstream installer can use in its own verified
-//! replacement flow.
+//! launcher at its final path. It records the installer, canonical path, and
+//! launcher SHA-256. The update planner checks the receipt and returns data for
+//! the downstream installer's replacement flow.
 //!
 //! This module does not download artifacts, execute package-manager commands,
 //! replace launchers, or modify managed prefixes.
@@ -50,7 +49,7 @@ pub struct LauncherIdentity {
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum LauncherOwnership {
-    /// The named installer may run its own verified replacement flow.
+    /// The named installer is responsible for launcher replacement.
     Direct {
         /// Stable downstream installer identity.
         installer: String,
@@ -84,7 +83,7 @@ pub struct LauncherReceipt {
 /// A validated direct-launcher update plan.
 ///
 /// The downstream updater must still download and verify the replacement
-/// artifact before invoking its installer-owned replacement flow. The expected
+/// artifact before invoking its installer replacement flow. The expected
 /// digest lets that flow recheck that the installed launcher has not changed
 /// since the plan was created.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -103,7 +102,7 @@ pub struct LauncherUpdatePlan {
     pub release_source: String,
 }
 
-/// Safe reasons why direct launcher replacement was refused.
+/// Reasons direct launcher replacement was refused.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LauncherUpdateRefusalReason {
     /// The requested launcher could not be resolved to a regular file.
@@ -126,7 +125,7 @@ pub enum LauncherUpdateRefusalReason {
     UpdatePlanChanged,
 }
 
-/// Structured refusal returned instead of an unsafe update plan.
+/// Details returned when launcher update planning is refused.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LauncherUpdateRefusal {
     /// Machine-readable refusal reason.
@@ -148,7 +147,7 @@ pub enum LauncherUpdateDecision {
     Refused(LauncherUpdateRefusal),
 }
 
-/// Error produced while creating an installer-owned receipt.
+/// Error produced while creating a launcher receipt.
 #[derive(Debug)]
 pub enum LauncherReceiptError {
     /// Installer input does not satisfy the v1 receipt schema.
@@ -300,7 +299,7 @@ pub fn write_launcher_receipt(
 /// Validate an installed launcher for the expected installer identity.
 ///
 /// Only a matching `direct` receipt yields [`LauncherUpdateDecision::Allowed`].
-/// Every error and every external owner fails closed with a structured refusal.
+/// All other cases return a structured refusal.
 pub fn plan_launcher_update(launcher: &Path, expected_installer: &str) -> LauncherUpdateDecision {
     if let Err(error) = validate_text("expected installer identity", expected_installer) {
         return refused(
@@ -349,10 +348,7 @@ pub fn plan_launcher_update(launcher: &Path, expected_installer: &str) -> Launch
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
             return refused(
                 LauncherUpdateRefusalReason::MissingReceipt,
-                format!(
-                    "no installer-owned launcher receipt exists at {}",
-                    receipt_path.display()
-                ),
+                format!("no launcher receipt exists at {}", receipt_path.display()),
                 None,
                 None,
             );
@@ -509,7 +505,7 @@ pub fn plan_launcher_update(launcher: &Path, expected_installer: &str) -> Launch
         return refused(
             LauncherUpdateRefusalReason::LauncherDigestMismatch,
             format!(
-                "launcher at {} no longer matches its installer-owned receipt",
+                "launcher at {} no longer matches its receipt",
                 canonical.display()
             ),
             None,
@@ -557,7 +553,7 @@ pub fn plan_launcher_update(launcher: &Path, expected_installer: &str) -> Launch
 ///
 /// A downstream updater should call this after it has downloaded and verified
 /// a candidate artifact, then compare the returned decision before entering its
-/// installer-owned replacement step. This narrows the planning race but does
+/// installer replacement step. This narrows the planning race but does
 /// not provide a cross-process filesystem lock.
 pub fn revalidate_launcher_update(plan: &LauncherUpdatePlan) -> LauncherUpdateDecision {
     match plan_launcher_update(&plan.launcher_path, &plan.installer) {
@@ -566,7 +562,7 @@ pub fn revalidate_launcher_update(plan: &LauncherUpdatePlan) -> LauncherUpdateDe
         }
         LauncherUpdateDecision::Allowed(_) => refused(
             LauncherUpdateRefusalReason::UpdatePlanChanged,
-            "launcher update plan changed after update planning".to_string(),
+            "launcher or receipt changed after the update was planned".to_string(),
             None,
             None,
         ),
@@ -583,7 +579,7 @@ fn canonical_launcher(launcher: &Path) -> Result<PathBuf, LauncherReceiptError> 
         })?;
     if input_metadata.file_type().is_symlink() || !input_metadata.is_file() {
         return Err(LauncherReceiptError::InvalidInput(format!(
-            "launcher is not an exact regular-file installation path: {}",
+            "launcher path must name a regular file and must not be a symlink: {}",
             launcher.display()
         )));
     }
@@ -1204,7 +1200,11 @@ mod tests {
             refusal.reason,
             LauncherUpdateRefusalReason::LauncherUnavailable
         );
-        assert!(write_error.to_string().contains("exact regular-file"));
+        assert!(
+            write_error
+                .to_string()
+                .contains("regular file and must not be a symlink")
+        );
     }
 
     #[cfg(unix)]

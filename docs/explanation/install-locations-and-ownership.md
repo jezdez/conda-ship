@@ -123,9 +123,10 @@ package manager or installer that placed it.
 
 Launcher replacement also belongs to that package manager or installer. A
 direct standalone installer can write an adjacent receipt that records the
-launcher path and SHA-256. The receipt API validates the record and returns an
-update plan. It does not replace the launcher. External package managers can
-record an update command for display. Fleet-managed launchers have no receipt.
+launcher path and SHA-256. The receipt API returns a decision containing either
+an allowed update plan or a refusal. It does not replace the launcher. External
+package managers can record an update command for display. Fleet-managed
+launchers have no receipt.
 
 See {doc}`../reference/launcher-receipts` for the receipt schema and refusal
 rules. Constructor-compatible `.installer.info` inside the prefix remains
