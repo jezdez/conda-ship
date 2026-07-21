@@ -103,8 +103,8 @@ jobs:
           else
             BIN="./dist/demo-${TARGET}"
           fi
-          "$BIN" --path "$RUNNER_TEMP/demo-smoke" bootstrap
-          "$BIN" --path "$RUNNER_TEMP/demo-smoke" status
+          DEMO_PREFIX="$RUNNER_TEMP/demo-smoke" "$BIN" info --json
+          DEMO_PREFIX="$RUNNER_TEMP/demo-smoke" "$BIN" list --json
 
       - name: Build embedded bundle
         if: matrix.target == 'x86_64-unknown-linux-gnu'
@@ -122,8 +122,8 @@ jobs:
         if: matrix.target == 'x86_64-unknown-linux-gnu'
         shell: bash
         run: |
-          ./dist/demoz-"$TARGET" --path "$RUNNER_TEMP/demoz-smoke" bootstrap
-          ./dist/demoz-"$TARGET" --path "$RUNNER_TEMP/demoz-smoke" status
+          DEMO_PREFIX="$RUNNER_TEMP/demoz-smoke" ./dist/demoz-"$TARGET" info --json
+          DEMO_PREFIX="$RUNNER_TEMP/demoz-smoke" ./dist/demoz-"$TARGET" list --json
 
       - name: Stage canary binary
         shell: bash
@@ -199,7 +199,11 @@ jobs:
           set -euo pipefail
 
           target/release/cs.exe --help >/dev/null
-          CONDA_SHIP_ALLOW_UNSTAMPED_TEMPLATE=1 target/release/cs-template.exe --version
+          if target/release/cs-template.exe 2>template-error.txt; then
+            echo "Expected the unstamped template to refuse execution" >&2
+            exit 1
+          fi
+          grep -q "runtime template, not a runnable conda runtime" template-error.txt
 
   package-wheels:
     name: Package PyPI wheel (${{ matrix.target }})

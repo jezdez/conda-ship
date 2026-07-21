@@ -77,15 +77,15 @@ it needs an equivalent place for checksums, package metadata, and provenance.
 For an online runtime, a Homebrew formula usually installs the runtime binary
 and lets the runtime download packages at first bootstrap.
 
-Set an installer so uninstall guidance is useful:
+Set installer metadata when downstream packaging needs to record the provider:
 
 ```bash
 cs build --installer homebrew
 ```
 
 The formula should install the runtime onto `PATH`. It should not modify the
-managed prefix directly; the runtime owns bootstrap, status, shell, pass-through,
-and uninstall behavior.
+managed prefix directly. The first invocation automatically bootstraps the
+prefix, then every invocation delegates its arguments.
 
 ## Wrap With A Conda Package
 
@@ -97,7 +97,7 @@ Keep two boundaries clear:
 - the conda package installs the runtime binary
 - the generated runtime bootstraps and owns its managed prefix
 
-Use `installer` to tell users where the runtime binary came from:
+Use `installer` to record where the runtime binary came from:
 
 ```bash
 cs build --installer conda-package
@@ -111,17 +111,20 @@ Installer generators can include either:
 - an external runtime plus extracted or adjacent bundle
 - an embedded runtime
 
-For `external`, place the bundle where the installer or first-run script can
-pass it to bootstrap:
+For `external`, place the extracted bundle where the installer or first-run
+script can expose it through the runtime-name-derived variables:
 
 ```bash
-RUNTIME bootstrap --bundle /path/to/bundle --offline
+DEMO_BUNDLE=/path/to/bundle DEMO_OFFLINE=1 demo info
 ```
+
+For another runtime name, derive the variable names by uppercasing it and
+replacing non-alphanumeric characters with underscores.
 
 For `embedded`, no extra bundle path is needed:
 
 ```bash
-RUNTIME bootstrap
+demo info
 ```
 
 The installer should not unpack the managed conda prefix by itself. Let the
@@ -133,7 +136,7 @@ consistently.
 Do not preinstall the managed prefix behind the runtime's back. Runtime
 bootstrap writes ownership metadata, `conda-meta/history`,
 `conda-meta/initial-state.explicit.txt`, and verification state that later
-`status`, pass-through, reset, and `uninstall` commands rely on.
+delegate and conda-self commands rely on.
 ```
 
 ## Package For Docker Or Internal Images
@@ -145,18 +148,20 @@ Build-time bootstrap gives faster startup:
 
 ```dockerfile
 COPY demo /usr/local/bin/demo
-RUN demo --path /opt/demo bootstrap
+ENV DEMO_PREFIX=/opt/demo
+RUN demo info
 ```
 
 Run-time bootstrap gives a smaller image layer before first use:
 
 ```dockerfile
 COPY demo /usr/local/bin/demo
+ENV DEMO_PREFIX=/opt/demo
 ENTRYPOINT ["demo"]
 ```
 
-Use an explicit `--path` in images. Avoid relying on a user home directory when
-the image will run as different users.
+Use the runtime-specific `_PREFIX` variable in images. Avoid relying on a user
+home directory when the image will run as different users.
 
 ## Verify Before Publishing
 

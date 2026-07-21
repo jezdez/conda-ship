@@ -279,6 +279,7 @@ pub(crate) fn run_artifact(
     runtime_version: Option<String>,
     platform: Option<String>,
     out_dir: PathBuf,
+    install_path: Option<PathBuf>,
     template: Option<PathBuf>,
     docs_url: Option<String>,
     install_scheme: Option<runtime_data::InstallScheme>,
@@ -292,6 +293,7 @@ pub(crate) fn run_artifact(
     let runtime = resolve_runtime_name(runtime_name, &derived.input.config)?;
     let layout = resolve_artifact_layout(artifact_layout, &derived.input.config);
     let bundle_env_var = runtime_data::runtime_env_var(&runtime, "BUNDLE");
+    let prefix_env_var = runtime_data::runtime_env_var(&runtime, "PREFIX");
     let bundle_dir = root.join(SHIP_STATE_DIR).join("bundle");
     let output = build_artifact(
         Some(layout),
@@ -313,6 +315,9 @@ pub(crate) fn run_artifact(
 
     let mut command = std::process::Command::new(&output.binary);
     command.args(args);
+    if let Some(install_path) = install_path {
+        command.env(prefix_env_var, install_path);
+    }
     if layout == BundleLayout::External {
         command.env(bundle_env_var, bundle_dir);
     }

@@ -117,8 +117,8 @@ jobs:
           else
             BIN="./dist/demo-${TARGET}"
           fi
-          "$BIN" --path "$RUNNER_TEMP/demo-smoke" bootstrap
-          "$BIN" --path "$RUNNER_TEMP/demo-smoke" status
+          DEMO_PREFIX="$RUNNER_TEMP/demo-smoke" "$BIN" info --json
+          DEMO_PREFIX="$RUNNER_TEMP/demo-smoke" "$BIN" list --json
 
       - name: Build embedded bundle
         shell: bash
@@ -146,8 +146,8 @@ jobs:
           else
             BIN="./dist/demoz-${TARGET}"
           fi
-          "$BIN" --path "$RUNNER_TEMP/demoz-smoke" bootstrap
-          "$BIN" --path "$RUNNER_TEMP/demoz-smoke" status
+          DEMO_PREFIX="$RUNNER_TEMP/demoz-smoke" "$BIN" info --json
+          DEMO_PREFIX="$RUNNER_TEMP/demoz-smoke" "$BIN" list --json
 
   coverage:
     name: Coverage

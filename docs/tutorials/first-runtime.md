@@ -3,8 +3,8 @@
 This tutorial builds a local conda runtime named `demo` from a
 conda-workspaces project.
 
-You will create a small project, lock it, build a runtime binary, bootstrap
-that runtime into a temporary install path, and then remove it again.
+You will create a small project, lock it, build a runtime binary, and invoke it
+with a temporary managed prefix.
 
 ## Before You Start
 
@@ -113,17 +113,17 @@ package archives when it bootstraps.
 
 ## Smoke-Test The Runtime
 
-For this tutorial, bootstrap the generated runtime into a temporary local path
-to prove that the artifact works:
+For this tutorial, invoke the generated runtime with a temporary local prefix:
 
 ```bash
 mkdir -p .tmp
-./dist/demo --path "$PWD/.tmp/demo" bootstrap
+DEMO_PREFIX="$PWD/.tmp/demo" ./dist/demo info
 ```
 
-This creates a conda installation managed by the `demo` runtime. This local
-bootstrap is only a smoke test; a real downstream distribution should document
-how its users install and update the runtime it publishes.
+Because the prefix is absent, the runtime automatically bootstraps the selected
+package set and then executes `conda info`. The command output is the delegate's
+normal status output. A real downstream distribution should document how its
+users install and update the runtime it publishes.
 
 The runtime also writes conda prefix metadata during bootstrap:
 
@@ -139,25 +139,21 @@ the installer snapshot used by `conda self reset --snapshot installer-updated`
 and `conda self reset --snapshot installer-exact`.
 
 ```{note}
-The explicit `--path` keeps this tutorial install inside the project directory.
-Published runtimes should document their normal install location and reserve
-`--path` for local testing or advanced overrides.
+The `DEMO_PREFIX` override keeps this tutorial install inside the project
+directory. The variable name comes from `runtime-name`. Published runtimes
+should document their normal install location and reserve the `_PREFIX`
+variable for packaging and advanced overrides.
 ```
-
-Check it:
-
-```bash
-./dist/demo --path "$PWD/.tmp/demo" status
-```
-
-The status output shows the install path, configured channels, package metadata,
-installed package count, and delegate executable path.
 
 Clean up the temporary install:
 
 ```bash
-./dist/demo --path "$PWD/.tmp/demo" uninstall --yes
+rm -rf -- "$PWD/.tmp/demo"
 ```
+
+The generated runtime does not reserve an uninstall command. For a published
+distribution, removal belongs to its installer, package manager, or a
+self-management plugin such as conda-self.
 
 ## Optional: Build An Embedded Runtime
 
@@ -175,16 +171,15 @@ Embedded runtimes use the configured runtime name by default, so this stages
 Smoke-test it:
 
 ```bash
-./dist/demo --path "$PWD/.tmp/demo-embedded" bootstrap
-./dist/demo --path "$PWD/.tmp/demo-embedded" status
-./dist/demo --path "$PWD/.tmp/demo-embedded" uninstall --yes
+DEMO_PREFIX="$PWD/.tmp/demo-embedded" ./dist/demo info
+rm -rf -- "$PWD/.tmp/demo-embedded"
 ```
 
 ## What You Learned
 
 You created a small workspace project, solved it, built an online runtime, and
-used that binary to install and manage its own conda prefix in a temporary smoke
-test.
+used that binary to automatically install its conda prefix before transparently
+executing the configured delegate.
 
 For a real downstream distribution, choose a runtime name owned by that
 distribution, keep its package choices in the source manifest, and publish the

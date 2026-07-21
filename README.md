@@ -55,12 +55,10 @@ conda workspace lock
 cs inspect
 cs build --dry-run
 cs build
-./dist/demo --version
+./dist/demo info
 ```
 
-![Quickstart: inspect, preview, build, and run a stamped runtime](demos/quickstart.gif)
-
-For a guided walkthrough with bootstrap, status, uninstall, and embedded runtime
+For a guided walkthrough with automatic first-run bootstrap and embedded runtime
 examples, see the
 [first runtime tutorial](https://jezdez.github.io/conda-ship/tutorials/first-runtime/).
 
@@ -74,9 +72,10 @@ conda-ship stages a runtime binary plus release metadata:
 - `.sha256`: checksums for staged files
 - optional `.bundle.tar.zst`: compressed package archives for offline builds
 
-The runtime itself has a small management surface: `bootstrap`, `status`,
-`shell`, and `uninstall`. Other commands pass through to the configured
-delegate executable after bootstrap, usually `conda`.
+On first invocation, the runtime automatically bootstraps its managed prefix.
+It then passes every argument to the configured delegate executable, usually
+`conda`. Help, version, status, shell, and lifecycle commands therefore belong
+to the delegate and its plugins rather than conda-ship.
 
 During bootstrap, generated runtimes also write constructor-compatible conda
 prefix metadata. The managed prefix gets `conda-meta/history` and
@@ -140,7 +139,7 @@ cs inspect
 cs build --dry-run
 cs build
 cs build --artifact-layout embedded
-cs run -- --path /tmp/demo-smoke bootstrap
+cs run --install-path /tmp/demo-smoke -- info
 ```
 
 `cs inspect` is the preflight command. It derives the runtime lock, validates the
@@ -159,10 +158,9 @@ before handing them to downstream packaging or signing.
 
 ![Verify staged conda-ship artifacts](demos/verify.gif)
 
-The staged runtime is a stamped copy of the generic runtime template with its
-own command surface before pass-through to the configured delegate.
-
-![Run a generated conda-ship runtime](demos/runtime-cli.gif)
+The staged runtime is a stamped copy of the generic runtime template. It
+automatically bootstraps its managed prefix when needed and otherwise behaves
+like its configured delegate.
 
 ## GitHub Actions
 

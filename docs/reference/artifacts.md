@@ -75,8 +75,8 @@ or `demo-cli-linux-64.info.json`.
 For an `external` build, conda-ship also stages `demo.bundle.tar.zst` or a
 target-qualified equivalent.
 
-These files describe the staged release output. During `bootstrap`, the
-generated runtime also writes managed-prefix metadata such as
+These files describe the staged release output. During automatic first-run
+bootstrap, the generated runtime also writes managed-prefix metadata such as
 `conda-meta/history` and `conda-meta/initial-state.explicit.txt` inside the
 install path.
 
@@ -84,7 +84,7 @@ install path.
 
 conda-ship appends a runtime data block to every staged runtime. The block
 contains the runtime lock, runtime name, delegate executable, install scheme,
-install name, docs URL, bundle environment variable names, and the embedded
+install name, docs URL, bootstrap control metadata, and the embedded
 bundle bytes for `embedded` builds.
 
 The data block ends with:
@@ -98,7 +98,7 @@ The data block ends with:
 
 The generated runtime validates the stamped header at startup. For
 embedded artifacts, it also verifies the bundle checksum before extracting package
-archives during `bootstrap`.
+archives during automatic bootstrap.
 
 The binary checksum in `.sha256` covers the final stamped artifact. The
 conda-ship release workflow also publishes GitHub Artifact Attestations for

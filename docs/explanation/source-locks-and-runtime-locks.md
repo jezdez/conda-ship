@@ -51,7 +51,7 @@ The runtime lock answers:
 
 - What will this runtime install into its managed prefix?
 - Which package records should be verified during bootstrap?
-- Which channels and packages should status output report?
+- Which channels and packages were selected for the runtime artifact?
 
 Keeping them separate lets a downstream project maintain normal workspace input
 while shipping only the selected runtime environment.
@@ -87,6 +87,5 @@ dist/demo.runtime.lock          runtime lock
         |
         | stamped into runtime
         v
-demo bootstrap installs from that lock
+first demo invocation installs from that lock, then runs the delegate
 ```
-

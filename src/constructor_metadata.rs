@@ -75,7 +75,10 @@ fn render_history(
     dists.sort();
 
     let mut content = format!("==> {timestamp} <==\n");
-    content.push_str(&format!("# cmd: {} bootstrap\n", policy::command_name()));
+    content.push_str(&format!(
+        "# cmd: {} [automatic bootstrap]\n",
+        policy::command_name()
+    ));
     for dist in dists {
         content.push('+');
         content.push_str(&dist);
@@ -215,7 +218,7 @@ mod tests {
             history,
             "\
 ==> 123 <==
-# cmd: cs-template bootstrap
+# cmd: cs-template [automatic bootstrap]
 +https://conda.anaconda.org/conda-forge/noarch::conda-spawn-1.0-0
 # update specs: [\"conda-spawn\"]
 

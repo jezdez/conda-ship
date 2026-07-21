@@ -63,11 +63,15 @@ This stages:
 - metadata files
 
 Use this layout when an installer, archive, or enterprise deployment system can
-place the runtime and bundle side by side. Users bootstrap with:
+place the runtime and bundle side by side. Set the runtime-name-derived bundle
+and offline variables on first invocation:
 
 ```bash
-RUNTIME bootstrap --bundle ./bundle-dir --offline
+DEMO_BUNDLE=./bundle-dir DEMO_OFFLINE=1 demo info
 ```
+
+For another runtime name, derive the variable names by uppercasing it and
+replacing non-alphanumeric characters with underscores.
 
 The external bundle is not a conda channel mirror. It is a flat set of `.conda`
 and `.tar.bz2` archives named in the runtime lock.
@@ -88,10 +92,11 @@ demo          -> online, external, or embedded runtime
 demo-cli      -> staged runtime when configured explicitly
 ```
 
-Bootstrap detects the embedded bundle automatically:
+The first invocation detects the embedded bundle automatically, installs the
+managed prefix, and then runs the delegate:
 
 ```bash
-demo bootstrap
+demo info
 ```
 
 This is useful when the runtime must install without network access and you do

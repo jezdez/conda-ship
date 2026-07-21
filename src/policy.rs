@@ -40,10 +40,6 @@ pub(crate) fn install_name() -> &'static str {
     &runtime_data::current().header.install_name
 }
 
-pub(crate) fn install_path_for_display() -> String {
-    install_scheme_path_for_display(install_scheme(), install_name())
-}
-
 pub(crate) fn metadata_file() -> &'static str {
     &runtime_data::current().header.metadata_file
 }
@@ -56,12 +52,19 @@ pub(crate) fn offline_env_var() -> &'static str {
     &runtime_data::current().header.offline_env_var
 }
 
-pub(crate) fn docs_url() -> &'static str {
-    &runtime_data::current().header.docs_url
+pub(crate) fn prefix_env_var() -> String {
+    runtime_data::runtime_env_var(runtime_name(), "PREFIX")
 }
 
 pub(crate) fn default_install_path() -> miette::Result<PathBuf> {
     install_path_for_scheme(install_scheme(), install_name())
+}
+
+pub(crate) fn install_path() -> miette::Result<PathBuf> {
+    match env::var_os(prefix_env_var()) {
+        Some(path) if !path.is_empty() => expand_install_path(path),
+        _ => default_install_path(),
+    }
 }
 
 pub(crate) fn install_path_for_scheme(
@@ -82,33 +85,8 @@ pub(crate) fn install_path_for_scheme(
     }
 }
 
-pub(crate) fn install_scheme_path_for_display(
-    scheme: runtime_data::InstallScheme,
-    install_name: &str,
-) -> String {
-    match scheme {
-        runtime_data::InstallScheme::CondaHome => format!("~/.conda/{install_name}"),
-        runtime_data::InstallScheme::UserData => {
-            format!("{}/conda/{install_name}", user_data_dir_for_display())
-        }
-    }
-}
-
 pub(crate) fn expand_install_path(path: impl AsRef<Path>) -> miette::Result<PathBuf> {
     expand_path_str(&path.as_ref().to_string_lossy())
-}
-
-pub(crate) fn install_path_for_posix_shell() -> String {
-    match install_scheme() {
-        runtime_data::InstallScheme::CondaHome => format!("$HOME/.conda/{}", install_name()),
-        runtime_data::InstallScheme::UserData => {
-            format!(
-                "{}/conda/{}",
-                user_data_dir_for_posix_shell(),
-                install_name()
-            )
-        }
-    }
 }
 
 pub(crate) fn path_for_display(path: &Path) -> String {
@@ -120,24 +98,6 @@ fn normalize_path_display(path: &str, separator: char) -> String {
         path.replace('/', "\\")
     } else {
         path.to_string()
-    }
-}
-
-fn user_data_dir_for_display() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "%LOCALAPPDATA%"
-    } else if cfg!(target_os = "macos") {
-        "~/Library/Application Support"
-    } else {
-        "${XDG_DATA_HOME:-~/.local/share}"
-    }
-}
-
-fn user_data_dir_for_posix_shell() -> &'static str {
-    if cfg!(target_os = "macos") {
-        "$HOME/Library/Application Support"
-    } else {
-        "${XDG_DATA_HOME:-$HOME/.local/share}"
     }
 }
 
@@ -233,22 +193,12 @@ fn expand_env_vars(path: &str) -> String {
     out
 }
 
-pub(crate) fn status_binary_name(has_embedded_bundle: bool) -> &'static str {
-    if has_embedded_bundle {
-        embedded_artifact_name()
-    } else {
-        command_name()
-    }
-}
-
 pub(crate) fn frozen_message() -> String {
     format!(
         "This base environment is managed by {display}.\n\
 Create a new environment instead: conda create -n myenv\n\
-To re-bootstrap: {command} bootstrap --force\n\
-To override: pass --override-frozen-env",
+To override: pass --override-frozen",
         display = display_name(),
-        command = command_name()
     )
 }
 

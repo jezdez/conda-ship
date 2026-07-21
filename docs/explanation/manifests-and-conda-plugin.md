@@ -90,7 +90,7 @@ Package and channel intent belongs in the
 {external+conda-workspaces:doc}`conda workspace sections <reference/conda-toml-spec>`
 when that manifest is available. conda-ship reads the selected lockfile
 environment and stamps the resolved package names and channel URLs into runtime
-metadata for status output.
+metadata.
 
 For conda-workspaces projects that keep conda config in `pyproject.toml`, use
 `[tool.conda.*]` table names, such as `[tool.conda.workspace]` and

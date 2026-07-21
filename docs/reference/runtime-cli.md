@@ -1,156 +1,59 @@
-# Runtime CLI Reference
+# Generated Runtime Reference
 
-Every conda-ship artifact includes a generated runtime. In this page,
-`RUNTIME` stands for the staged executable name resolved by `cs build` from
-`[tool.conda-ship].runtime-name`, `--runtime-name`, or an explicit
-`artifact-name`.
-`DELEGATE` stands for the executable inside the managed prefix that receives
-pass-through arguments.
+Every conda-ship artifact is a stamped copy of the generic runtime template. In
+this page, `RUNTIME` stands for the staged executable name and `DELEGATE`
+stands for the configured executable inside the managed prefix.
 
-For conda-express, `RUNTIME` is `cx`. A release artifact can be staged as `cxz`
-by configuring `artifact-name`.
+The generated runtime does not expose a conda-ship CLI. It owns only the
+bootstrap boundary needed to make the delegate available.
 
-## Global Options
+## First Invocation
 
-`-v, --verbose`
-: Increase output detail.
-
-`-q, --quiet`
-: Suppress non-essential output.
-
-`--path PATH`
-: Use a custom install path instead of the distribution default. This applies to
-  `bootstrap`, `status`, `shell`, `uninstall`, and pass-through delegate commands.
-  Put it before pass-through commands so conda does not interpret it as one of
-  its own options, for example `RUNTIME --path /tmp/demo install numpy`.
-
-`-h, --help`
-: Show runtime help.
-
-`-V, --version`
-: Show the runtime version.
-
-## `RUNTIME bootstrap`
-
-Install conda into the runtime's install path.
+When the managed prefix is absent, the first invocation automatically installs
+the stamped package set and then executes the delegate with the original
+arguments:
 
 ```bash
-RUNTIME bootstrap [OPTIONS]
+RUNTIME info
 ```
 
-Options:
-
-`--force`
-: Remove an existing install path before bootstrapping again.
-
-`--bundle DIR`
-: Pre-populate the package cache from a directory containing `.conda` or
-  `.tar.bz2` archives. The directory is treated as a flat package archive
-  bundle, not as a conda channel mirror.
-
-`--offline`
-: Disable network access. Packages must be available from the local cache, an
-  explicit `--bundle`, or an embedded bundle.
-
-After package installation, bootstrap writes conda-ship ownership metadata,
-`.condarc`, the CEP 22 frozen marker, and the prefix metadata that conda tools
-expect in `conda-meta/history` and `conda-meta/initial-state.explicit.txt`.
-The initial-state file records the package URLs and checksums from the stamped
-runtime lock so installer reset tools such as `conda-self` can return the
-managed base prefix to the shipped package set.
-
-Examples:
+For a conda delegate, that invocation bootstraps the prefix and then runs
+`conda info`. For a Python delegate, this invocation bootstraps the prefix and
+then runs `python --version`:
 
 ```bash
-# Standard network bootstrap from the stamped lockfile
-RUNTIME bootstrap
-
-# Re-bootstrap into the default install path
-RUNTIME bootstrap --force
-
-# Bootstrap into a custom install path
-RUNTIME --path /opt/name bootstrap
-
-# Bootstrap from an external bundle directory
-RUNTIME bootstrap --bundle ./packages --offline
+RUNTIME --version
 ```
 
-For an embedded runtime, conda-ship detects the built-in bundle
-automatically:
+A bare invocation also bootstraps and then invokes the delegate without
+arguments.
 
-```bash
-RUNTIME bootstrap
-```
+The same behavior applies to `online`, `external`, and `embedded` artifacts.
+Online artifacts download packages from the stamped runtime lock. External
+artifacts read archives from the configured bundle directory. Embedded
+artifacts automatically extract their built-in bundle.
 
-An explicit `--bundle` still takes priority over the embedded bundle.
-Embedded bundle extraction rejects anything except top-level `.conda` and
-`.tar.bz2` package archive files.
+During bootstrap, the runtime writes conda-ship ownership metadata,
+`.condarc`, the CEP 22 frozen marker, and the prefix metadata expected by conda
+tools in `conda-meta/history` and `conda-meta/initial-state.explicit.txt`.
 
-## `RUNTIME status`
+## Transparent Delegation
 
-Show runtime and install details.
+After the prefix is available, every argument belongs to the delegate. The
+runtime does not reserve or rewrite any of these names:
 
-```bash
-RUNTIME [--path PATH] status
-```
+- `--help` and `--version`
+- `status` and `uninstall`
+- `shell` and `self`
+- `activate`, `deactivate`, and `init`
+- delegate verbosity and quiet options
 
-The output includes the runtime name, runtime version, install path, configured
-channels, configured package specs, installed package count, and delegate
-executable path for the managed prefix.
+Standard input, standard output, standard error, signals, and the delegate exit
+status remain transparent. The runtime does not filter delegate output or
+fabricate `CONDA_PREFIX`, `CONDA_DEFAULT_ENV`, or `CONDA_SHLVL`.
 
-## `RUNTIME shell`
-
-Start a conda-spawn subshell for an environment.
-
-```bash
-RUNTIME shell [ENV]
-```
-
-Examples:
-
-```bash
-RUNTIME shell myenv
-exit
-```
-
-This command delegates to `conda spawn`. It uses the runtime's default install
-path. It is available when the downstream distribution includes `conda-spawn`
-in its selected source environment.
-
-## `RUNTIME uninstall`
-
-Remove the install path and named environments.
-
-```bash
-RUNTIME uninstall [OPTIONS]
-```
-
-`-y, --yes`
-: Skip the interactive confirmation prompt.
-
-The command removes the managed install path, including named environments
-below it, and prints a hint for removing the runtime through the package manager
-or installer that provided the runtime binary.
-
-## `RUNTIME help`
-
-Show the runtime help text.
-
-```bash
-RUNTIME help
-```
-
-```{figure} ../../demos/runtime-cli.gif
-:alt: Terminal recording of a generated runtime printing its version and runtime-specific activation guidance.
-
-Generated runtimes expose their own command surface before pass-through to the delegate.
-```
-
-## Pass-Through Commands
-
-Any command not listed above is passed through to the configured delegate
-executable after bootstrap. For a runtime whose delegate is `conda`, this looks
-like:
+For a conda delegate, normal commands therefore look like direct conda
+commands:
 
 ```bash
 RUNTIME create -n myenv python=3.12 numpy
@@ -158,29 +61,60 @@ RUNTIME install -n myenv pandas
 RUNTIME list -n myenv
 RUNTIME env list
 RUNTIME info
-
-# Use a custom runtime install path for pass-through commands
-RUNTIME --path /tmp/name install -n myenv pandas
+RUNTIME --help
+RUNTIME --version
 ```
 
-If the install path does not exist, pass-through commands automatically
-bootstrap first.
+`RUNTIME info` is the normal status command for a conda delegate. If the
+distribution includes conda-spawn with the alias implemented by
+[conda-spawn PR #59](https://github.com/conda/conda-spawn/pull/59),
+`RUNTIME shell` is the delegate-native alias for `conda spawn`.
 
-The delegate process receives a conda-like base environment: `CONDA_ROOT_PREFIX`,
-`CONDA_PREFIX`, `CONDA_DEFAULT_ENV=base`, `CONDA_SHLVL=1`, and a `PATH` with the
-managed prefix's executable directories first. On Unix this includes `bin` and
-`condabin`; on Windows this includes the root prefix, `Library` binary
-directories, `Scripts`, `bin`, and `condabin`.
+Healthy conda-prefix diagnosis and repair remain delegate concerns. Use
+`conda doctor` and its supported fixes for diagnosed health checks. Use the
+commands supplied by conda-self for installer snapshots and self-management
+when the distribution includes that plugin.
 
-## Disabled Shell Commands
+## Bootstrap Controls
 
-Generated runtimes can use conda-spawn for activation when it is included in
-the selected source environment. When the delegate is `conda`, these commands
-are intercepted with runtime-specific guidance instead of being passed
-through:
+Bootstrap controls are environment variables derived from the configured
+runtime name. Non-alphanumeric characters become underscores and letters are
+uppercased.
 
-- `RUNTIME activate`
-- `RUNTIME deactivate`
-- `RUNTIME init`
+For a runtime named `demo`, the variables are:
 
-Use `RUNTIME shell ENV` instead of `conda activate ENV`.
+`DEMO_PREFIX`
+: Override the managed prefix path.
+
+`DEMO_BUNDLE`
+: Path to an external directory containing the package archives named in the
+  stamped runtime lock.
+
+`DEMO_OFFLINE`
+: Disable network access during bootstrap. Empty, `0`, and `false` disable the
+  flag. Other non-empty values enable it.
+
+Example:
+
+```bash
+DEMO_PREFIX=/opt/demo \
+DEMO_BUNDLE=/opt/demo-bundle \
+DEMO_OFFLINE=1 \
+demo info
+```
+
+The runtime reads these values only to locate and bootstrap the managed prefix.
+They do not consume or replace delegate arguments.
+
+Embedded artifacts need no bundle or offline override:
+
+```bash
+DEMO_PREFIX=/opt/demo demo info
+```
+
+For local smoke tests through the builder, prefer `cs run --install-path PATH`
+instead of setting the prefix variable yourself:
+
+```bash
+cs run --install-path /tmp/demo-smoke -- info
+```

@@ -13,8 +13,8 @@ At a glance:
 - The builder selects one solved environment, derives a runtime lock, stamps
   the generic runtime template, and stages online, external, or embedded
   artifacts.
-- The generated runtime bootstraps a managed prefix and passes user commands to
-  its configured delegate.
+- The generated runtime automatically bootstraps a managed prefix when absent
+  and passes every argument to its configured delegate unchanged.
 - The downstream project owns package sets, runtime names, user-facing policy,
   installers, documentation, and release channels.
 
@@ -82,7 +82,8 @@ Runtime
 : The executable conda-ship produces.
 
 Delegate
-: The executable inside the managed prefix that receives pass-through commands.
+: The executable inside the managed prefix that receives every runtime
+  argument.
 
 Artifact
 : A release file staged by the build.
@@ -124,8 +125,9 @@ artifact carries the compressed bundle inside the runtime. See
 [artifact layouts](../how-to/choose-artifact-layout.md) for the exact files and
 configuration choices.
 
-An embedded runtime automatically uses its bundled archives during bootstrap.
-Its bundle can be overridden when needed.
+An embedded runtime automatically uses its bundled archives during first-run
+bootstrap. Its bundle can be overridden with the runtime-name-derived bundle
+environment variable when needed.
 
 The bundle format is intentionally narrow. conda-ship writes top-level `.conda`
 and `.tar.bz2` files, then verifies them against the lockfile at install time.

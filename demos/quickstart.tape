@@ -31,6 +31,6 @@ Type@80ms "cs build --out-dir dist"
 Enter
 Sleep 3s
 
-Type@80ms "./dist/demo --version"
+Type@80ms `DEMO_PREFIX="$DEMO_HOME/quickstart-prefix" ./dist/demo info --base`
 Enter
 Sleep 3s

@@ -23,11 +23,10 @@ binary:
 - optional compressed package bundle
 - documentation URL
 - metadata filename
-- bundle and offline environment variable names
+- runtime-name-derived bundle, offline, and prefix controls
 
 That is what turns the same generic bootstrap code into a specific runtime
-with its own runtime name, delegate, package set, help links, and install
-location.
+with its own runtime name, delegate, package set, and install location.
 
 ## Where The Template Comes From
 
@@ -56,15 +55,17 @@ or an explicit `--template PATH`.
 
 ## What Users See
 
-The finished runtime has a small command surface:
+The finished runtime has no conda-ship command surface. On first invocation it
+installs the selected package set into its managed prefix, then executes the
+configured delegate with the original arguments. Later invocations execute the
+same delegate directly through the existing prefix.
 
-- `bootstrap`: install the selected package set into the runtime's install path
-- `status`: report runtime and install details
-- `shell`: start a conda-spawn subshell when conda-spawn is included
-- `uninstall`: remove the install path
-
-All other commands are passed through to the configured delegate executable
-after bootstrap.
+This means `--help`, `--version`, `status`, `shell`, `uninstall`, and every
+other argument belong to the delegate. For a conda delegate, `conda info`
+reports conda and prefix status. A distribution that includes conda-spawn with
+the alias from
+[conda-spawn PR #59](https://github.com/conda/conda-spawn/pull/59) can expose
+`RUNTIME shell` as a delegate-native command.
 
 The base prefix is protected with a CEP 22 frozen marker. Users create named
 environments for regular package work.
@@ -73,10 +74,10 @@ environments for regular package work.
 
 Some runtime behavior is visible to users:
 
-- optional conda-spawn based activation through `RUNTIME shell`
-- disabled `activate`, `deactivate`, and `init` commands with guidance when the delegate is `conda`
-- automatic bootstrap before pass-through delegate commands
-- uninstall that removes the install path and prints a runtime-removal hint
+- automatic bootstrap before the first delegate invocation
+- transparent argument, stream, signal, and exit-status handling
+- optional delegate-native commands from packages such as conda-spawn and conda-self
+- runtime-name-derived environment variables for bundle, offline, and prefix controls
 
 The package set, runtime name, delegate, documentation URL, and release channel belong to
 the project using conda-ship.

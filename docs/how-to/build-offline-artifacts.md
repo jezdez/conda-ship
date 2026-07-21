@@ -42,20 +42,24 @@ For an `external` build, distribute these files together:
 - `demo.packages.txt`
 - `demo.sha256`
 
-Point the runtime at an extracted bundle directory:
+Point the runtime at an extracted bundle directory on its first invocation:
 
 ```bash
 mkdir -p /opt/demo-bundle
 tar -I zstd -xf demo.bundle.tar.zst -C /opt/demo-bundle
-demo --path /opt/demo bootstrap --bundle /opt/demo-bundle --offline
+DEMO_PREFIX=/opt/demo \
+DEMO_BUNDLE=/opt/demo-bundle \
+DEMO_OFFLINE=1 \
+demo info
 ```
 
 Pass the directory that contains the package archive files themselves. A bundle
 directory is not a conda channel mirror; conda-ship looks for top-level `.conda`
 and `.tar.bz2` files named in the runtime lock.
 
-conda-ship also stamps a runtime-specific bundle environment variable into the
-runtime. For a runtime named `demo`, that variable is `DEMO_BUNDLE`.
+The bundle, offline, and prefix controls are derived from the runtime name. For
+a runtime named `demo`, they are `DEMO_BUNDLE`, `DEMO_OFFLINE`, and
+`DEMO_PREFIX`.
 
 ```{note}
 External bundles are transport artifacts, not package indexes. Do not add
@@ -68,7 +72,7 @@ package archives directly.
 An embedded runtime carries the bundle inside the binary:
 
 ```bash
-demo --path /opt/demo bootstrap
+DEMO_PREFIX=/opt/demo demo info
 ```
 
 The runtime extracts the compressed package archives to a temporary directory
@@ -85,5 +89,6 @@ links before extraction so a bundled runtime cannot write outside the temporary
 bundle directory during bootstrap.
 ```
 
-An explicit `--bundle` still takes priority over the embedded bundle. Use that
-override to test a replacement package set without rebuilding the binary.
+An explicit `DEMO_BUNDLE` value still takes priority over the embedded bundle.
+Use that override to test a replacement package set without rebuilding the
+binary.

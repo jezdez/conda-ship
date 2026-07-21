@@ -163,8 +163,9 @@ refusing to use unmanaged install path
 ```
 
 The runtime found an existing conda prefix without its ownership metadata. Use a
-different runtime `--path`, or remove the old prefix yourself if you know it is
-safe.
+different runtime-specific `_PREFIX` value, such as
+`DEMO_PREFIX=/tmp/demo demo info`, or remove the old prefix yourself if you know
+it is safe.
 
 Generated runtimes refuse unmanaged prefixes to avoid deleting or mutating conda
 installations they did not create.

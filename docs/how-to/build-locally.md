@@ -115,10 +115,13 @@ Use `cs run` to build and immediately execute the staged runtime:
 
 ```bash
 cs run \
-  -- --path /tmp/demo-smoke bootstrap
+  --install-path /tmp/demo-smoke \
+  -- info
 ```
 
-Everything after `--` is passed to the generated runtime.
+`--install-path` controls the managed prefix used by this smoke test. Everything
+after `--` is passed unchanged to the configured delegate after automatic
+bootstrap.
 
 ## Build For Another Target
 
