@@ -64,7 +64,7 @@ pub(crate) async fn ensure_bootstrapped(prefix: &Path) -> miette::Result<()> {
 
     if reinstall {
         eprintln!(
-            "{} Incomplete owned bootstrap found. Retrying now...",
+            "{} Previous bootstrap was interrupted. Retrying...",
             console::style(">>").cyan().bold()
         );
     } else {

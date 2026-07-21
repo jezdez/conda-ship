@@ -69,16 +69,17 @@ It records:
 - package names
 
 Later runtime invocations check that metadata before reusing a prefix.
-The metadata file is also the bootstrap `ready` commit. Metadata written by
-older conda-ship runtimes without an explicit bootstrap state is treated as
-ready when its ownership identity and delegate still validate.
+The metadata file marks bootstrap complete. Metadata written by older
+conda-ship runtimes is accepted when its ownership identity and delegate still
+validate.
 
 While bootstrap is running, the runtime holds a lock in the prefix's parent
 directory and writes a separate internal `installing` marker inside the prefix.
-That marker is positive ownership evidence for automatic in-place recovery. A
-later invocation waits for a live bootstrap to release the lock, then checks
-the prefix again. If the previous process stopped, recovery reinstalls every
-locked package and reruns post-link scripts without deleting the prefix.
+The marker identifies the runtime that started bootstrap. A later invocation
+waits for a live bootstrap to release the lock, then checks the prefix again. If
+the previous process stopped and the marker matches this runtime, recovery
+reinstalls every locked package and reruns post-link scripts without deleting
+the prefix.
 
 This ownership file is conda-ship-specific. The runtime also writes standard
 conda prefix metadata:

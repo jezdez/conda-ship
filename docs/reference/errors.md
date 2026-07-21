@@ -102,5 +102,5 @@ conda without depending on terminal formatting.
 : The prefix does not contain ownership metadata for this runtime.
 
 `refusing to use install path with invalid bootstrap state`
-: The internal installing marker is malformed or does not belong to this
-  runtime. conda-ship does not guess ownership of a non-empty prefix.
+: The internal installing marker is malformed or belongs to another runtime.
+  A non-empty prefix without matching ownership state is rejected.

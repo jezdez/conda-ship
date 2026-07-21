@@ -136,7 +136,7 @@ pub fn write_metadata(
         .into_diagnostic()
         .with_context(|| {
             format!(
-                "failed to commit runtime metadata at {}",
+                "failed to replace runtime metadata at {}",
                 policy::path_for_display(&path)
             )
         })?;
@@ -198,7 +198,7 @@ pub(crate) fn validate_metadata_ready(meta: &PrefixMetadata) -> miette::Result<(
     validate_metadata_identity(meta)?;
     if meta.bootstrap_state != BootstrapPhase::Ready {
         return Err(miette::miette!(
-            "runtime metadata is not a ready bootstrap commit"
+            "runtime metadata does not mark bootstrap complete"
         ));
     }
     Ok(())
