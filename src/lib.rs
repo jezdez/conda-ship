@@ -6,6 +6,8 @@
 
 #![cfg_attr(feature = "fleet", allow(dead_code))]
 
+pub mod launcher_receipt;
+
 #[cfg(feature = "fleet")]
 mod bootstrap_lock;
 #[cfg(feature = "fleet")]

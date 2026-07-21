@@ -120,3 +120,13 @@ supported fixes to diagnose and repair an installed prefix. Installer snapshot
 and self-management commands can come from conda-self when a distribution
 includes it. Removal of the runtime binary remains the responsibility of the
 package manager or installer that placed it.
+
+Launcher replacement also belongs to that package manager or installer. A
+direct standalone installer can write an adjacent receipt that records the
+launcher path and SHA-256. The receipt API validates the record and returns an
+update plan. It does not replace the launcher. External package managers can
+record an update command for display. Fleet-managed launchers have no receipt.
+
+See {doc}`../reference/launcher-receipts` for the receipt schema and refusal
+rules. Constructor-compatible `.installer.info` inside the prefix remains
+reporting metadata and never authorizes launcher replacement.

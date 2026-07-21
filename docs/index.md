@@ -91,6 +91,7 @@ reference/fleet
 reference/github-action
 reference/configuration
 reference/artifacts
+reference/launcher-receipts
 reference/environment-variables
 reference/runtime-data-format
 reference/errors
