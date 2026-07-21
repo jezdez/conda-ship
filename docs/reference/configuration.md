@@ -177,14 +177,14 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   the GitHub Action `installer` input.
 
 `condarc-file`
-: Optional path to a native YAML condarc file. Relative paths are resolved from
+: Optional path to a YAML condarc file. Relative paths are resolved from
   the selected project manifest. The builder requires a YAML mapping and stamps
   the file's exact text content into the runtime. During bootstrap, the runtime
   writes that content to `<prefix>/.condarc`.
 
   When omitted, conda-ship does not create, replace, or remove `.condarc`.
-  Channels from the selected lockfile remain bootstrap provenance and are not
-  merged into persistent conda configuration.
+  The runtime lock still records the channels used to build the prefix.
+  conda-ship does not merge them into persistent conda configuration.
 
 `freeze-base`
 : Whether bootstrap writes the existing CEP 22 marker to
@@ -207,10 +207,10 @@ stamped runtime lock. When `conda-self` is installed in the runtime, it uses
 that file as the installer snapshot for the `installer-updated` and
 `installer-exact` reset modes.
 
-Package selection and lockfile channel provenance belong in the selected source
-environment. conda-ship records the resolved package names and channel URLs in
-generated runtime metadata. Persistent conda configuration is separate and is
-written only from an explicit `condarc-file`.
+Keep package selection and lockfile channels in the selected source environment.
+conda-ship records the resolved package names and channel URLs in runtime
+metadata. It writes persistent conda configuration only when `condarc-file` is
+set.
 
 ## Stamped Runtime Metadata
 
@@ -250,7 +250,7 @@ These files are not stamped into the runtime binary. They are rendered from the
 runtime lock when the prefix is bootstrapped.
 
 The runtime writes `.condarc` and the CEP 22 frozen marker only when their
-corresponding downstream policy is configured.
+corresponding options are set.
 
 Non-alphanumeric characters in environment variable names become underscores.
 

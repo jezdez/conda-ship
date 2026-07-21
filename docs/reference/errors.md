@@ -35,7 +35,7 @@ conda without depending on terminal formatting.
   manifest directory.
 
 `failed to parse condarc-file as YAML`
-: Fix the referenced native YAML file.
+: Fix the referenced YAML file.
 
 `condarc-file must contain a YAML mapping`
 : Use normal condarc key and value entries rather than a top-level scalar or

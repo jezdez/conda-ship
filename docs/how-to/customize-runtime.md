@@ -93,7 +93,7 @@ conda-self = "*"
 conda-ship writes `conda-meta/initial-state.explicit.txt` during bootstrap.
 `conda-self` treats that file as the installer snapshot for reset commands.
 
-## Choose Installed Conda Policy
+## Configure Condarc And Base Freezing
 
 By default, conda-ship does not create `.condarc` or freeze the managed base
 prefix. A downstream conda distribution can opt into both behaviors:
@@ -104,7 +104,7 @@ condarc-file = "runtime.condarc"
 freeze-base = true
 ```
 
-Keep `runtime.condarc` in native YAML next to the selected manifest:
+Keep `runtime.condarc` as YAML next to the selected manifest:
 
 ```yaml
 channels:
