@@ -151,8 +151,7 @@ async fn bootstrap(prefix: &Path, bundle: Option<PathBuf>, offline: bool) -> mie
     if let Some(content) = lock_content.as_deref() {
         constructor_metadata::write_prefix_metadata(prefix, content, &specs)?;
     }
-    write_condarc(prefix, &channels)?;
-    write_frozen(prefix)?;
+    write_configured_policy(prefix, cfg)?;
     write_metadata(prefix, &channels, &specs)?;
 
     compile_python_bytecode(prefix);
@@ -161,6 +160,19 @@ async fn bootstrap(prefix: &Path, bundle: Option<PathBuf>, offline: bool) -> mie
         "{} Runtime bootstrapped successfully.",
         console::style("✔").green().bold()
     );
+    Ok(())
+}
+
+fn write_configured_policy(
+    prefix: &Path,
+    config: &crate::config::RuntimeConfig,
+) -> miette::Result<()> {
+    if let Some(contents) = config.condarc.as_deref() {
+        write_condarc(prefix, contents)?;
+    }
+    if config.freeze_base {
+        write_frozen(prefix)?;
+    }
     Ok(())
 }
 
@@ -207,5 +219,46 @@ mod tests {
     fn test_is_bootstrapped_false() {
         let tmp = TempDir::new().unwrap();
         assert!(!is_bootstrapped(tmp.path()));
+    }
+
+    #[test]
+    fn test_default_policy_leaves_prefix_files_untouched() {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join("conda-meta")).unwrap();
+        std::fs::write(tmp.path().join(".condarc"), "package: condarc\n").unwrap();
+        std::fs::write(
+            tmp.path().join("conda-meta").join("frozen"),
+            "package marker",
+        )
+        .unwrap();
+
+        write_configured_policy(tmp.path(), &crate::config::RuntimeConfig::default()).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join(".condarc")).unwrap(),
+            "package: condarc\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join("conda-meta").join("frozen")).unwrap(),
+            "package marker"
+        );
+    }
+
+    #[test]
+    fn test_configured_policy_writes_condarc_and_frozen_marker() {
+        let tmp = TempDir::new().unwrap();
+        let config = crate::config::RuntimeConfig {
+            condarc: Some("solver: rattler\n".to_string()),
+            freeze_base: true,
+            ..crate::config::RuntimeConfig::default()
+        };
+
+        write_configured_policy(tmp.path(), &config).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(tmp.path().join(".condarc")).unwrap(),
+            "solver: rattler\n"
+        );
+        assert!(tmp.path().join("conda-meta").join("frozen").is_file());
     }
 }

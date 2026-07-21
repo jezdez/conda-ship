@@ -74,6 +74,10 @@ struct ShipConfig {
     install_name: Option<String>,
     #[serde(default)]
     installer: Option<String>,
+    #[serde(default, rename = "condarc-file")]
+    condarc_file: Option<PathBuf>,
+    #[serde(default, rename = "freeze-base")]
+    freeze_base: bool,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -108,6 +112,8 @@ struct RuntimeStampConfig {
     install_scheme: Option<runtime_data::InstallScheme>,
     install_name: Option<String>,
     installer: Option<String>,
+    condarc: Option<String>,
+    freeze_base: bool,
 }
 
 #[derive(Parser)]

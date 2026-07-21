@@ -1,7 +1,9 @@
 ---
 source: src/config.rs
-assertion_line: 194
-expression: "serde_json::json!({\n    \"channels\": config.channels, \"packages\": config.packages,\n})"
+assertion_line: 175
+expression: "serde_json::json!({\n    \"channels\": config.channels, \"packages\": config.packages, \"condarc\":\n    config.condarc, \"freeze_base\": config.freeze_base,\n})"
 ---
 channels: []
 packages: []
+condarc: ~
+freeze_base: false

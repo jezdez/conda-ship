@@ -128,6 +128,11 @@ Include `conda-self` when a conda runtime should
 expose `conda self reset` for restoring the bootstrapped base prefix to the
 initial package set shipped by the runtime.
 
+Conda configuration remains downstream policy. Set `condarc-file` when the
+runtime should install exact native YAML as `<prefix>/.condarc`, and set
+`freeze-base = true` when it should write a CEP 22 frozen marker. Both are
+disabled by default.
+
 ## Local Workflow
 
 Packaged builds find `cs-template` next to the installed `cs` executable.

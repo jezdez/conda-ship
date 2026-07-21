@@ -20,7 +20,7 @@ use super::diagnostic::{DiagnosticKind, ShipDiagnostic};
 use super::project::{
     DerivedRuntimeLock, ManifestKind, ProjectInput, derive_runtime_lock, discover_manifest_path,
     discover_project_input, filter_excluded, find_project_root, is_supported_pyproject_manifest,
-    manifest_kind,
+    manifest_kind, read_condarc_file,
 };
 use super::{
     BundleLayout, Cli, Command, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionConfig,
@@ -285,6 +285,8 @@ delegate-executable = "conda"
 artifact-layout = "embedded"
 exclude-packages = ["conda-libmamba-solver"]
 installer = "homebrew"
+condarc-file = "runtime.condarc"
+freeze-base = true
 "#,
     )
     .unwrap();
@@ -305,6 +307,44 @@ installer = "homebrew"
         manifest.tool.conda_ship.installer.as_deref(),
         Some("homebrew")
     );
+    assert_eq!(
+        manifest.tool.conda_ship.condarc_file.as_deref(),
+        Some(Path::new("runtime.condarc"))
+    );
+    assert!(manifest.tool.conda_ship.freeze_base);
+}
+
+#[test]
+fn test_read_condarc_file_resolves_from_manifest_and_preserves_text() {
+    let tmp = TempDir::new().unwrap();
+    let project = tmp.path().join("project");
+    std::fs::create_dir(&project).unwrap();
+    let manifest = project.join("conda.toml");
+    std::fs::write(&manifest, "").unwrap();
+    let expected = "# downstream policy\nchannels:\n  - conda-forge\n";
+    std::fs::write(project.join("runtime.condarc"), expected).unwrap();
+
+    let contents = read_condarc_file(&manifest, Some(Path::new("runtime.condarc")))
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(contents, expected);
+}
+
+#[rstest]
+#[case::sequence("- conda-forge\n", "must contain a YAML mapping")]
+#[case::invalid("channels: [\n", "failed to parse condarc-file")]
+fn test_read_condarc_file_rejects_invalid_input(#[case] contents: &str, #[case] expected: &str) {
+    let tmp = TempDir::new().unwrap();
+    let manifest = tmp.path().join("conda.toml");
+    std::fs::write(&manifest, "").unwrap();
+    std::fs::write(tmp.path().join("runtime.condarc"), contents).unwrap();
+
+    let error = read_condarc_file(&manifest, Some(Path::new("runtime.condarc")))
+        .expect_err("invalid condarc should fail")
+        .to_string();
+
+    assert!(error.contains(expected), "{error}");
 }
 
 #[rstest]
@@ -567,6 +607,8 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
             delegate_executable: Some("conda".to_string()),
             runtime_version: Some("9.8.7".to_string()),
             installer: Some("homebrew".to_string()),
+            condarc: Some("solver: rattler\n".to_string()),
+            freeze_base: true,
             ..RuntimeStampConfig::default()
         },
         platforms: vec![platform],
@@ -607,6 +649,11 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
     assert_eq!(stamped.header.bundle_env_var, "DEMO_BUNDLE");
     assert_eq!(stamped.header.runtime_version, "9.8.7");
     assert_eq!(stamped.header.installer.as_deref(), Some("homebrew"));
+    assert_eq!(
+        stamped.header.runtime_config.condarc.as_deref(),
+        Some("solver: rattler\n")
+    );
+    assert!(stamped.header.runtime_config.freeze_base);
     assert_eq!(
         stamped.header.runtime_config.packages,
         vec!["conda".to_string()]

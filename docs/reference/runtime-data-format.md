@@ -65,7 +65,8 @@ The stamped header records:
 : Optional package manager or installer metadata.
 
 `runtime_config`
-: Resolved runtime channels and package names used for bootstrap metadata.
+: Resolved runtime channels and package names used for bootstrap metadata, plus
+  optional stamped condarc text and the frozen-base policy.
 
 `runtime_lock`
 : Runtime lock used for bootstrap.

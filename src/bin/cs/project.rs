@@ -92,6 +92,7 @@ impl ManifestKind {
 
 pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeLock> {
     let input = discover_project_input(root)?;
+    let condarc = read_condarc_file(&input.manifest_path, input.config.condarc_file.as_deref())?;
     let lock_content = std::fs::read_to_string(&input.lock_path)
         .into_diagnostic()
         .with_context(|| format!("failed to read {}", input.lock_path.display()))?;
@@ -194,12 +195,40 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
             install_scheme: input.config.install_scheme,
             install_name: input.config.install_name,
             installer: input.config.installer,
+            condarc,
+            freeze_base: input.config.freeze_base,
         },
         platforms,
         total_packages,
         total_excluded,
         removed_excludes,
     })
+}
+
+pub(crate) fn read_condarc_file(
+    manifest_path: &Path,
+    configured_path: Option<&Path>,
+) -> miette::Result<Option<String>> {
+    let Some(configured_path) = configured_path else {
+        return Ok(None);
+    };
+    let path = manifest_path
+        .parent()
+        .unwrap_or_else(|| Path::new(""))
+        .join(configured_path);
+    let contents = std::fs::read_to_string(&path)
+        .into_diagnostic()
+        .with_context(|| format!("failed to read condarc-file {}", path.display()))?;
+    let document: serde_yaml::Value = serde_yaml::from_str(&contents)
+        .into_diagnostic()
+        .with_context(|| format!("failed to parse condarc-file {} as YAML", path.display()))?;
+    if !document.is_mapping() {
+        return Err(miette::miette!(
+            "condarc-file must contain a YAML mapping: {}",
+            path.display()
+        ));
+    }
+    Ok(Some(contents))
 }
 
 pub(crate) fn discover_project_input(root: &Path) -> miette::Result<ProjectInput> {

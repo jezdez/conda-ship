@@ -93,6 +93,33 @@ conda-self = "*"
 conda-ship writes `conda-meta/initial-state.explicit.txt` during bootstrap.
 `conda-self` treats that file as the installer snapshot for reset commands.
 
+## Choose Installed Conda Policy
+
+By default, conda-ship does not create `.condarc` or freeze the managed base
+prefix. A downstream conda distribution can opt into both behaviors:
+
+```toml
+[tool.conda-ship]
+condarc-file = "runtime.condarc"
+freeze-base = true
+```
+
+Keep `runtime.condarc` in native YAML next to the selected manifest:
+
+```yaml
+channels:
+  - conda-forge
+solver: rattler
+auto_activate_base: false
+notify_outdated_conda: false
+show_channel_urls: true
+```
+
+The builder validates that the file contains a YAML mapping and stamps its
+exact text. It does not derive or merge lockfile channels into this file.
+Omitting `condarc-file` leaves `.condarc` alone. Leaving `freeze-base` false
+also preserves any frozen marker created by an installed package.
+
 ## Configure Build Input
 
 Keep package and channel intent in the manifest format owned by your workspace
