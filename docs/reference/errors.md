@@ -30,11 +30,7 @@ conda without depending on terminal formatting.
   `runtime-version = { from = "project-metadata" }` through the Python
   `conda ship` adapter for dynamic Python project versions.
 
-## Runtime Package Set
-
-`selected source environment ... is missing required package(s)`
-: Add the missing runtime packages to the selected source environment:
-  `conda`, `conda-rattler-solver`, and `conda-spawn`.
+## Package Archives
 
 `cannot bundle packages without SHA256 hashes`
 : Refresh the source lockfile with package hash metadata before building
@@ -71,7 +67,7 @@ conda without depending on terminal formatting.
 
 ## Runtime Bootstrap
 
-`runtime template, not a runnable conda runtime`
+`runtime template, not a runnable runtime`
 : Run a binary produced by `cs build`, not the generic runtime template.
 
 `runtime has no stamped lockfile`

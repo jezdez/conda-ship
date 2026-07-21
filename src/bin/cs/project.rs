@@ -7,8 +7,7 @@ use rattler_lock::{CondaPackageData, LockFile, LockFileBuilder, PlatformData};
 
 use super::diagnostic::{DiagnosticKind, ship_error};
 use super::{
-    ProjectManifest, REQUIRED_RUNTIME_PACKAGES, RuntimeStampConfig, RuntimeVersionConfig,
-    RuntimeVersionSource, ShipConfig,
+    ProjectManifest, RuntimeStampConfig, RuntimeVersionConfig, RuntimeVersionSource, ShipConfig,
 };
 
 pub(crate) fn project_root(override_root: Option<&Path>) -> miette::Result<PathBuf> {
@@ -158,8 +157,6 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
             total_excluded += removed.len();
             kept
         };
-        validate_required_runtime_packages(platform.name().as_str(), &filtered)?;
-
         total_packages += filtered.len();
         for pkg in filtered {
             resolved_package_names.insert(package_record(&pkg)?.name.as_normalized().to_string());
@@ -203,36 +200,6 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
         total_excluded,
         removed_excludes,
     })
-}
-
-pub(crate) fn validate_required_runtime_packages(
-    platform: &str,
-    packages: &[CondaPackageData],
-) -> miette::Result<()> {
-    let mut package_names = HashSet::new();
-    for pkg in packages {
-        package_names.insert(package_record(pkg)?.name.as_normalized().to_string());
-    }
-    let missing: Vec<_> = REQUIRED_RUNTIME_PACKAGES
-        .iter()
-        .copied()
-        .filter(|name| !package_names.contains(*name))
-        .collect();
-
-    if !missing.is_empty() {
-        return Err(ship_error(
-            DiagnosticKind::MissingRuntimePackages,
-            format!(
-                "selected source environment for {platform} is missing required package(s): {}",
-                missing.join(", ")
-            ),
-            Some(
-                "Add the missing packages to source-environment or choose another source-environment."
-                    .to_string(),
-            ),
-        ));
-    }
-    Ok(())
 }
 
 pub(crate) fn discover_project_input(root: &Path) -> miette::Result<ProjectInput> {

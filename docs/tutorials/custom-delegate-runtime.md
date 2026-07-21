@@ -3,10 +3,9 @@
 This tutorial builds a runtime whose pass-through command is `python` instead of
 `conda`.
 
-You will still include conda, conda-rattler-solver, and conda-spawn in the
-managed prefix because those packages are part of conda-ship's runtime contract.
-The difference is the command users get after bootstrap: unknown runtime
-arguments are passed to Python.
+The managed prefix only needs Python and its dependencies. conda-ship does not
+require conda, conda-rattler-solver, or conda-spawn when the distribution does
+not use them.
 
 ## Before You Start
 
@@ -57,10 +56,7 @@ cd python-runtime
 ```bash
 conda workspace init --format conda --name python-runtime
 conda workspace add --feature ship --no-lockfile-update \
-  "python>=3.12" \
-  "conda>=25.1" \
-  conda-rattler-solver \
-  "conda-spawn>=0.1.0"
+  "python>=3.12"
 ```
 
 Add conda-ship policy:
@@ -74,7 +70,6 @@ runtime-version = "0.1.0"
 delegate-executable = "python"
 artifact-layout = "online"
 source-environment = "ship"
-exclude-packages = ["conda-libmamba-solver"]
 TOML
 ```
 
@@ -103,13 +98,9 @@ runtime-version = "0.1.0"
 delegate-executable = "python"
 artifact-layout = "online"
 source-environment = "ship"
-exclude-packages = ["conda-libmamba-solver"]
 TOML
 pixi add --feature ship --no-install \
-  "python>=3.12" \
-  "conda>=25.1" \
-  conda-rattler-solver \
-  "conda-spawn>=0.1.0"
+  "python>=3.12"
 pixi lock
 ```
 
@@ -137,9 +128,7 @@ mkdir -p .tmp
 ./dist/pydemo --path "$PWD/.tmp/pydemo" bootstrap
 ```
 
-The runtime installs the selected source environment into the managed prefix.
-Even though the delegate is Python, the prefix still contains conda and
-conda-spawn.
+The runtime installs the selected Python environment into the managed prefix.
 
 ## Run Python Through The Runtime
 
@@ -176,4 +165,5 @@ Remove the tutorial install path:
 The `delegate-executable` is the executable that receives pass-through
 arguments after the runtime is bootstrapped. Use `delegate-executable = "conda"`
 for conda-like distributions, and another executable when the runtime should
-present a smaller or different command surface.
+present a smaller or different command surface. The selected source environment
+only needs to include that delegate and its runtime dependencies.

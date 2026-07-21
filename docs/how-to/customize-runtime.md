@@ -68,15 +68,14 @@ installer = "homebrew"
 
 ## Choose Runtime Packages
 
-A conda-ship runtime must include:
+The selected source environment is the complete runtime package set.
+conda-ship does not add or require packages by name. Include the configured
+delegate executable and everything that delegate needs. A conda distribution
+usually includes `python`, `conda`, its selected solver plugin, and
+`conda-spawn` when it exposes `RUNTIME shell`.
 
-- `python`
-- `conda`
-- `conda-rattler-solver`
-- `conda-spawn`
-
-Additional plugins are a distribution decision. Record them in the selected
-source environment and commit the matching lockfile.
+Record the complete package set in the selected source environment and commit
+the matching lockfile.
 
 Add `conda-self` when the generated runtime should let users reset the managed
 base prefix back to the packages shipped by the runtime:

@@ -62,10 +62,11 @@ In `pyproject.toml`, conda-workspaces sections live below `[tool.conda]`, for
 example `[tool.conda.feature.ship.dependencies]`. Pixi sections live below
 `[tool.pixi]`, for example `[tool.pixi.feature.ship.dependencies]`.
 
-The selected environment must include `conda`, `conda-rattler-solver`, and
-`conda-spawn`. Generated runtimes install that environment as the managed base
-prefix, write `solver: rattler` into the installed `.condarc`, and implement
-`RUNTIME shell` through conda-spawn. Pass-through commands go to the configured
+conda-ship does not require specific packages in the selected environment. The
+environment must provide the configured delegate executable. Conda-like
+distributions include `conda` and the plugins they use. `RUNTIME shell`
+requires `conda-spawn`. Generated runtimes install the selected environment as
+the managed base prefix, and pass-through commands go to the configured
 delegate executable inside that prefix.
 
 `conda-self` is optional. Include it in the selected source environment when

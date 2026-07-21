@@ -58,9 +58,9 @@ or an explicit `--template PATH`.
 
 The finished runtime has a small command surface:
 
-- `bootstrap`: install conda into the runtime's install path
+- `bootstrap`: install the selected package set into the runtime's install path
 - `status`: report runtime and install details
-- `shell`: start a conda-spawn subshell
+- `shell`: start a conda-spawn subshell when conda-spawn is included
 - `uninstall`: remove the install path
 
 All other commands are passed through to the configured delegate executable
@@ -73,7 +73,7 @@ environments for regular package work.
 
 Some runtime behavior is visible to users:
 
-- conda-spawn based activation through `RUNTIME shell`
+- optional conda-spawn based activation through `RUNTIME shell`
 - disabled `activate`, `deactivate`, and `init` commands with guidance when the delegate is `conda`
 - automatic bootstrap before pass-through delegate commands
 - uninstall that removes the install path and prints a runtime-removal hint

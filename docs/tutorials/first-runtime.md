@@ -48,7 +48,7 @@ Create a `conda.toml`:
 conda workspace init --format conda --name demo-runtime
 ```
 
-Add the packages required by generated conda runtimes. The `ship` feature is
+Add the packages chosen for this conda runtime. The `ship` feature is
 the source environment that conda-ship will turn into a runtime lock:
 
 ```bash

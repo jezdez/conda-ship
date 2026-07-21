@@ -121,7 +121,7 @@ fn runtime_after_help() -> String {
 
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
-    /// Bootstrap a fresh conda installation into the install path
+    /// Bootstrap the selected runtime packages into the install path
     Bootstrap {
         /// Force re-bootstrap even if the install path already exists
         #[clap(long)]

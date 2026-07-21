@@ -275,7 +275,6 @@ const SHIP_STATE_DIR: &str = "target/conda-ship";
 const RUNTIME_LOCK_FILE: &str = "runtime.lock";
 const BUNDLE_ARCHIVE_FILE: &str = "bundle.tar.zst";
 const RUNTIME_TEMPLATE_ENV: &str = "CONDA_SHIP_TEMPLATE";
-const REQUIRED_RUNTIME_PACKAGES: &[&str] = &["conda", "conda-spawn", "conda-rattler-solver"];
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "kebab-case")]

@@ -120,9 +120,12 @@ source-environment = "ship"
 exclude-packages = ["conda-libmamba-solver"]
 ```
 
-The selected source environment must include the runtime contract packages:
-`conda`, `conda-rattler-solver`, and `conda-spawn`.
-Include `conda-self` in the same source environment when the runtime should
+The selected source environment defines the complete package set. It must
+include the configured delegate executable and any optional commands the
+distribution exposes. A conda distribution can include `conda`,
+`conda-rattler-solver`, and `conda-spawn`, while a runtime with another delegate
+can omit them.
+Include `conda-self` when a conda runtime should
 expose `conda self reset` for restoring the bootstrapped base prefix to the
 initial package set shipped by the runtime.
 
