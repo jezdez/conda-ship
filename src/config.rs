@@ -41,13 +41,17 @@ pub fn embedded_bundle() -> Option<&'static runtime_data::EmbeddedBundle> {
 
 const PREFIX_METADATA_SCHEMA_VERSION: u8 = 1;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PrefixMetadata {
     pub schema_version: u8,
     pub display_name: String,
     pub install_name: String,
     pub metadata_file: String,
     pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delegate_executable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lock_sha256: Option<String>,
     pub channels: Vec<String>,
     pub packages: Vec<String>,
     #[serde(default = "ready_bootstrap_phase")]
@@ -58,12 +62,27 @@ fn ready_bootstrap_phase() -> BootstrapPhase {
     BootstrapPhase::Ready
 }
 
-pub(crate) fn metadata_path(prefix: &Path) -> PathBuf {
-    prefix.join(policy::metadata_file())
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PrefixMetadataIdentity<'a> {
+    pub display_name: &'a str,
+    pub install_name: &'a str,
+    pub metadata_file: &'a str,
+    pub version: &'a str,
+    pub delegate_executable: Option<&'a str>,
+    pub lock_sha256: Option<&'a str>,
 }
 
-fn temporary_metadata_path(prefix: &Path) -> PathBuf {
-    metadata_path(prefix).with_extension("tmp")
+#[cfg(test)]
+pub(crate) fn metadata_path(prefix: &Path) -> PathBuf {
+    metadata_path_for(prefix, policy::metadata_file())
+}
+
+pub(crate) fn metadata_path_for(prefix: &Path, metadata_file: &str) -> PathBuf {
+    prefix.join(metadata_file)
+}
+
+fn temporary_metadata_path_for(prefix: &Path, metadata_file: &str) -> PathBuf {
+    metadata_path_for(prefix, metadata_file).with_extension("tmp")
 }
 
 fn remove_regular_file_if_present(path: &Path) -> miette::Result<()> {
@@ -88,8 +107,12 @@ fn remove_regular_file_if_present(path: &Path) -> miette::Result<()> {
 }
 
 pub(crate) fn invalidate_metadata(prefix: &Path) -> miette::Result<()> {
-    remove_regular_file_if_present(&metadata_path(prefix))?;
-    remove_regular_file_if_present(&temporary_metadata_path(prefix))
+    invalidate_metadata_for(prefix, policy::metadata_file())
+}
+
+pub(crate) fn invalidate_metadata_for(prefix: &Path, metadata_file: &str) -> miette::Result<()> {
+    remove_regular_file_if_present(&metadata_path_for(prefix, metadata_file))?;
+    remove_regular_file_if_present(&temporary_metadata_path_for(prefix, metadata_file))
 }
 
 pub fn write_metadata(
@@ -97,18 +120,41 @@ pub fn write_metadata(
     channels: &[String],
     packages: &[String],
 ) -> miette::Result<()> {
+    write_metadata_for_identity(
+        prefix,
+        PrefixMetadataIdentity {
+            display_name: policy::display_name(),
+            install_name: policy::install_name(),
+            metadata_file: policy::metadata_file(),
+            version: policy::runtime_version(),
+            delegate_executable: Some(policy::delegate_executable()),
+            lock_sha256: None,
+        },
+        channels,
+        packages,
+    )
+}
+
+pub(crate) fn write_metadata_for_identity(
+    prefix: &Path,
+    identity: PrefixMetadataIdentity<'_>,
+    channels: &[String],
+    packages: &[String],
+) -> miette::Result<()> {
     let meta = PrefixMetadata {
         schema_version: PREFIX_METADATA_SCHEMA_VERSION,
-        display_name: policy::display_name().to_string(),
-        install_name: policy::install_name().to_string(),
-        metadata_file: policy::metadata_file().to_string(),
-        version: policy::runtime_version().to_string(),
+        display_name: identity.display_name.to_string(),
+        install_name: identity.install_name.to_string(),
+        metadata_file: identity.metadata_file.to_string(),
+        version: identity.version.to_string(),
+        delegate_executable: identity.delegate_executable.map(ToString::to_string),
+        lock_sha256: identity.lock_sha256.map(ToString::to_string),
         channels: channels.to_vec(),
         packages: packages.to_vec(),
         bootstrap_state: BootstrapPhase::Ready,
     };
-    let path = metadata_path(prefix);
-    let temporary_path = temporary_metadata_path(prefix);
+    let path = metadata_path_for(prefix, identity.metadata_file);
+    let temporary_path = temporary_metadata_path_for(prefix, identity.metadata_file);
     remove_regular_file_if_present(&temporary_path)?;
     let mut temporary = std::fs::File::create(&temporary_path)
         .into_diagnostic()
@@ -143,14 +189,25 @@ pub fn write_metadata(
     Ok(())
 }
 
+#[cfg(test)]
 pub fn read_metadata(prefix: &Path) -> miette::Result<PrefixMetadata> {
-    let path = metadata_path(prefix);
-    let data = std::fs::read_to_string(&path)
+    read_metadata_from_path(&metadata_path(prefix))
+}
+
+pub(crate) fn read_metadata_for(
+    prefix: &Path,
+    metadata_file: &str,
+) -> miette::Result<PrefixMetadata> {
+    read_metadata_from_path(&metadata_path_for(prefix, metadata_file))
+}
+
+pub(crate) fn read_metadata_from_path(path: &Path) -> miette::Result<PrefixMetadata> {
+    let data = std::fs::read_to_string(path)
         .into_diagnostic()
         .with_context(|| {
             format!(
                 "failed to read runtime metadata at {}",
-                policy::path_for_display(&path)
+                policy::path_for_display(path)
             )
         })?;
     serde_json::from_str(&data)
@@ -158,44 +215,74 @@ pub fn read_metadata(prefix: &Path) -> miette::Result<PrefixMetadata> {
         .with_context(|| {
             format!(
                 "failed to parse runtime metadata at {}",
-                policy::path_for_display(&path)
+                policy::path_for_display(path)
             )
         })
 }
 
+#[cfg(test)]
 pub(crate) fn validate_metadata_identity(meta: &PrefixMetadata) -> miette::Result<()> {
+    validate_metadata_identity_for(
+        meta,
+        policy::display_name(),
+        policy::install_name(),
+        policy::metadata_file(),
+    )
+}
+
+pub(crate) fn validate_metadata_identity_for(
+    meta: &PrefixMetadata,
+    display_name: &str,
+    install_name: &str,
+    metadata_file: &str,
+) -> miette::Result<()> {
     if meta.schema_version != PREFIX_METADATA_SCHEMA_VERSION {
         return Err(miette::miette!(
             "unsupported runtime metadata schema version: {}",
             meta.schema_version
         ));
     }
-    if meta.display_name != policy::display_name() {
+    if meta.display_name != display_name {
         return Err(miette::miette!(
             "runtime metadata belongs to {}, not {}",
             meta.display_name,
-            policy::display_name()
+            display_name
         ));
     }
-    if meta.install_name != policy::install_name() {
+    if meta.install_name != install_name {
         return Err(miette::miette!(
             "runtime metadata install name is {}, expected {}",
             meta.install_name,
-            policy::install_name()
+            install_name
         ));
     }
-    if meta.metadata_file != policy::metadata_file() {
+    if meta.metadata_file != metadata_file {
         return Err(miette::miette!(
             "runtime metadata file is {}, expected {}",
             meta.metadata_file,
-            policy::metadata_file()
+            metadata_file
         ));
     }
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn validate_metadata_ready(meta: &PrefixMetadata) -> miette::Result<()> {
     validate_metadata_identity(meta)?;
+    validate_ready_phase(meta)
+}
+
+pub(crate) fn validate_metadata_ready_for(
+    meta: &PrefixMetadata,
+    display_name: &str,
+    install_name: &str,
+    metadata_file: &str,
+) -> miette::Result<()> {
+    validate_metadata_identity_for(meta, display_name, install_name, metadata_file)?;
+    validate_ready_phase(meta)
+}
+
+fn validate_ready_phase(meta: &PrefixMetadata) -> miette::Result<()> {
     if meta.bootstrap_state != BootstrapPhase::Ready {
         return Err(miette::miette!(
             "runtime metadata does not mark bootstrap complete"
@@ -211,8 +298,12 @@ pub(crate) fn validate_metadata_ready(meta: &PrefixMetadata) -> miette::Result<(
 /// let the distribution decide how base updates are performed.
 /// See: <https://conda.org/learn/ceps/cep-0022/>
 pub fn write_frozen(prefix: &Path) -> miette::Result<()> {
+    write_frozen_with_message(prefix, &policy::frozen_message())
+}
+
+pub(crate) fn write_frozen_with_message(prefix: &Path, message: &str) -> miette::Result<()> {
     let frozen_path = prefix.join("conda-meta").join("frozen");
-    let contents = serde_json::json!({ "message": policy::frozen_message() });
+    let contents = serde_json::json!({ "message": message });
     std::fs::create_dir_all(prefix.join("conda-meta")).into_diagnostic()?;
     std::fs::write(
         &frozen_path,

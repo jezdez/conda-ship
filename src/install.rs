@@ -24,7 +24,7 @@ use rattler_conda_types::{
 use rattler_lock::LockFile;
 use rattler_networking::AuthenticationMiddleware;
 
-use crate::{config, policy};
+use crate::{config, exec, policy};
 
 static GLOBAL_MP: std::sync::LazyLock<MultiProgress> = std::sync::LazyLock::new(|| {
     let mp = MultiProgress::new();
@@ -81,10 +81,25 @@ pub async fn from_lockfile(
     lock_content: &str,
     reinstall: bool,
 ) -> miette::Result<()> {
+    from_lockfile_with_specs(
+        prefix,
+        lock_content,
+        &config::embedded_config().packages,
+        reinstall,
+    )
+    .await
+}
+
+/// Install packages from a pre-solved lockfile with explicit requested specs.
+pub(crate) async fn from_lockfile_with_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
+    reinstall: bool,
+) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     let client = make_download_client()?;
 
@@ -108,6 +123,26 @@ pub async fn from_lockfile(
 pub async fn from_lockfile_with_bundle(
     prefix: &Path,
     lock_content: &str,
+    bundle_dir: &Path,
+    offline: bool,
+    reinstall: bool,
+) -> miette::Result<()> {
+    from_lockfile_with_bundle_and_specs(
+        prefix,
+        lock_content,
+        &config::embedded_config().packages,
+        bundle_dir,
+        offline,
+        reinstall,
+    )
+    .await
+}
+
+/// Install packages from a lockfile and local bundle using explicit requested specs.
+pub(crate) async fn from_lockfile_with_bundle_and_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
     bundle_dir: &Path,
     offline: bool,
     reinstall: bool,
@@ -159,8 +194,7 @@ pub async fn from_lockfile_with_bundle(
         start.elapsed().as_secs_f64()
     );
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     let reinstall_packages = reinstall_package_names(&required_packages, reinstall);
 
@@ -208,14 +242,29 @@ pub async fn from_lockfile_offline(
     lock_content: &str,
     reinstall: bool,
 ) -> miette::Result<()> {
+    from_lockfile_offline_with_specs(
+        prefix,
+        lock_content,
+        &config::embedded_config().packages,
+        reinstall,
+    )
+    .await
+}
+
+/// Install packages from a lockfile in offline mode with explicit requested specs.
+pub(crate) async fn from_lockfile_offline_with_specs(
+    prefix: &Path,
+    lock_content: &str,
+    requested_specs: &[String],
+    reinstall: bool,
+) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let cache_dir = default_cache_dir()
         .map_err(|e| miette::miette!("could not determine cache directory: {}", e))?;
     let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
 
-    let cfg = config::embedded_config();
-    let match_specs = parse_specs(&cfg.packages)?;
+    let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
     let reinstall_packages = reinstall_package_names(&required_packages, reinstall);
 
@@ -597,6 +646,33 @@ pub(crate) fn wrap_spinner<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>
     let result = func();
     pb.finish_and_clear();
     result
+}
+
+pub(crate) fn compile_python_bytecode(prefix: &Path) {
+    let python = exec::executable_in_prefix(prefix, "python");
+    if !python.exists() {
+        return;
+    }
+
+    let lib_dir = prefix.join("lib");
+    let result = wrap_spinner("compiling Python bytecode", move || {
+        std::process::Command::new(&python)
+            .args(["-m", "compileall", "-q", "-j", "0"])
+            .arg(&lib_dir)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+    });
+
+    match result {
+        Ok(status) if status.success() => {}
+        _ => {
+            eprintln!(
+                "   {} bytecode compilation finished with errors (non-fatal)",
+                console::style("!").yellow(),
+            );
+        }
+    }
 }
 
 #[cfg(test)]

@@ -5,20 +5,46 @@ use std::path::{Path, PathBuf};
 use miette::IntoDiagnostic;
 
 use crate::bootstrap_lock::BootstrapLock;
-use crate::bootstrap_state::{self, BootstrapPhase};
+use crate::bootstrap_state::{self, BootstrapIdentity, BootstrapPhase};
 use crate::config::{
-    PrefixMetadata, embedded_config, embedded_lock, read_metadata, write_condarc, write_frozen,
-    write_metadata,
+    PrefixMetadata, embedded_config, embedded_lock, write_condarc, write_frozen, write_metadata,
 };
 use crate::{constructor_metadata, exec, install, policy};
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ManagedPrefixIdentity<'a> {
+    pub display_name: &'a str,
+    pub install_name: &'a str,
+    pub metadata_file: &'a str,
+    pub expected_delegate: Option<&'a str>,
+}
+
+impl<'a> ManagedPrefixIdentity<'a> {
+    fn bootstrap_identity(self) -> BootstrapIdentity<'a> {
+        BootstrapIdentity {
+            display_name: self.display_name,
+            install_name: self.install_name,
+            metadata_file: self.metadata_file,
+        }
+    }
+}
+
+fn embedded_prefix_identity() -> ManagedPrefixIdentity<'static> {
+    ManagedPrefixIdentity {
+        display_name: policy::display_name(),
+        install_name: policy::install_name(),
+        metadata_file: policy::metadata_file(),
+        expected_delegate: Some(policy::delegate_executable()),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PrefixDisposition {
+pub(crate) enum PrefixDisposition {
     Ready,
     Bootstrap { reinstall: bool },
 }
 
-fn is_empty_dir(prefix: &Path) -> miette::Result<bool> {
+pub(crate) fn is_empty_dir(prefix: &Path) -> miette::Result<bool> {
     if !prefix.is_dir() {
         return Ok(false);
     }
@@ -28,24 +54,45 @@ fn is_empty_dir(prefix: &Path) -> miette::Result<bool> {
         .is_none())
 }
 
-fn read_managed_metadata(prefix: &Path, action: &str) -> miette::Result<PrefixMetadata> {
-    let metadata_path = crate::config::metadata_path(prefix);
-    if !metadata_path.is_file() {
-        return Err(miette::miette!(
-            "refusing to {action} unmanaged install path: {}\n  Expected runtime metadata file: {}",
-            policy::path_for_display(prefix),
-            policy::path_for_display(&metadata_path)
-        ));
+pub(crate) fn read_managed_metadata_for(
+    prefix: &Path,
+    identity: ManagedPrefixIdentity<'_>,
+    action: &str,
+) -> miette::Result<PrefixMetadata> {
+    let metadata_path = crate::config::metadata_path_for(prefix, identity.metadata_file);
+    match std::fs::symlink_metadata(&metadata_path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            return Err(miette::miette!(
+                "refusing to {action} unmanaged install path: {}\n  Runtime metadata is not a regular file: {}",
+                policy::path_for_display(prefix),
+                policy::path_for_display(&metadata_path)
+            ));
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(miette::miette!(
+                "refusing to {action} unmanaged install path: {}\n  Expected runtime metadata file: {}",
+                policy::path_for_display(prefix),
+                policy::path_for_display(&metadata_path)
+            ));
+        }
+        Err(error) => return Err(error).into_diagnostic(),
     }
 
-    let meta = read_metadata(prefix).map_err(|err| {
+    let meta = crate::config::read_metadata_for(prefix, identity.metadata_file).map_err(|err| {
         miette::miette!(
             "refusing to {action} unmanaged install path: {}\n  Invalid runtime metadata file: {}\n  {err}",
             policy::path_for_display(prefix),
             policy::path_for_display(&metadata_path)
         )
     })?;
-    crate::config::validate_metadata_ready(&meta).map_err(|err| {
+    crate::config::validate_metadata_ready_for(
+        &meta,
+        identity.display_name,
+        identity.install_name,
+        identity.metadata_file,
+    )
+    .map_err(|err| {
         miette::miette!(
             "refusing to {action} install path owned by a different runtime: {}\n  Invalid runtime metadata file: {}\n  {err}",
             policy::path_for_display(prefix),
@@ -83,6 +130,14 @@ pub(crate) async fn ensure_bootstrapped(prefix: &Path) -> miette::Result<()> {
 }
 
 fn prefix_disposition(prefix: &Path) -> miette::Result<PrefixDisposition> {
+    prefix_disposition_for(prefix, embedded_prefix_identity(), true)
+}
+
+pub(crate) fn prefix_disposition_for(
+    prefix: &Path,
+    identity: ManagedPrefixIdentity<'_>,
+    require_healthy_delegate: bool,
+) -> miette::Result<PrefixDisposition> {
     validate_prefix_path(prefix)?;
 
     if let Some(state) = bootstrap_state::read(prefix).map_err(|error| {
@@ -91,12 +146,14 @@ fn prefix_disposition(prefix: &Path) -> miette::Result<PrefixDisposition> {
             policy::path_for_display(prefix)
         )
     })? {
-        bootstrap_state::validate_identity(&state).map_err(|error| {
-            miette::miette!(
-                "refusing to use install path owned by a different runtime: {}\n  {error}",
-                policy::path_for_display(prefix)
-            )
-        })?;
+        bootstrap_state::validate_identity_for(&state, identity.bootstrap_identity()).map_err(
+            |error| {
+                miette::miette!(
+                    "refusing to use install path owned by a different runtime: {}\n  {error}",
+                    policy::path_for_display(prefix)
+                )
+            },
+        )?;
         if state.phase() != BootstrapPhase::Installing {
             return Err(miette::miette!(
                 "refusing to use install path with invalid bootstrap state: {}",
@@ -104,7 +161,7 @@ fn prefix_disposition(prefix: &Path) -> miette::Result<PrefixDisposition> {
             ));
         }
 
-        let metadata_path = crate::config::metadata_path(prefix);
+        let metadata_path = crate::config::metadata_path_for(prefix, identity.metadata_file);
         match std::fs::symlink_metadata(&metadata_path) {
             Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
                 return Err(miette::miette!(
@@ -113,15 +170,27 @@ fn prefix_disposition(prefix: &Path) -> miette::Result<PrefixDisposition> {
                 ));
             }
             Ok(_) => {
-                if let Ok(meta) = read_metadata(prefix) {
-                    crate::config::validate_metadata_identity(&meta).map_err(|error| {
+                if let Ok(meta) = crate::config::read_metadata_for(prefix, identity.metadata_file) {
+                    crate::config::validate_metadata_identity_for(
+                        &meta,
+                        identity.display_name,
+                        identity.install_name,
+                        identity.metadata_file,
+                    )
+                    .map_err(|error| {
                         miette::miette!(
                             "refusing to recover install path owned by a different runtime: {}\n  {error}",
                             policy::path_for_display(prefix)
                         )
                     })?;
                     if meta.bootstrap_state == BootstrapPhase::Ready
-                        && exec::validate_delegate(prefix, policy::delegate_executable()).is_ok()
+                        && (!require_healthy_delegate
+                            || validate_recorded_delegate(
+                                prefix,
+                                &meta,
+                                identity.expected_delegate,
+                            )
+                            .is_ok())
                     {
                         bootstrap_state::remove(prefix)?;
                         return Ok(PrefixDisposition::Ready);
@@ -139,7 +208,12 @@ fn prefix_disposition(prefix: &Path) -> miette::Result<PrefixDisposition> {
         return Ok(PrefixDisposition::Bootstrap { reinstall: false });
     }
 
-    validate_ready_prefix(prefix).map_err(|error| {
+    let ready = if require_healthy_delegate {
+        validate_ready_prefix_for(prefix, identity)
+    } else {
+        read_managed_metadata_for(prefix, identity, "reinstall").map(|_| ())
+    };
+    ready.map_err(|error| {
         miette::miette!(
             "refusing to bootstrap into existing non-empty path: {}\n  {error}",
             policy::path_for_display(prefix)
@@ -148,7 +222,7 @@ fn prefix_disposition(prefix: &Path) -> miette::Result<PrefixDisposition> {
     Ok(PrefixDisposition::Ready)
 }
 
-fn validate_prefix_path(prefix: &Path) -> miette::Result<()> {
+pub(crate) fn validate_prefix_path(prefix: &Path) -> miette::Result<()> {
     match std::fs::symlink_metadata(prefix) {
         Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_dir() => {
             Err(miette::miette!(
@@ -162,9 +236,35 @@ fn validate_prefix_path(prefix: &Path) -> miette::Result<()> {
     }
 }
 
-fn validate_ready_prefix(prefix: &Path) -> miette::Result<()> {
-    read_managed_metadata(prefix, "use")?;
-    exec::validate_delegate(prefix, policy::delegate_executable())
+pub(crate) fn validate_ready_prefix_for(
+    prefix: &Path,
+    identity: ManagedPrefixIdentity<'_>,
+) -> miette::Result<()> {
+    let meta = read_managed_metadata_for(prefix, identity, "use")?;
+    validate_recorded_delegate(prefix, &meta, identity.expected_delegate)
+}
+
+fn validate_recorded_delegate(
+    prefix: &Path,
+    meta: &PrefixMetadata,
+    fallback: Option<&str>,
+) -> miette::Result<()> {
+    let recorded = meta.delegate_executable.as_deref();
+    let delegate = match (fallback, recorded) {
+        (Some(expected), Some(recorded)) if recorded != expected => {
+            return Err(miette::miette!(
+                "runtime metadata records delegate {recorded:?}, expected {expected:?}"
+            ));
+        }
+        (Some(expected), _) => expected,
+        (None, Some(recorded)) => recorded,
+        (None, None) => {
+            return Err(miette::miette!(
+                "runtime metadata has no delegate executable"
+            ));
+        }
+    };
+    exec::validate_delegate(prefix, delegate)
 }
 
 fn configured_bundle() -> miette::Result<Option<PathBuf>> {
@@ -253,7 +353,7 @@ async fn bootstrap(
         constructor_metadata::write_prefix_metadata(prefix, content, &specs)?;
     }
     write_configured_policy(prefix, cfg)?;
-    compile_python_bytecode(prefix);
+    install::compile_python_bytecode(prefix);
     exec::validate_delegate(prefix, policy::delegate_executable())?;
     write_metadata(prefix, &channels, &specs)?;
     bootstrap_state::remove(prefix)?;
@@ -276,33 +376,6 @@ fn write_configured_policy(
         write_frozen(prefix)?;
     }
     Ok(())
-}
-
-fn compile_python_bytecode(prefix: &Path) {
-    let python = exec::executable_in_prefix(prefix, "python");
-    if !python.exists() {
-        return;
-    }
-
-    let lib_dir = prefix.join("lib");
-    let result = install::wrap_spinner("compiling Python bytecode", move || {
-        std::process::Command::new(&python)
-            .args(["-m", "compileall", "-q", "-j", "0"])
-            .arg(&lib_dir)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-    });
-
-    match result {
-        Ok(status) if status.success() => {}
-        _ => {
-            eprintln!(
-                "   {} bytecode compilation finished with errors (non-fatal)",
-                console::style("!").yellow(),
-            );
-        }
-    }
 }
 
 #[cfg(test)]
@@ -407,6 +480,38 @@ mod tests {
 
         assert!(error.contains("existing non-empty path"));
         assert!(error.contains("executable not found"));
+        assert_eq!(
+            prefix_disposition_for(tmp.path(), embedded_prefix_identity(), false).unwrap(),
+            PrefixDisposition::Ready
+        );
+    }
+
+    #[test]
+    fn test_stamped_runtime_rejects_conflicting_recorded_delegate() {
+        let tmp = TempDir::new().unwrap();
+        let recorded_delegate = format!("{}-other", policy::delegate_executable());
+        let executable = exec::executable_in_prefix(tmp.path(), &recorded_delegate);
+        std::fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        std::fs::write(executable, b"delegate").unwrap();
+        crate::config::write_metadata_for_identity(
+            tmp.path(),
+            crate::config::PrefixMetadataIdentity {
+                display_name: policy::display_name(),
+                install_name: policy::install_name(),
+                metadata_file: policy::metadata_file(),
+                version: policy::runtime_version(),
+                delegate_executable: Some(&recorded_delegate),
+                lock_sha256: None,
+            },
+            &[],
+            &[],
+        )
+        .unwrap();
+
+        let error = prefix_disposition(tmp.path()).unwrap_err().to_string();
+
+        assert!(error.contains("records delegate"), "{error}");
+        assert!(error.contains("expected"), "{error}");
     }
 
     #[test]

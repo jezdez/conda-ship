@@ -42,6 +42,9 @@ Then follow the [quickstart](tutorials/quickstart.md).
   [artifacts](reference/artifacts.md).
 - Unsure what belongs here versus downstream: read
   [project boundaries](explanation/project-boundaries.md).
+- Building an orchestrator for multiple locked runtimes: read
+  [Fleet concepts](explanation/fleet.md) and the
+  [Fleet API reference](reference/fleet.md).
 
 ## Scope
 
@@ -84,6 +87,7 @@ reference/cli
 reference/names
 reference/conda-plugin
 reference/runtime-cli
+reference/fleet
 reference/github-action
 reference/configuration
 reference/artifacts
@@ -100,6 +104,7 @@ reference/errors
 explanation/overview
 explanation/source-locks-and-runtime-locks
 explanation/runtime-template
+explanation/fleet
 explanation/install-locations-and-ownership
 explanation/trust-and-provenance
 explanation/project-boundaries

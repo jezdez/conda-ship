@@ -29,18 +29,33 @@ pub(crate) struct BootstrapState {
 }
 
 impl BootstrapState {
-    fn current(state: BootstrapPhase) -> Self {
+    fn current(state: BootstrapPhase, identity: BootstrapIdentity<'_>) -> Self {
         Self {
             schema_version: BOOTSTRAP_STATE_SCHEMA_VERSION,
             state,
-            display_name: policy::display_name().to_string(),
-            install_name: policy::install_name().to_string(),
-            metadata_file: policy::metadata_file().to_string(),
+            display_name: identity.display_name.to_string(),
+            install_name: identity.install_name.to_string(),
+            metadata_file: identity.metadata_file.to_string(),
         }
     }
 
     pub(crate) fn phase(&self) -> BootstrapPhase {
         self.state
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BootstrapIdentity<'a> {
+    pub display_name: &'a str,
+    pub install_name: &'a str,
+    pub metadata_file: &'a str,
+}
+
+fn embedded_identity() -> BootstrapIdentity<'static> {
+    BootstrapIdentity {
+        display_name: policy::display_name(),
+        install_name: policy::install_name(),
+        metadata_file: policy::metadata_file(),
     }
 }
 
@@ -126,6 +141,13 @@ pub(crate) fn read(prefix: &Path) -> miette::Result<Option<BootstrapState>> {
 }
 
 pub(crate) fn write_installing(prefix: &Path) -> miette::Result<()> {
+    write_installing_for(prefix, embedded_identity())
+}
+
+pub(crate) fn write_installing_for(
+    prefix: &Path,
+    identity: BootstrapIdentity<'_>,
+) -> miette::Result<()> {
     std::fs::create_dir_all(prefix)
         .into_diagnostic()
         .with_context(|| format!("failed to create {}", policy::path_for_display(prefix)))?;
@@ -138,7 +160,7 @@ pub(crate) fn write_installing(prefix: &Path) -> miette::Result<()> {
         .context("failed to create temporary bootstrap state")?;
     serde_json::to_writer_pretty(
         &mut temporary,
-        &BootstrapState::current(BootstrapPhase::Installing),
+        &BootstrapState::current(BootstrapPhase::Installing, identity),
     )
     .into_diagnostic()
     .context("failed to render bootstrap state")?;
@@ -171,32 +193,40 @@ pub(crate) fn remove(prefix: &Path) -> miette::Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn validate_identity(state: &BootstrapState) -> miette::Result<()> {
+    validate_identity_for(state, embedded_identity())
+}
+
+pub(crate) fn validate_identity_for(
+    state: &BootstrapState,
+    identity: BootstrapIdentity<'_>,
+) -> miette::Result<()> {
     if state.schema_version != BOOTSTRAP_STATE_SCHEMA_VERSION {
         return Err(miette::miette!(
             "unsupported bootstrap state schema version: {}",
             state.schema_version
         ));
     }
-    if state.display_name != policy::display_name() {
+    if state.display_name != identity.display_name {
         return Err(miette::miette!(
             "bootstrap state belongs to {}, not {}",
             state.display_name,
-            policy::display_name()
+            identity.display_name
         ));
     }
-    if state.install_name != policy::install_name() {
+    if state.install_name != identity.install_name {
         return Err(miette::miette!(
             "bootstrap state install name is {}, expected {}",
             state.install_name,
-            policy::install_name()
+            identity.install_name
         ));
     }
-    if state.metadata_file != policy::metadata_file() {
+    if state.metadata_file != identity.metadata_file {
         return Err(miette::miette!(
             "bootstrap state metadata file is {}, expected {}",
             state.metadata_file,
-            policy::metadata_file()
+            identity.metadata_file
         ));
     }
     if state.state != BootstrapPhase::Installing {
@@ -225,7 +255,7 @@ mod tests {
 
     #[test]
     fn test_bootstrap_state_rejects_another_runtime() {
-        let mut state = BootstrapState::current(BootstrapPhase::Installing);
+        let mut state = BootstrapState::current(BootstrapPhase::Installing, embedded_identity());
         state.install_name = "another-runtime".to_string();
 
         let error = validate_identity(&state).unwrap_err().to_string();
@@ -237,7 +267,7 @@ mod tests {
     #[test]
     fn test_temporary_installing_state_is_recoverable() {
         let tmp = TempDir::new().unwrap();
-        let state = BootstrapState::current(BootstrapPhase::Installing);
+        let state = BootstrapState::current(BootstrapPhase::Installing, embedded_identity());
         std::fs::write(
             temporary_path(tmp.path()),
             serde_json::to_vec_pretty(&state).unwrap(),
@@ -253,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_ready_marker_is_rejected() {
-        let state = BootstrapState::current(BootstrapPhase::Ready);
+        let state = BootstrapState::current(BootstrapPhase::Ready, embedded_identity());
 
         let error = validate_identity(&state).unwrap_err().to_string();
 

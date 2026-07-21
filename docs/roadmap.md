@@ -21,6 +21,28 @@ The repository stays focused on producing runtimes. Distribution
 wrappers such as Homebrew formulae, constructor-based installers, Docker images,
 or enterprise package manager recipes live outside the core builder.
 
+## Experimental Fleet API
+
+Fleet is an experimental Rust API. The Cargo feature that enables it is
+`fleet`. It lets orchestrators manage multiple locked conda prefixes while
+reusing conda-ship package installation, metadata, offline bundle code, shared
+package cache, prefix mutation locking, and interrupted-install recovery.
+Stamped runtime artifacts remain the primary conda-ship output.
+
+The initial API includes:
+
+- no solving
+- no catalog
+- no update or repair workflow
+- no runtime command namespace
+- no synthetic conda activation environment
+- no global PATH mutation
+- no filesystem-mutating shim writer
+- no conda-ship-owned update flow for launchers created by Fleet callers
+
+See [fleet concepts](explanation/fleet.md) and the
+[API reference](reference/fleet.md).
+
 ## Manifest And Plugin Work
 
 conda-ship supports conda-workspaces project input for downstream

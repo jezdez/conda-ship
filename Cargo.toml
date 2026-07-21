@@ -43,6 +43,7 @@ path = "src/bin/cs.rs"
 
 [features]
 default = ["rustls-tls"]
+fleet = []
 native-tls = [
   "reqwest/native-tls",
   "rattler/native-tls",
