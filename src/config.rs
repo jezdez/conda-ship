@@ -1,10 +1,12 @@
 //! Configuration and runtime metadata management.
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use miette::{Context, IntoDiagnostic};
 
+use crate::bootstrap_state::BootstrapPhase;
 use crate::{policy, runtime_data};
 
 pub use crate::runtime_data::RuntimeConfig;
@@ -48,10 +50,46 @@ pub struct PrefixMetadata {
     pub version: String,
     pub channels: Vec<String>,
     pub packages: Vec<String>,
+    #[serde(default = "ready_bootstrap_phase")]
+    pub(crate) bootstrap_state: BootstrapPhase,
+}
+
+fn ready_bootstrap_phase() -> BootstrapPhase {
+    BootstrapPhase::Ready
 }
 
 pub(crate) fn metadata_path(prefix: &Path) -> PathBuf {
     prefix.join(policy::metadata_file())
+}
+
+fn temporary_metadata_path(prefix: &Path) -> PathBuf {
+    metadata_path(prefix).with_extension("tmp")
+}
+
+fn remove_regular_file_if_present(path: &Path) -> miette::Result<()> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            Err(miette::miette!(
+                "runtime metadata is not a regular file: {}",
+                policy::path_for_display(path)
+            ))
+        }
+        Ok(_) => std::fs::remove_file(path)
+            .into_diagnostic()
+            .with_context(|| {
+                format!(
+                    "failed to remove runtime metadata at {}",
+                    policy::path_for_display(path)
+                )
+            }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).into_diagnostic(),
+    }
+}
+
+pub(crate) fn invalidate_metadata(prefix: &Path) -> miette::Result<()> {
+    remove_regular_file_if_present(&metadata_path(prefix))?;
+    remove_regular_file_if_present(&temporary_metadata_path(prefix))
 }
 
 pub fn write_metadata(
@@ -67,9 +105,41 @@ pub fn write_metadata(
         version: policy::runtime_version().to_string(),
         channels: channels.to_vec(),
         packages: packages.to_vec(),
+        bootstrap_state: BootstrapPhase::Ready,
     };
-    let json = serde_json::to_string_pretty(&meta).into_diagnostic()?;
-    std::fs::write(metadata_path(prefix), json).into_diagnostic()?;
+    let path = metadata_path(prefix);
+    let temporary_path = temporary_metadata_path(prefix);
+    remove_regular_file_if_present(&temporary_path)?;
+    let mut temporary = std::fs::File::create(&temporary_path)
+        .into_diagnostic()
+        .with_context(|| {
+            format!(
+                "failed to create temporary runtime metadata at {}",
+                policy::path_for_display(&temporary_path)
+            )
+        })?;
+    serde_json::to_writer_pretty(&mut temporary, &meta)
+        .into_diagnostic()
+        .context("failed to render runtime metadata")?;
+    temporary
+        .write_all(b"\n")
+        .into_diagnostic()
+        .context("failed to write runtime metadata")?;
+    temporary
+        .sync_all()
+        .into_diagnostic()
+        .context("failed to sync runtime metadata")?;
+    drop(temporary);
+
+    remove_regular_file_if_present(&path)?;
+    std::fs::rename(&temporary_path, &path)
+        .into_diagnostic()
+        .with_context(|| {
+            format!(
+                "failed to replace runtime metadata at {}",
+                policy::path_for_display(&path)
+            )
+        })?;
     Ok(())
 }
 
@@ -119,6 +189,16 @@ pub(crate) fn validate_metadata_identity(meta: &PrefixMetadata) -> miette::Resul
             "runtime metadata file is {}, expected {}",
             meta.metadata_file,
             policy::metadata_file()
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_metadata_ready(meta: &PrefixMetadata) -> miette::Result<()> {
+    validate_metadata_identity(meta)?;
+    if meta.bootstrap_state != BootstrapPhase::Ready {
+        return Err(miette::miette!(
+            "runtime metadata does not mark bootstrap complete"
         ));
     }
     Ok(())
@@ -199,6 +279,25 @@ mod tests {
         assert_eq!(meta.metadata_file, policy::metadata_file());
         assert_eq!(meta.channels, channels);
         assert_eq!(meta.packages, packages);
+        assert_eq!(meta.bootstrap_state, BootstrapPhase::Ready);
+    }
+
+    #[test]
+    fn test_metadata_without_bootstrap_state_is_a_ready_commit() {
+        let metadata = serde_json::json!({
+            "schema_version": PREFIX_METADATA_SCHEMA_VERSION,
+            "display_name": policy::display_name(),
+            "install_name": policy::install_name(),
+            "metadata_file": policy::metadata_file(),
+            "version": policy::runtime_version(),
+            "channels": [],
+            "packages": [],
+        });
+
+        let parsed: PrefixMetadata = serde_json::from_value(metadata).unwrap();
+
+        assert_eq!(parsed.bootstrap_state, BootstrapPhase::Ready);
+        validate_metadata_ready(&parsed).unwrap();
     }
 
     #[test]

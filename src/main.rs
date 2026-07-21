@@ -4,6 +4,8 @@ use std::env;
 
 use miette::IntoDiagnostic;
 
+mod bootstrap_lock;
+mod bootstrap_state;
 mod commands;
 mod config;
 mod constructor_metadata;

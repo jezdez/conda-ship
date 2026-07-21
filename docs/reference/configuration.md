@@ -239,7 +239,8 @@ runtime name as uppercased `RUNTIME_NAME` plus `_PREFIX`.
 
 At bootstrap time, the generated runtime writes a separate prefix metadata file
 inside the managed prefix. That file is used for ownership checks before later
-operations touch the prefix.
+operations touch the prefix. It is written last to mark bootstrap complete.
+The internal installing marker is then removed.
 
 The bootstrap also writes standard conda prefix metadata:
 

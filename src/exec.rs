@@ -48,19 +48,25 @@ fn validate_executable_name(executable: &str) -> miette::Result<()> {
     Ok(())
 }
 
-fn build_delegate_command(
-    prefix: &Path,
-    delegate: &str,
-    args: &[OsString],
-) -> miette::Result<Command> {
+pub(crate) fn validate_delegate(prefix: &Path, delegate: &str) -> miette::Result<()> {
     validate_executable_name(delegate)?;
     let delegate_bin = executable_in_prefix(prefix, delegate);
-    if !delegate_bin.exists() {
+    if !delegate_bin.is_file() {
         return Err(miette::miette!(
             "{delegate} executable not found at {}",
             policy::path_for_display(&delegate_bin)
         ));
     }
+    Ok(())
+}
+
+fn build_delegate_command(
+    prefix: &Path,
+    delegate: &str,
+    args: &[OsString],
+) -> miette::Result<Command> {
+    validate_delegate(prefix, delegate)?;
+    let delegate_bin = executable_in_prefix(prefix, delegate);
     let mut command = Command::new(delegate_bin);
     command.args(args);
     apply_delegate_environment(&mut command, prefix)?;

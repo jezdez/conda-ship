@@ -2,7 +2,7 @@
 
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
@@ -19,7 +19,7 @@ use rattler::{
     package_cache::PackageCache,
 };
 use rattler_conda_types::{
-    MatchSpec, ParseMatchSpecOptions, Platform, PrefixRecord, RepoDataRecord,
+    MatchSpec, PackageName, ParseMatchSpecOptions, Platform, PrefixRecord, RepoDataRecord,
 };
 use rattler_lock::LockFile;
 use rattler_networking::AuthenticationMiddleware;
@@ -76,7 +76,11 @@ fn lockfile_records(lock_content: &str) -> miette::Result<(Platform, Vec<RepoDat
 }
 
 /// Install packages from a pre-solved lockfile (fast path, no solve needed).
-pub async fn from_lockfile(prefix: &Path, lock_content: &str) -> miette::Result<()> {
+pub async fn from_lockfile(
+    prefix: &Path,
+    lock_content: &str,
+    reinstall: bool,
+) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let cfg = config::embedded_config();
@@ -91,6 +95,7 @@ pub async fn from_lockfile(prefix: &Path, lock_content: &str) -> miette::Result<
         &match_specs,
         client,
         required_packages,
+        reinstall,
     )
     .await
 }
@@ -105,6 +110,7 @@ pub async fn from_lockfile_with_bundle(
     lock_content: &str,
     bundle_dir: &Path,
     offline: bool,
+    reinstall: bool,
 ) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
@@ -156,11 +162,13 @@ pub async fn from_lockfile_with_bundle(
     let cfg = config::embedded_config();
     let match_specs = parse_specs(&cfg.packages)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
+    let reinstall_packages = reinstall_package_names(&required_packages, reinstall);
 
     let mut installer = Installer::new()
         .with_package_cache(package_cache)
         .with_target_platform(platform)
         .with_installed_packages(installed.to_vec())
+        .with_reinstall_packages(reinstall_packages)
         .with_execute_link_scripts(true)
         .with_requested_specs(match_specs)
         .with_reporter(
@@ -180,10 +188,11 @@ pub async fn from_lockfile_with_bundle(
         .into_diagnostic()
         .context("failed to install packages")?;
 
+    validate_post_link_script_result(result.post_link_script_result.as_ref())?;
+
     if result.transaction.operations.is_empty() {
         eprintln!("   {} Already up to date", console::style("✔").green());
     } else {
-        report_post_link_script_failures(result.post_link_script_result.as_ref());
         eprintln!(
             "   Installed {} packages in {:.1}s",
             result.transaction.operations.len(),
@@ -194,7 +203,11 @@ pub async fn from_lockfile_with_bundle(
 }
 
 /// Install packages from a lockfile in offline mode (cache only, no bundle).
-pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette::Result<()> {
+pub async fn from_lockfile_offline(
+    prefix: &Path,
+    lock_content: &str,
+    reinstall: bool,
+) -> miette::Result<()> {
     let (platform, required_packages) = lockfile_records(lock_content)?;
 
     let cache_dir = default_cache_dir()
@@ -204,12 +217,14 @@ pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette:
     let cfg = config::embedded_config();
     let match_specs = parse_specs(&cfg.packages)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
+    let reinstall_packages = reinstall_package_names(&required_packages, reinstall);
 
     let start = Instant::now();
     let result = Installer::new()
         .with_package_cache(package_cache)
         .with_target_platform(platform)
         .with_installed_packages(installed.to_vec())
+        .with_reinstall_packages(reinstall_packages)
         .with_execute_link_scripts(true)
         .with_requested_specs(match_specs)
         .with_reporter(
@@ -222,10 +237,11 @@ pub async fn from_lockfile_offline(prefix: &Path, lock_content: &str) -> miette:
         .into_diagnostic()
         .context("failed to install packages (offline mode — are all packages cached?)")?;
 
+    validate_post_link_script_result(result.post_link_script_result.as_ref())?;
+
     if result.transaction.operations.is_empty() {
         eprintln!("   {} Already up to date", console::style("✔").green());
     } else {
-        report_post_link_script_failures(result.post_link_script_result.as_ref());
         eprintln!(
             "   Installed {} packages in {:.1}s",
             result.transaction.operations.len(),
@@ -441,22 +457,18 @@ fn verify_bundle_package(
     Ok(())
 }
 
-fn report_post_link_script_failures(
+fn validate_post_link_script_result(
     post_link_result: Option<&Result<PrePostLinkResult, LinkScriptError>>,
-) {
+) -> miette::Result<()> {
     match post_link_result {
-        Some(Ok(result)) => {
-            for line in post_link_failure_lines(result) {
-                eprintln!("{line}");
-            }
-        }
-        Some(Err(err)) => {
-            eprintln!(
-                "   {} failed to inspect post-link script results: {err}",
-                console::style("!").yellow(),
-            );
-        }
-        None => {}
+        Some(Ok(result)) if !result.failed_packages.is_empty() => Err(miette::miette!(
+            "{}",
+            post_link_failure_lines(result).join("\n")
+        )),
+        Some(Err(error)) => Err(miette::miette!(
+            "failed to inspect post-link script results: {error}"
+        )),
+        Some(Ok(_)) | None => Ok(()),
     }
 }
 
@@ -471,8 +483,7 @@ fn post_link_failure_lines(result: &PrePostLinkResult) -> Vec<String> {
         .map(|package| package.as_normalized().to_string())
         .collect();
     let mut lines = vec![format!(
-        "   {} post-link scripts failed for {} package(s): {}",
-        console::style("!").yellow(),
+        "post-link scripts failed for {} package(s): {}",
         result.failed_packages.len(),
         packages.join(", ")
     )];
@@ -490,11 +501,21 @@ fn post_link_failure_lines(result: &PrePostLinkResult) -> Vec<String> {
             .map(str::trim)
             .filter(|line| !line.is_empty())
         {
-            lines.push(format!("     {}: {line}", package.as_normalized()));
+            lines.push(format!("{}: {line}", package.as_normalized()));
         }
     }
 
     lines
+}
+
+fn reinstall_package_names(packages: &[RepoDataRecord], reinstall: bool) -> HashSet<PackageName> {
+    if !reinstall {
+        return HashSet::new();
+    }
+    packages
+        .iter()
+        .map(|record| record.package_record.name.clone())
+        .collect()
 }
 
 pub(crate) fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
@@ -533,12 +554,15 @@ async fn run_installer(
     specs: &[MatchSpec],
     client: reqwest_middleware::ClientWithMiddleware,
     packages: Vec<RepoDataRecord>,
+    reinstall: bool,
 ) -> miette::Result<()> {
     let start = Instant::now();
+    let reinstall_packages = reinstall_package_names(&packages, reinstall);
     let result = Installer::new()
         .with_download_client(client)
         .with_target_platform(platform)
         .with_installed_packages(installed.to_vec())
+        .with_reinstall_packages(reinstall_packages)
         .with_execute_link_scripts(true)
         .with_requested_specs(specs.to_vec())
         .with_reporter(
@@ -551,10 +575,11 @@ async fn run_installer(
         .into_diagnostic()
         .context("failed to install packages")?;
 
+    validate_post_link_script_result(result.post_link_script_result.as_ref())?;
+
     if result.transaction.operations.is_empty() {
         eprintln!("   {} Already up to date", console::style("✔").green());
     } else {
-        report_post_link_script_failures(result.post_link_script_result.as_ref());
         eprintln!(
             "   Installed {} packages in {:.1}s",
             result.transaction.operations.len(),
@@ -630,6 +655,26 @@ mod tests {
         assert!(lines[0].contains("anaconda_powershell_prompt"));
         assert!(lines[1].contains("anaconda_prompt"));
         assert!(lines[1].contains("menuinst v2.1.1"));
+
+        let error = validate_post_link_script_result(Some(&Ok(result)))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("post-link scripts failed"));
+    }
+
+    #[test]
+    fn test_post_link_result_error_is_fatal() {
+        let result = Err(LinkScriptError::IoError(
+            "could not read post-link messages".to_string(),
+            std::io::Error::other("broken message file"),
+        ));
+
+        let error = validate_post_link_script_result(Some(&result))
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("failed to inspect post-link script results"));
+        assert!(error.contains("could not read post-link messages"));
     }
 
     #[rstest]
@@ -709,6 +754,34 @@ mod tests {
                 .unwrap(),
             channel: Some("conda-forge".to_string()),
         }
+    }
+
+    #[test]
+    fn test_recovery_reinstalls_an_otherwise_unchanged_package() {
+        let desired = make_record_with_url("dummy-1.0-0.conda", b"package");
+        let current = PrefixRecord::from_repodata_record(desired.clone(), Vec::new());
+
+        let unchanged = rattler::install::Transaction::from_current_and_desired(
+            vec![current.clone()],
+            vec![desired.clone()],
+            None,
+            None,
+            Platform::Linux64,
+        )
+        .unwrap();
+        assert_eq!(unchanged.packages_to_install(), 0);
+
+        let reinstall = reinstall_package_names(std::slice::from_ref(&desired), true);
+        let recovery = rattler::install::Transaction::from_current_and_desired(
+            vec![current],
+            vec![desired],
+            Some(&reinstall),
+            None,
+            Platform::Linux64,
+        )
+        .unwrap();
+
+        assert_eq!(recovery.packages_to_install(), 1);
     }
 
     #[rstest]

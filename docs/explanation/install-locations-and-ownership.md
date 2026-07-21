@@ -60,6 +60,7 @@ managed prefix.
 It records:
 
 - schema version
+- bootstrap state
 - display name
 - install name
 - metadata filename
@@ -68,6 +69,17 @@ It records:
 - package names
 
 Later runtime invocations check that metadata before reusing a prefix.
+The metadata file marks bootstrap complete. Metadata written by older
+conda-ship runtimes is accepted when its ownership identity and delegate still
+validate.
+
+While bootstrap is running, the runtime holds a lock in the prefix's parent
+directory and writes a separate internal `installing` marker inside the prefix.
+The marker identifies the runtime that started bootstrap. A later invocation
+waits for a live bootstrap to release the lock, then checks the prefix again. If
+the previous process stopped and the marker matches this runtime, recovery
+reinstalls every locked package and reruns post-link scripts without deleting
+the prefix.
 
 This ownership file is conda-ship-specific. The runtime also writes standard
 conda prefix metadata:
