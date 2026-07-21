@@ -67,6 +67,12 @@ runtime-name = "demo"
 installer = "homebrew"
 ```
 
+During automatic bootstrap, that stamp writes Constructor-compatible
+`.installer.info` JSON into the managed prefix. Its `name`, `version`, and
+`platform` fields identify the stamped distribution, while `type` contains the
+configured `installer` value. This reports provenance. It does not prove that
+the runtime binary may replace itself.
+
 ## Choose Runtime Packages
 
 The selected source environment is the complete runtime package set.
