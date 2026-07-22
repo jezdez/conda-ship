@@ -39,29 +39,29 @@ struct PlannedArtifactPaths {
     package_list: PathBuf,
 }
 
-#[derive(serde::Serialize)]
-struct ArtifactChecksum {
-    path: String,
-    sha256: String,
-    bytes: u64,
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub(crate) struct ArtifactChecksum {
+    pub(crate) path: String,
+    pub(crate) sha256: String,
+    pub(crate) bytes: u64,
 }
 
-#[derive(serde::Serialize)]
-struct ArtifactInfo {
-    schema_version: u8,
-    name: String,
-    artifact_name: String,
-    runtime_name: String,
-    runtime_version: String,
-    layout: String,
-    platform: String,
-    update: Option<runtime_data::RuntimeUpdateConfig>,
-    binary: String,
-    bundle: Option<String>,
-    lock: String,
-    package_list: String,
-    package_count: usize,
-    checksums: Vec<ArtifactChecksum>,
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub(crate) struct ArtifactInfo {
+    pub(crate) schema_version: u8,
+    pub(crate) name: String,
+    pub(crate) artifact_name: String,
+    pub(crate) runtime_name: String,
+    pub(crate) runtime_version: String,
+    pub(crate) layout: String,
+    pub(crate) platform: String,
+    pub(crate) update: Option<runtime_data::RuntimeUpdateConfig>,
+    pub(crate) binary: String,
+    pub(crate) bundle: Option<String>,
+    pub(crate) lock: String,
+    pub(crate) package_list: String,
+    pub(crate) package_count: usize,
+    pub(crate) checksums: Vec<ArtifactChecksum>,
 }
 
 #[derive(serde::Serialize)]

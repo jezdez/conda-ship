@@ -58,6 +58,9 @@ inputs:
     default: ""
 
 outputs:
+  cs-path:
+    description: "Absolute path to the downloaded conda-ship builder for post-sign packaging steps."
+    value: ${{ steps.download.outputs.cs_path }}
   dist-path:
     description: "Absolute path to the directory containing all generated runtime artifacts."
     value: ${{ steps.stage.outputs.dist_path }}
