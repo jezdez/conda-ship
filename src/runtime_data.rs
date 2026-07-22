@@ -15,6 +15,8 @@ const FORMAT_VERSION: u32 = 1;
 const FOOTER_LEN: usize = 8 + 8 + 32 + 32 + 4 + FOOTER_MAGIC.len();
 #[allow(dead_code)]
 const MAX_HEADER_LEN: u64 = 16 * 1024 * 1024;
+const INITIAL_TRAILING_SIGNATURE_SEARCH_LEN: u64 = 64 * 1024;
+const MAX_TRAILING_SIGNATURE_LEN: u64 = 16 * 1024 * 1024;
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct RuntimeConfig {
@@ -255,9 +257,64 @@ pub fn read_from_path(path: &Path) -> io::Result<Option<RuntimeData>> {
         return Ok(None);
     }
 
-    file.seek(SeekFrom::End(-(FOOTER_LEN as i64)))?;
+    let max_search_len = file_len.min(MAX_TRAILING_SIGNATURE_LEN + FOOTER_LEN as u64);
+    let mut search_len = (FOOTER_LEN as u64).min(max_search_len);
+    let mut last_error = None;
+    loop {
+        file.seek(SeekFrom::Start(file_len - search_len))?;
+        let mut tail = vec![0_u8; search_len as usize];
+        file.read_exact(&mut tail)?;
+        let magic_offsets = tail
+            .windows(FOOTER_MAGIC.len())
+            .enumerate()
+            .filter_map(|(offset, window)| (window == FOOTER_MAGIC).then_some(offset));
+        for magic_offset in magic_offsets.rev() {
+            match read_runtime_data_at_footer(
+                path,
+                &mut file,
+                file_len,
+                search_len,
+                &tail,
+                magic_offset,
+            ) {
+                Ok(Some(data)) => return Ok(Some(data)),
+                Ok(None) => {}
+                Err(error) if magic_offset + FOOTER_MAGIC.len() == tail.len() => {
+                    last_error = Some(error)
+                }
+                Err(_) => {}
+            }
+        }
+        if search_len == max_search_len {
+            break;
+        }
+        search_len = if search_len < INITIAL_TRAILING_SIGNATURE_SEARCH_LEN {
+            INITIAL_TRAILING_SIGNATURE_SEARCH_LEN.min(max_search_len)
+        } else {
+            search_len.saturating_mul(2).min(max_search_len)
+        };
+    }
+    match last_error {
+        Some(error) => Err(error),
+        None => Ok(None),
+    }
+}
+
+fn read_runtime_data_at_footer(
+    path: &Path,
+    file: &mut File,
+    file_len: u64,
+    search_len: u64,
+    tail: &[u8],
+    magic_offset: usize,
+) -> io::Result<Option<RuntimeData>> {
+    let magic_end = magic_offset + FOOTER_MAGIC.len();
+    if magic_end < FOOTER_LEN {
+        return Err(invalid_data("runtime data footer is truncated"));
+    }
+    let footer_offset_in_tail = magic_end - FOOTER_LEN;
     let mut footer = [0_u8; FOOTER_LEN];
-    file.read_exact(&mut footer)?;
+    footer.copy_from_slice(&tail[footer_offset_in_tail..magic_end]);
 
     let Some(decoded) = decode_footer(&footer)? else {
         return Ok(None);
@@ -274,15 +331,13 @@ pub fn read_from_path(path: &Path) -> io::Result<Option<RuntimeData>> {
         .header_len
         .checked_add(decoded.bundle_len)
         .ok_or_else(|| invalid_data("runtime data length overflow"))?;
-    let trailer_len = payload_len
-        .checked_add(FOOTER_LEN as u64)
-        .ok_or_else(|| invalid_data("runtime data trailer length overflow"))?;
-    if trailer_len > file_len {
+    let footer_start = file_len - search_len + footer_offset_in_tail as u64;
+    if payload_len > footer_start {
         return Err(invalid_data(
             "runtime data footer points before start of file",
         ));
     }
-    let payload_start = file_len - trailer_len;
+    let payload_start = footer_start - payload_len;
 
     file.seek(SeekFrom::Start(payload_start))?;
     let header_len = usize::try_from(decoded.header_len)
@@ -431,6 +486,44 @@ mod tests {
         assert!(data.header.runtime_config.freeze_base);
         assert!(data.bundle.is_none());
         assert!(data.stamped);
+    }
+
+    #[test]
+    fn test_read_runtime_data_before_platform_signature() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"binary").unwrap();
+
+        let header = RuntimeDataHeader::for_name("snek");
+        append_to_binary(tmp.path(), &header, None).unwrap();
+        OpenOptions::new()
+            .append(true)
+            .open(tmp.path())
+            .unwrap()
+            .write_all(&vec![0x5a; 128 * 1024])
+            .unwrap();
+
+        let data = read_from_path(tmp.path()).unwrap().unwrap();
+        assert_eq!(data.header.runtime_name, "snek");
+    }
+
+    #[test]
+    fn test_read_runtime_data_ignores_footer_magic_inside_platform_signature() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"binary").unwrap();
+
+        let header = RuntimeDataHeader::for_name("snek");
+        append_to_binary(tmp.path(), &header, None).unwrap();
+        let mut signature = vec![0_u8; FOOTER_LEN];
+        signature[FOOTER_LEN - FOOTER_MAGIC.len()..].copy_from_slice(FOOTER_MAGIC);
+        OpenOptions::new()
+            .append(true)
+            .open(tmp.path())
+            .unwrap()
+            .write_all(&signature)
+            .unwrap();
+
+        let data = read_from_path(tmp.path()).unwrap().unwrap();
+        assert_eq!(data.header.runtime_name, "snek");
     }
 
     #[test]

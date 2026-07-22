@@ -24,8 +24,11 @@ mod project;
 #[cfg(test)]
 #[path = "cs/tests.rs"]
 mod tests;
+#[path = "cs/update_package.rs"]
+mod update_package;
 
 use artifact::{build_artifact, dry_run_build_artifact, inspect_artifact, run_artifact};
+use update_package::build_update_package;
 
 #[derive(Clone, Default, serde::Deserialize)]
 struct ProjectManifest {
@@ -272,6 +275,25 @@ enum Command {
         #[arg(long)]
         root: Option<PathBuf>,
     },
+
+    /// Wrap a finalized runtime executable in a conda update package
+    PackageUpdate {
+        /// Artifact info JSON written by cs build
+        #[arg(long)]
+        info: PathBuf,
+
+        /// Finalized runtime executable (default: binary recorded in --info)
+        #[arg(long)]
+        binary: Option<PathBuf>,
+
+        /// Output directory (default: directory containing --info)
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+
+        /// Emit package metadata as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 impl Command {
@@ -280,6 +302,7 @@ impl Command {
             Self::Build { .. } => "build",
             Self::Run { .. } => "run",
             Self::Inspect { .. } => "inspect",
+            Self::PackageUpdate { .. } => "package-update",
         }
     }
 }
@@ -435,6 +458,12 @@ fn run(cli: Cli) -> miette::Result<()> {
             json,
             root,
         } => inspect_artifact(platform, json, root)?,
+        Command::PackageUpdate {
+            info,
+            binary,
+            out_dir,
+            json,
+        } => build_update_package(&info, binary.as_deref(), out_dir.as_deref(), json)?,
     }
     Ok(())
 }

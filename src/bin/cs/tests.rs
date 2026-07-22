@@ -1267,6 +1267,24 @@ fn test_lock_subcommand_is_not_accepted() {
 }
 
 #[test]
+fn test_package_update_accepts_artifact_info() {
+    let cli = Cli::try_parse_from([
+        "cs",
+        "package-update",
+        "--info",
+        "dist/demo.info.json",
+        "--json",
+    ])
+    .unwrap();
+
+    let Command::PackageUpdate { info, json, .. } = cli.command else {
+        panic!("expected package-update command")
+    };
+    assert_eq!(info, Path::new("dist/demo.info.json"));
+    assert!(json);
+}
+
+#[test]
 fn test_build_rejects_path_option() {
     let result = Cli::try_parse_from([
         "cs",

@@ -527,6 +527,7 @@ dependencies = [
  "rattler_conda_types",
  "rattler_lock",
  "rattler_networking",
+ "rattler_package_streaming",
  "reqwest",
  "rstest",
  "rustls",
