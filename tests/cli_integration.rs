@@ -198,26 +198,22 @@ fn test_runtime_named_conda_does_not_use_active_conda_prefix() {
     let tmp = TempDir::new().unwrap();
     let binary = build_named_stamped_runtime(&tmp, "conda", "cs");
     let active_prefix = tmp.path().join("active-environment");
-    let home = tmp.path().join("home");
-    let default_prefix = home.join(".conda").join("conda");
     std::fs::create_dir_all(active_prefix.join("conda-meta")).unwrap();
-    std::fs::create_dir_all(default_prefix.join("conda-meta")).unwrap();
     std::fs::write(
         active_prefix.join(".conda.json"),
-        r#"{"schema_version":1,"display_name":"conda","install_name":"conda","metadata_file":".conda.json","version":"9.8.7","channels":[],"packages":[]}"#,
+        r#"{"schema_version":1,"display_name":"conda","install_name":"conda","metadata_file":".conda.json","version":"9.8.7","delegate_executable":"cs","channels":[],"packages":[]}"#,
     )
     .unwrap();
     install_cs_delegate(&active_prefix);
 
     assert_cmd::Command::new(binary)
         .env("CONDA_PREFIX", &active_prefix)
-        .env("HOME", &home)
-        .env("USERPROFILE", &home)
+        .env("CONDA_BUNDLE", tmp.path().join("missing-bundle"))
         .arg("--help")
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "refusing to bootstrap into existing non-empty path",
+            "configured bundle path is not a directory",
         ));
 }
 
