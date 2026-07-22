@@ -15,6 +15,7 @@ use super::artifact::{
     validate_artifact_name, validate_delegate_executable, validate_docs_url, validate_install_name,
     validate_installer, validate_package_archive_name, validate_runtime_name,
     validate_runtime_version, validate_target_label, validate_target_triple,
+    validate_update_config,
 };
 use super::diagnostic::{DiagnosticKind, ShipDiagnostic};
 use super::project::{
@@ -287,6 +288,12 @@ exclude-packages = ["conda-libmamba-solver"]
 installer = "homebrew"
 condarc-file = "runtime.condarc"
 freeze-base = true
+
+[tool.conda-ship.update]
+channel = "https://prefix.dev/demo"
+package = "demo-runtime"
+build-number = 2
+ownership = "direct"
 "#,
     )
     .unwrap();
@@ -312,6 +319,160 @@ freeze-base = true
         Some(Path::new("runtime.condarc"))
     );
     assert!(manifest.tool.conda_ship.freeze_base);
+    assert_eq!(
+        manifest.tool.conda_ship.update,
+        Some(runtime_data::RuntimeUpdateConfig {
+            channel: "https://prefix.dev/demo".to_string(),
+            package: "demo-runtime".to_string(),
+            build_number: 2,
+            ownership: runtime_data::UpdateOwnership::Direct,
+            instruction: None,
+        })
+    );
+}
+
+#[test]
+fn test_update_config_defaults_to_direct_build_zero() {
+    let manifest: super::ProjectManifest = toml::from_str(
+        r#"
+[tool.conda-ship.update]
+channel = "https://conda.anaconda.org/jezdez"
+package = "conda-runtime"
+"#,
+    )
+    .unwrap();
+
+    let update = manifest.tool.conda_ship.update.unwrap();
+    assert_eq!(update.build_number, 0);
+    assert_eq!(update.ownership, runtime_data::UpdateOwnership::Direct);
+    assert!(update.instruction.is_none());
+}
+
+#[rstest]
+#[case::online(BundleLayout::Online, runtime_data::UpdateOwnership::Direct, None)]
+#[case::embedded(BundleLayout::Embedded, runtime_data::UpdateOwnership::Direct, None)]
+#[case::external_owner(BundleLayout::Online, runtime_data::UpdateOwnership::External, None)]
+#[case::external_owner_with_instruction(
+    BundleLayout::Embedded,
+    runtime_data::UpdateOwnership::External,
+    Some("brew update && brew upgrade conda")
+)]
+fn test_update_config_accepts_supported_policy(
+    #[case] layout: BundleLayout,
+    #[case] ownership: runtime_data::UpdateOwnership,
+    #[case] instruction: Option<&str>,
+) {
+    let config = RuntimeStampConfig {
+        update: Some(runtime_data::RuntimeUpdateConfig {
+            channel: "https://conda.anaconda.org/jezdez".to_string(),
+            package: "conda-runtime".to_string(),
+            build_number: 0,
+            ownership,
+            instruction: instruction.map(str::to_string),
+        }),
+        ..RuntimeStampConfig::default()
+    };
+
+    validate_update_config(&config, layout).unwrap();
+}
+
+#[rstest]
+#[case::external_layout(
+    BundleLayout::External,
+    "https://prefix.dev/demo",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::Direct,
+    None,
+    "only for online and embedded"
+)]
+#[case::empty_channel(
+    BundleLayout::Online,
+    "",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::Direct,
+    None,
+    "must not be empty"
+)]
+#[case::userinfo(
+    BundleLayout::Embedded,
+    "https://user@prefix.dev/demo",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::Direct,
+    None,
+    "must not contain credentials"
+)]
+#[case::fragment(
+    BundleLayout::Embedded,
+    "https://prefix.dev/demo#release",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::Direct,
+    None,
+    "query or fragment"
+)]
+#[case::path_credentials(
+    BundleLayout::Embedded,
+    "https://conda.anaconda.org/t/secret/demo",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::Direct,
+    None,
+    "token-bearing"
+)]
+#[case::insecure_http(
+    BundleLayout::Online,
+    "http://packages.example.test/demo",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::Direct,
+    None,
+    "must use https:// or file://"
+)]
+#[case::invalid_package(
+    BundleLayout::Online,
+    "https://prefix.dev/demo",
+    "Invalid Package",
+    runtime_data::UpdateOwnership::Direct,
+    None,
+    "invalid runtime update package name"
+)]
+#[case::direct_instruction(
+    BundleLayout::Online,
+    "https://prefix.dev/demo",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::Direct,
+    Some("Run an installer."),
+    "must not configure"
+)]
+#[case::empty_instruction(
+    BundleLayout::Online,
+    "https://prefix.dev/demo",
+    "demo-runtime",
+    runtime_data::UpdateOwnership::External,
+    Some("  "),
+    "instruction must not be empty"
+)]
+fn test_update_config_rejects_invalid_policy(
+    #[case] layout: BundleLayout,
+    #[case] channel: &str,
+    #[case] package: &str,
+    #[case] ownership: runtime_data::UpdateOwnership,
+    #[case] instruction: Option<&str>,
+    #[case] expected: &str,
+) {
+    let config = RuntimeStampConfig {
+        update: Some(runtime_data::RuntimeUpdateConfig {
+            channel: channel.to_string(),
+            package: package.to_string(),
+            build_number: 0,
+            ownership,
+            instruction: instruction.map(str::to_string),
+        }),
+        ..RuntimeStampConfig::default()
+    };
+
+    let error = validate_update_config(&config, layout)
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains(expected), "{error}");
 }
 
 #[test]
@@ -648,6 +809,9 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
     assert_eq!(stamped.header.metadata_file, ".demo.json");
     assert_eq!(stamped.header.bundle_env_var, "DEMO_BUNDLE");
     assert_eq!(stamped.header.runtime_version, "9.8.7");
+    assert_eq!(stamped.header.artifact_layout, "external");
+    assert_eq!(stamped.header.platform, "linux-64");
+    assert!(stamped.header.update.is_none());
     assert_eq!(stamped.header.installer.as_deref(), Some("homebrew"));
     assert_eq!(
         stamped.header.runtime_config.condarc.as_deref(),
@@ -671,6 +835,10 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
         serde_json::from_str(&std::fs::read_to_string(&output.info).unwrap()).unwrap();
     assert_eq!(info["layout"], "external");
     assert_eq!(info["name"], "demo-cli-linux-64");
+    assert_eq!(info["artifact_name"], "demo-cli");
+    assert_eq!(info["runtime_name"], "demo");
+    assert_eq!(info["runtime_version"], "9.8.7");
+    assert!(info["update"].is_null());
     assert_eq!(info["bundle"], "demo-cli-linux-64.bundle.tar.zst");
 
     let checksums = std::fs::read_to_string(&output.checksums).unwrap();
@@ -718,6 +886,13 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
             packages: vec!["conda".to_string()],
             delegate_executable: Some("conda".to_string()),
             runtime_version: Some("9.8.7".to_string()),
+            update: Some(runtime_data::RuntimeUpdateConfig {
+                channel: "https://conda.anaconda.org/jezdez".to_string(),
+                package: "conda-runtime".to_string(),
+                build_number: 3,
+                ownership: runtime_data::UpdateOwnership::External,
+                instruction: Some("brew update && brew upgrade conda".to_string()),
+            }),
             ..RuntimeStampConfig::default()
         },
         platforms: vec![platform],
@@ -759,14 +934,23 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
     assert_eq!(stamped.header.install_name, "demo");
     assert_eq!(stamped.header.metadata_file, ".demo.json");
     assert_eq!(stamped.header.bundle_env_var, "DEMO_BUNDLE");
+    assert_eq!(stamped.header.artifact_layout, "embedded");
+    assert_eq!(stamped.header.platform, "linux-64");
     assert!(stamped.bundle.is_some());
 
     let info: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&output.info).unwrap()).unwrap();
     assert_eq!(info["name"], "demoz");
+    assert_eq!(info["artifact_name"], "demoz");
+    assert_eq!(info["runtime_name"], "demo");
+    assert_eq!(info["runtime_version"], "9.8.7");
     assert_eq!(info["layout"], "embedded");
     assert_eq!(info["binary"], expected_binary);
     assert!(info["bundle"].is_null());
+    assert_eq!(
+        info["update"],
+        serde_json::to_value(stamped.header.update).unwrap()
+    );
 }
 
 #[rstest]

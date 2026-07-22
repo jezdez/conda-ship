@@ -30,6 +30,10 @@ fn write_demo_runtime_metadata(prefix: &Path) {
 }
 
 fn build_stamped_runtime(tmp: &TempDir, delegate: &str) -> PathBuf {
+    build_named_stamped_runtime(tmp, "demo", delegate)
+}
+
+fn build_named_stamped_runtime(tmp: &TempDir, runtime_name: &str, delegate: &str) -> PathBuf {
     let root = env!("CARGO_MANIFEST_DIR");
     let template = assert_cmd::cargo::cargo_bin!("cs-template");
     let out_dir = tmp.path().join("dist");
@@ -41,7 +45,7 @@ fn build_stamped_runtime(tmp: &TempDir, delegate: &str) -> PathBuf {
             "--root",
             root,
             "--runtime-name",
-            "demo",
+            runtime_name,
             "--delegate-executable",
             delegate,
             "--runtime-version",
@@ -52,7 +56,11 @@ fn build_stamped_runtime(tmp: &TempDir, delegate: &str) -> PathBuf {
         .assert()
         .success();
 
-    out_dir.join(if cfg!(windows) { "demo.exe" } else { "demo" })
+    out_dir.join(if cfg!(windows) {
+        format!("{runtime_name}.exe")
+    } else {
+        runtime_name.to_string()
+    })
 }
 
 fn install_cs_delegate(prefix: &Path) {
@@ -155,6 +163,81 @@ fn test_stamped_runtime_delegates_help_to_configured_executable() {
 
     assert_cmd::Command::new(binary)
         .env("DEMO_PREFIX", &prefix)
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Build ready-to-run conda runtimes",
+        ));
+}
+
+#[test]
+fn test_conda_ship_prefix_takes_precedence_over_runtime_specific_prefix() {
+    let tmp = TempDir::new().unwrap();
+    let binary = build_stamped_runtime(&tmp, "cs");
+    let managed_prefix = tmp.path().join("managed-root");
+    let compatibility_prefix = tmp.path().join("compatibility-root");
+    std::fs::create_dir_all(managed_prefix.join("conda-meta")).unwrap();
+    std::fs::create_dir_all(compatibility_prefix.join("conda-meta")).unwrap();
+    write_demo_runtime_metadata(&managed_prefix);
+    install_cs_delegate(&managed_prefix);
+
+    assert_cmd::Command::new(binary)
+        .env("CONDA_SHIP_PREFIX", &managed_prefix)
+        .env("DEMO_PREFIX", &compatibility_prefix)
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Build ready-to-run conda runtimes",
+        ));
+}
+
+#[test]
+fn test_runtime_named_conda_does_not_use_active_conda_prefix() {
+    let tmp = TempDir::new().unwrap();
+    let binary = build_named_stamped_runtime(&tmp, "conda", "cs");
+    let active_prefix = tmp.path().join("active-environment");
+    let home = tmp.path().join("home");
+    let default_prefix = home.join(".conda").join("conda");
+    std::fs::create_dir_all(active_prefix.join("conda-meta")).unwrap();
+    std::fs::create_dir_all(default_prefix.join("conda-meta")).unwrap();
+    std::fs::write(
+        active_prefix.join(".conda.json"),
+        r#"{"schema_version":1,"display_name":"conda","install_name":"conda","metadata_file":".conda.json","version":"9.8.7","channels":[],"packages":[]}"#,
+    )
+    .unwrap();
+    install_cs_delegate(&active_prefix);
+
+    assert_cmd::Command::new(binary)
+        .env("CONDA_PREFIX", &active_prefix)
+        .env("HOME", &home)
+        .env("USERPROFILE", &home)
+        .arg("--help")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "refusing to bootstrap into existing non-empty path",
+        ));
+}
+
+#[test]
+fn test_conda_ship_prefix_selects_managed_root_for_runtime_named_conda() {
+    let tmp = TempDir::new().unwrap();
+    let binary = build_named_stamped_runtime(&tmp, "conda", "cs");
+    let managed_prefix = tmp.path().join("managed-root");
+    let active_prefix = tmp.path().join("active-environment");
+    std::fs::create_dir_all(managed_prefix.join("conda-meta")).unwrap();
+    std::fs::write(
+        managed_prefix.join(".conda.json"),
+        r#"{"schema_version":1,"display_name":"conda","install_name":"conda","metadata_file":".conda.json","version":"9.8.7","channels":[],"packages":[]}"#,
+    )
+    .unwrap();
+    install_cs_delegate(&managed_prefix);
+
+    assert_cmd::Command::new(binary)
+        .env("CONDA_SHIP_PREFIX", &managed_prefix)
+        .env("CONDA_PREFIX", &active_prefix)
         .arg("--help")
         .assert()
         .success()

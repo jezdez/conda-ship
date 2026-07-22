@@ -50,8 +50,12 @@ struct ArtifactChecksum {
 struct ArtifactInfo {
     schema_version: u8,
     name: String,
+    artifact_name: String,
+    runtime_name: String,
+    runtime_version: String,
     layout: String,
     platform: String,
+    update: Option<runtime_data::RuntimeUpdateConfig>,
     binary: String,
     bundle: Option<String>,
     lock: String,
@@ -162,6 +166,7 @@ pub(crate) fn dry_run_build_artifact(
     )?;
     apply_install_location_overrides(&mut derived.runtime_config, install_scheme, install_name)?;
     validate_install_location_config(&derived.runtime_config, &runtime)?;
+    validate_update_config(&derived.runtime_config, layout)?;
 
     let runtime_lock_path = generated_runtime_lock_path(&root);
     let packages = packages_for_platform(&derived.lock_file, &runtime_lock_path, platform)?;
@@ -239,6 +244,7 @@ pub(crate) fn build_artifact(
     )?;
     apply_install_location_overrides(&mut derived.runtime_config, install_scheme, install_name)?;
     validate_install_location_config(&derived.runtime_config, &runtime)?;
+    validate_update_config(&derived.runtime_config, layout)?;
     let runtime_lock_path = generated_runtime_lock_path(&root);
     write_generated_runtime_lock(&runtime_lock_path, &derived.content)?;
 
@@ -293,7 +299,6 @@ pub(crate) fn run_artifact(
     let runtime = resolve_runtime_name(runtime_name, &derived.input.config)?;
     let layout = resolve_artifact_layout(artifact_layout, &derived.input.config);
     let bundle_env_var = runtime_data::runtime_env_var(&runtime, "BUNDLE");
-    let prefix_env_var = runtime_data::runtime_env_var(&runtime, "PREFIX");
     let bundle_dir = root.join(SHIP_STATE_DIR).join("bundle");
     let output = build_artifact(
         Some(layout),
@@ -316,7 +321,7 @@ pub(crate) fn run_artifact(
     let mut command = std::process::Command::new(&output.binary);
     command.args(args);
     if let Some(install_path) = install_path {
-        command.env(prefix_env_var, install_path);
+        command.env("CONDA_SHIP_PREFIX", install_path);
     }
     if layout == BundleLayout::External {
         command.env(bundle_env_var, bundle_dir);
@@ -761,6 +766,7 @@ pub(crate) fn stage_artifacts(
     stamp_runtime_data(
         &paths.binary,
         layout,
+        platform,
         runtime,
         artifact_name,
         derived,
@@ -792,6 +798,8 @@ pub(crate) fn stage_artifacts(
         root,
         &out_dir,
         &paths.stem,
+        runtime,
+        artifact_name,
         layout,
         platform,
         &paths.binary,
@@ -851,6 +859,8 @@ fn write_artifact_metadata(
     root: &Path,
     out_dir: &Path,
     stem: &str,
+    runtime: &str,
+    artifact_name: &str,
     layout: BundleLayout,
     platform: Platform,
     binary: &Path,
@@ -885,8 +895,18 @@ fn write_artifact_metadata(
     let info_doc = ArtifactInfo {
         schema_version: 1,
         name: stem.to_string(),
+        artifact_name: artifact_name.to_string(),
+        runtime_name: runtime.to_string(),
+        runtime_version: derived
+            .runtime_config
+            .runtime_version
+            .clone()
+            .ok_or_else(|| {
+                missing_runtime_version(derived.runtime_config.project_dynamic_version)
+            })?,
         layout: layout.as_str().to_string(),
         platform: platform.to_string(),
+        update: derived.runtime_config.update.clone(),
         binary: file_name(binary)?,
         bundle: bundle.map(file_name).transpose()?,
         lock: file_name(&lock)?,
@@ -1063,6 +1083,71 @@ fn validate_install_location_config(
     runtime: &str,
 ) -> miette::Result<()> {
     validate_install_name(config.install_name.as_deref().unwrap_or(runtime))
+}
+
+pub(crate) fn validate_update_config(
+    config: &RuntimeStampConfig,
+    layout: BundleLayout,
+) -> miette::Result<()> {
+    let Some(update) = config.update.as_ref() else {
+        return Ok(());
+    };
+    if layout == BundleLayout::External {
+        return Err(miette::miette!(
+            "[tool.conda-ship.update] is supported only for online and embedded artifacts"
+        ));
+    }
+    if update.channel.trim().is_empty() {
+        return Err(miette::miette!("runtime update channel must not be empty"));
+    }
+    let channel = reqwest::Url::parse(&update.channel)
+        .into_diagnostic()
+        .context("runtime update channel must be an absolute URL")?;
+    if !matches!(channel.scheme(), "https" | "file") {
+        return Err(miette::miette!(
+            "runtime update channel must use https:// or file://"
+        ));
+    }
+    if !channel.username().is_empty() || channel.password().is_some() {
+        return Err(miette::miette!(
+            "runtime update channel must not contain credentials"
+        ));
+    }
+    if channel.query().is_some() || channel.fragment().is_some() {
+        return Err(miette::miette!(
+            "runtime update channel must not contain a query or fragment"
+        ));
+    }
+    if runtime_data::update_channel_has_token_path(&channel) {
+        return Err(miette::miette!(
+            "runtime update channel must not contain a token-bearing /t/TOKEN path"
+        ));
+    }
+    if update
+        .package
+        .parse::<rattler_conda_types::PackageName>()
+        .is_err()
+    {
+        return Err(miette::miette!(
+            "invalid runtime update package name: {}",
+            update.package
+        ));
+    }
+    if update.ownership == runtime_data::UpdateOwnership::Direct && update.instruction.is_some() {
+        return Err(miette::miette!(
+            "direct runtime updates must not configure an external update instruction"
+        ));
+    }
+    if update
+        .instruction
+        .as_deref()
+        .is_some_and(|instruction| instruction.trim().is_empty())
+    {
+        return Err(miette::miette!(
+            "runtime update instruction must not be empty"
+        ));
+    }
+    Ok(())
 }
 
 fn validate_installer_config(config: &RuntimeStampConfig) -> miette::Result<()> {
@@ -1338,6 +1423,7 @@ fn resolve_runtime_template(path: &Path) -> miette::Result<PathBuf> {
 fn stamp_runtime_data(
     binary: &Path,
     layout: BundleLayout,
+    platform: Platform,
     runtime: &str,
     artifact_name: &str,
     derived: &DerivedRuntimeLock,
@@ -1361,6 +1447,8 @@ fn stamp_runtime_data(
             .ok_or_else(|| {
                 missing_runtime_version(derived.runtime_config.project_dynamic_version)
             })?,
+        artifact_layout: layout.as_str().to_string(),
+        platform: platform.to_string(),
         embedded_artifact_name: artifact_name.to_string(),
         delegate_executable,
         install_scheme: derived.runtime_config.install_scheme.unwrap_or_default(),
@@ -1378,6 +1466,7 @@ fn stamp_runtime_data(
             .clone()
             .unwrap_or_else(default_docs_url),
         installer: derived.runtime_config.installer.clone(),
+        update: derived.runtime_config.update.clone(),
         runtime_config: runtime_data::RuntimeConfig {
             channels: derived.runtime_config.channels.clone(),
             packages: derived.runtime_config.packages.clone(),

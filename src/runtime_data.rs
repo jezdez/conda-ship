@@ -28,6 +28,33 @@ pub struct RuntimeConfig {
     pub freeze_base: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum UpdateOwnership {
+    #[default]
+    Direct,
+    External,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeUpdateConfig {
+    pub channel: String,
+    pub package: String,
+    #[serde(default, rename = "build-number")]
+    pub build_number: u64,
+    #[serde(default)]
+    pub ownership: UpdateOwnership,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instruction: Option<String>,
+}
+
+#[allow(dead_code)]
+pub(crate) fn update_channel_has_token_path(channel: &reqwest::Url) -> bool {
+    let mut segments = channel.path_segments().into_iter().flatten();
+    matches!((segments.next(), segments.next()), (Some("t"), Some(token)) if !token.is_empty())
+}
+
 impl RuntimeConfig {
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
@@ -62,6 +89,10 @@ pub struct RuntimeDataHeader {
     pub artifact_name: String,
     pub runtime_name: String,
     pub runtime_version: String,
+    #[serde(default)]
+    pub artifact_layout: String,
+    #[serde(default)]
+    pub platform: String,
     pub embedded_artifact_name: String,
     pub delegate_executable: String,
     #[serde(default)]
@@ -73,6 +104,8 @@ pub struct RuntimeDataHeader {
     pub docs_url: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update: Option<RuntimeUpdateConfig>,
     #[serde(default)]
     pub runtime_config: RuntimeConfig,
     #[serde(default)]
@@ -86,6 +119,8 @@ impl RuntimeDataHeader {
             artifact_name: name.to_string(),
             runtime_name: name.to_string(),
             runtime_version: env!("CARGO_PKG_VERSION").to_string(),
+            artifact_layout: String::new(),
+            platform: String::new(),
             embedded_artifact_name: name.to_string(),
             delegate_executable: "conda".to_string(),
             install_scheme: InstallScheme::CondaHome,
@@ -95,6 +130,7 @@ impl RuntimeDataHeader {
             offline_env_var: runtime_env_var(name, "OFFLINE"),
             docs_url: "https://jezdez.github.io/conda-ship/".to_string(),
             installer: None,
+            update: None,
             runtime_config: RuntimeConfig::default(),
             runtime_lock: String::new(),
         }

@@ -56,6 +56,8 @@ pub struct PrefixMetadata {
     pub packages: Vec<String>,
     #[serde(default = "ready_bootstrap_phase")]
     pub(crate) bootstrap_state: BootstrapPhase,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) update: Option<runtime_data::RuntimeUpdateConfig>,
 }
 
 fn ready_bootstrap_phase() -> BootstrapPhase {
@@ -70,6 +72,7 @@ pub(crate) struct PrefixMetadataIdentity<'a> {
     pub version: &'a str,
     pub delegate_executable: Option<&'a str>,
     pub lock_sha256: Option<&'a str>,
+    pub update: Option<&'a runtime_data::RuntimeUpdateConfig>,
 }
 
 #[cfg(test)]
@@ -129,6 +132,7 @@ pub fn write_metadata(
             version: policy::runtime_version(),
             delegate_executable: Some(policy::delegate_executable()),
             lock_sha256: None,
+            update: runtime_data::current().header.update.as_ref(),
         },
         channels,
         packages,
@@ -152,6 +156,7 @@ pub(crate) fn write_metadata_for_identity(
         channels: channels.to_vec(),
         packages: packages.to_vec(),
         bootstrap_state: BootstrapPhase::Ready,
+        update: identity.update.cloned(),
     };
     let path = metadata_path_for(prefix, identity.metadata_file);
     let temporary_path = temporary_metadata_path_for(prefix, identity.metadata_file);
@@ -371,6 +376,38 @@ mod tests {
         assert_eq!(meta.channels, channels);
         assert_eq!(meta.packages, packages);
         assert_eq!(meta.bootstrap_state, BootstrapPhase::Ready);
+        assert!(meta.update.is_none());
+    }
+
+    #[test]
+    fn test_update_metadata_roundtrip() {
+        let tmp = TempDir::new().unwrap();
+        let update = runtime_data::RuntimeUpdateConfig {
+            channel: "https://conda.anaconda.org/jezdez".to_string(),
+            package: "conda-runtime".to_string(),
+            build_number: 4,
+            ownership: runtime_data::UpdateOwnership::External,
+            instruction: Some("brew update && brew upgrade conda".to_string()),
+        };
+
+        write_metadata_for_identity(
+            tmp.path(),
+            PrefixMetadataIdentity {
+                display_name: "conda",
+                install_name: "runtime",
+                metadata_file: ".conda.json",
+                version: "26.5.3",
+                delegate_executable: Some("conda"),
+                lock_sha256: None,
+                update: Some(&update),
+            },
+            &[],
+            &[],
+        )
+        .unwrap();
+
+        let meta = read_metadata_from_path(&tmp.path().join(".conda.json")).unwrap();
+        assert_eq!(meta.update, Some(update));
     }
 
     #[test]
@@ -388,6 +425,7 @@ mod tests {
         let parsed: PrefixMetadata = serde_json::from_value(metadata).unwrap();
 
         assert_eq!(parsed.bootstrap_state, BootstrapPhase::Ready);
+        assert!(parsed.update.is_none());
         validate_metadata_ready(&parsed).unwrap();
     }
 

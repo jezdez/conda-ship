@@ -60,12 +60,22 @@ pub(crate) fn prefix_env_var() -> String {
     runtime_data::runtime_env_var(runtime_name(), "PREFIX")
 }
 
+pub(crate) const PREFIX_ENV_VAR: &str = "CONDA_SHIP_PREFIX";
+
 pub(crate) fn default_install_path() -> miette::Result<PathBuf> {
     install_path_for_scheme(install_scheme(), install_name())
 }
 
 pub(crate) fn install_path() -> miette::Result<PathBuf> {
-    match env::var_os(prefix_env_var()) {
+    let configured = env::var_os(PREFIX_ENV_VAR)
+        .filter(|path| !path.is_empty())
+        .or_else(|| {
+            (runtime_name() != "conda")
+                .then(prefix_env_var)
+                .and_then(env::var_os)
+                .filter(|path| !path.is_empty())
+        });
+    match configured {
         Some(path) if !path.is_empty() => expand_install_path(path),
         _ => default_install_path(),
     }
