@@ -41,6 +41,60 @@ pub fn embedded_bundle() -> Option<&'static runtime_data::EmbeddedBundle> {
 
 const PREFIX_METADATA_SCHEMA_VERSION: u8 = 1;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum PendingExecutablePhase {
+    Staged,
+    Ready,
+    Replacing,
+    Cleanup,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct PendingExecutableUpdate {
+    pub phase: PendingExecutablePhase,
+    pub version: String,
+    #[serde(rename = "build-number")]
+    pub build_number: u64,
+    pub executable_sha256: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct ExecutableUpdateMetadata {
+    #[serde(default)]
+    pub executable: PathBuf,
+    #[serde(default)]
+    pub ownership: runtime_data::UpdateOwnership,
+    #[serde(default)]
+    pub artifact_name: String,
+    pub channel: String,
+    pub package: String,
+    #[serde(default, rename = "build-number")]
+    pub build_number: u64,
+    #[serde(default)]
+    pub sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instruction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending: Option<PendingExecutableUpdate>,
+}
+
+impl ExecutableUpdateMetadata {
+    fn from_config(update: &runtime_data::RuntimeUpdateConfig) -> Self {
+        Self {
+            executable: PathBuf::new(),
+            ownership: update.ownership,
+            artifact_name: String::new(),
+            channel: update.channel.clone(),
+            package: update.package.clone(),
+            build_number: update.build_number,
+            sha256: String::new(),
+            instruction: update.instruction.clone(),
+            pending: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PrefixMetadata {
     pub schema_version: u8,
@@ -57,7 +111,7 @@ pub struct PrefixMetadata {
     #[serde(default = "ready_bootstrap_phase")]
     pub(crate) bootstrap_state: BootstrapPhase,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) update: Option<runtime_data::RuntimeUpdateConfig>,
+    pub(crate) update: Option<ExecutableUpdateMetadata>,
 }
 
 fn ready_bootstrap_phase() -> BootstrapPhase {
@@ -88,6 +142,10 @@ fn temporary_metadata_path_for(prefix: &Path, metadata_file: &str) -> PathBuf {
     metadata_path_for(prefix, metadata_file).with_extension("tmp")
 }
 
+fn backup_metadata_path_for(prefix: &Path, metadata_file: &str) -> PathBuf {
+    metadata_path_for(prefix, metadata_file).with_extension("bak")
+}
+
 fn remove_regular_file_if_present(path: &Path) -> miette::Result<()> {
     match std::fs::symlink_metadata(path) {
         Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
@@ -115,7 +173,8 @@ pub(crate) fn invalidate_metadata(prefix: &Path) -> miette::Result<()> {
 
 pub(crate) fn invalidate_metadata_for(prefix: &Path, metadata_file: &str) -> miette::Result<()> {
     remove_regular_file_if_present(&metadata_path_for(prefix, metadata_file))?;
-    remove_regular_file_if_present(&temporary_metadata_path_for(prefix, metadata_file))
+    remove_regular_file_if_present(&temporary_metadata_path_for(prefix, metadata_file))?;
+    remove_regular_file_if_present(&backup_metadata_path_for(prefix, metadata_file))
 }
 
 pub fn write_metadata(
@@ -156,12 +215,30 @@ pub(crate) fn write_metadata_for_identity(
         channels: channels.to_vec(),
         packages: packages.to_vec(),
         bootstrap_state: BootstrapPhase::Ready,
-        update: identity.update.cloned(),
+        update: identity.update.map(ExecutableUpdateMetadata::from_config),
     };
-    let path = metadata_path_for(prefix, identity.metadata_file);
-    let temporary_path = temporary_metadata_path_for(prefix, identity.metadata_file);
+    persist_metadata_for(prefix, identity.metadata_file, &meta)
+}
+
+pub(crate) fn persist_metadata_for(
+    prefix: &Path,
+    metadata_file: &str,
+    meta: &PrefixMetadata,
+) -> miette::Result<()> {
+    if meta.metadata_file != metadata_file {
+        return Err(miette::miette!(
+            "runtime metadata file is {}, expected {metadata_file}",
+            meta.metadata_file
+        ));
+    }
+    let path = metadata_path_for(prefix, metadata_file);
+    let temporary_path = temporary_metadata_path_for(prefix, metadata_file);
+    let backup_path = backup_metadata_path_for(prefix, metadata_file);
     remove_regular_file_if_present(&temporary_path)?;
-    let mut temporary = std::fs::File::create(&temporary_path)
+    let mut temporary = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary_path)
         .into_diagnostic()
         .with_context(|| {
             format!(
@@ -182,15 +259,41 @@ pub(crate) fn write_metadata_for_identity(
         .context("failed to sync runtime metadata")?;
     drop(temporary);
 
-    remove_regular_file_if_present(&path)?;
-    std::fs::rename(&temporary_path, &path)
-        .into_diagnostic()
-        .with_context(|| {
-            format!(
-                "failed to replace runtime metadata at {}",
-                policy::path_for_display(&path)
-            )
-        })?;
+    if let Err(replace_error) = std::fs::rename(&temporary_path, &path) {
+        if !path.exists() {
+            return Err(replace_error).into_diagnostic().with_context(|| {
+                format!(
+                    "failed to replace runtime metadata at {}",
+                    policy::path_for_display(&path)
+                )
+            });
+        }
+        remove_regular_file_if_present(&backup_path)?;
+        std::fs::rename(&path, &backup_path)
+            .into_diagnostic()
+            .with_context(|| {
+                format!(
+                    "failed to preserve runtime metadata at {}",
+                    policy::path_for_display(&backup_path)
+                )
+            })?;
+        if let Err(error) = std::fs::rename(&temporary_path, &path) {
+            let rollback = std::fs::rename(&backup_path, &path);
+            return match rollback {
+                Ok(()) => Err(error).into_diagnostic().with_context(|| {
+                    format!(
+                        "failed to replace runtime metadata at {}",
+                        policy::path_for_display(&path)
+                    )
+                }),
+                Err(rollback_error) => Err(miette::miette!(
+                    "failed to replace runtime metadata at {}: {error}. The previous metadata could not be restored: {rollback_error}",
+                    policy::path_for_display(&path)
+                )),
+            };
+        }
+    }
+    remove_regular_file_if_present(&backup_path)?;
     Ok(())
 }
 
@@ -203,7 +306,56 @@ pub(crate) fn read_metadata_for(
     prefix: &Path,
     metadata_file: &str,
 ) -> miette::Result<PrefixMetadata> {
-    read_metadata_from_path(&metadata_path_for(prefix, metadata_file))
+    let path = metadata_path_for(prefix, metadata_file);
+    if let Some(meta) = read_regular_metadata_if_present(&path)? {
+        return Ok(meta);
+    }
+    let temporary_path = temporary_metadata_path_for(prefix, metadata_file);
+    let backup_path = backup_metadata_path_for(prefix, metadata_file);
+    if let Some(meta) = read_regular_metadata_if_present(&temporary_path)? {
+        let meta = restore_metadata_path(&temporary_path, &path, meta)?;
+        remove_regular_file_if_present(&backup_path)?;
+        return Ok(meta);
+    }
+    if let Some(meta) = read_regular_metadata_if_present(&backup_path)? {
+        return restore_metadata_path(&backup_path, &path, meta);
+    }
+    read_metadata_from_path(&path)
+}
+
+fn restore_metadata_path(
+    recovery_path: &Path,
+    final_path: &Path,
+    meta: PrefixMetadata,
+) -> miette::Result<PrefixMetadata> {
+    match std::fs::rename(recovery_path, final_path) {
+        Ok(()) => Ok(meta),
+        Err(error) => {
+            if let Some(current) = read_regular_metadata_if_present(final_path)? {
+                return Ok(current);
+            }
+            Err(error).into_diagnostic().with_context(|| {
+                format!(
+                    "failed to restore runtime metadata at {}",
+                    policy::path_for_display(final_path)
+                )
+            })
+        }
+    }
+}
+
+fn read_regular_metadata_if_present(path: &Path) -> miette::Result<Option<PrefixMetadata>> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() || !metadata.is_file() => {
+            Err(miette::miette!(
+                "runtime metadata is not a regular file: {}",
+                policy::path_for_display(path)
+            ))
+        }
+        Ok(_) => read_metadata_from_path(path).map(Some),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).into_diagnostic(),
+    }
 }
 
 pub(crate) fn read_metadata_from_path(path: &Path) -> miette::Result<PrefixMetadata> {
@@ -380,7 +532,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update_metadata_roundtrip() {
+    fn test_update_metadata_starts_with_only_stamped_policy() {
         let tmp = TempDir::new().unwrap();
         let update = runtime_data::RuntimeUpdateConfig {
             channel: "https://conda.anaconda.org/jezdez".to_string(),
@@ -407,7 +559,16 @@ mod tests {
         .unwrap();
 
         let meta = read_metadata_from_path(&tmp.path().join(".conda.json")).unwrap();
-        assert_eq!(meta.update, Some(update));
+        let recorded = meta.update.unwrap();
+        assert_eq!(recorded.ownership, update.ownership);
+        assert_eq!(recorded.channel, update.channel);
+        assert_eq!(recorded.package, update.package);
+        assert_eq!(recorded.build_number, update.build_number);
+        assert_eq!(recorded.instruction, update.instruction);
+        assert!(recorded.executable.as_os_str().is_empty());
+        assert!(recorded.artifact_name.is_empty());
+        assert!(recorded.sha256.is_empty());
+        assert!(recorded.pending.is_none());
     }
 
     #[test]

@@ -69,13 +69,7 @@ pub(crate) fn read_managed_metadata_for(
             ));
         }
         Ok(_) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            return Err(miette::miette!(
-                "refusing to {action} unmanaged install path: {}\n  Expected runtime metadata file: {}",
-                policy::path_for_display(prefix),
-                policy::path_for_display(&metadata_path)
-            ));
-        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error).into_diagnostic(),
     }
 

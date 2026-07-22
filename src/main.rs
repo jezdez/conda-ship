@@ -10,11 +10,13 @@ mod commands;
 mod config;
 mod constructor_metadata;
 mod exec;
+mod executable_update;
 mod hash;
 mod http;
 mod install;
 mod policy;
 mod runtime_data;
+mod runtime_update;
 mod tls;
 
 use commands::ensure_bootstrapped;
@@ -41,7 +43,16 @@ async fn async_main() -> miette::Result<()> {
     ensure_stamped_runtime()?;
 
     let prefix = policy::install_path()?;
+    if let Some(action) = env::var_os(runtime_update::INTERNAL_UPDATE_ENV) {
+        let action = action
+            .to_str()
+            .ok_or_else(|| miette::miette!("invalid internal runtime update action"))?;
+        return runtime_update::run_internal_helper(action, &prefix).await;
+    }
     ensure_bootstrapped(&prefix).await?;
+    if !runtime_update::recover_pending(&prefix)? {
+        runtime_update::initialize_current(&prefix)?;
+    }
 
     let args: Vec<_> = env::args_os().skip(1).collect();
     exec::replace_process_with_delegate(&prefix, policy::delegate_executable(), &args)
