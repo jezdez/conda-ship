@@ -162,10 +162,11 @@ Error shape:
 refusing to use unmanaged install path
 ```
 
-The runtime found an existing conda prefix without its ownership metadata. Use a
-different runtime-specific `_PREFIX` value, such as
-`DEMO_PREFIX=/tmp/demo demo info`, or remove the old prefix yourself if you know
-it is safe.
+The runtime found an existing conda prefix without its ownership metadata. Use
+`CONDA_SHIP_PREFIX` to choose another path, such as
+`CONDA_SHIP_PREFIX=/tmp/demo demo info`, or remove the old prefix yourself if
+you know it is safe. Runtime-specific `_PREFIX` variables also work for names
+other than `conda`.
 
 Generated runtimes refuse unmanaged prefixes to avoid deleting or mutating conda
 installations they did not create.

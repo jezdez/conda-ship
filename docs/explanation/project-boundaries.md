@@ -36,11 +36,17 @@ conda-ship owns the reusable build and runtime machinery:
 - staging `online`, `external`, and `embedded` artifact layouts
 - writing artifact metadata: `.runtime.lock`, `.packages.txt`, `.info.json`,
   and `.sha256`
+- stamping optional executable update policy
+- creating native executable update packages from finalized runtime bytes
 - exposing the composite GitHub Action and local builder CLI
 
 The generated runtime behavior also lives here: automatic first-run bootstrap,
 execution of the configured delegate, offline bundle handling, and embedded
-bundle handling. conda-ship does not define the delegate's commands or plugins.
+bundle handling. For update-enabled artifacts it also includes update package
+verification, staged replacement, recovery, external replacement
+reconciliation, and the version-one helper invoked by a coordinator as a child
+process.
+conda-ship does not define the delegate's commands or plugins.
 
 The experimental [Fleet API](fleet.md) also lives here because it reuses the
 same prefix mutation lock, recovery of interrupted installs, full-lock
@@ -67,11 +73,16 @@ Downstream projects decide what their users get:
 - GitHub Release policy
 - constructor-based installers or enterprise package manager recipes
 - orchestrator catalogs, onboarding, login, policy, and user-facing shim names
+- publication and indexing of executable update packages
+- user prompting and coordination with the inner package transaction
+- credentials supplied through an explicit `RATTLER_AUTH_FILE`
+- commands used to replace an externally owned executable
 - ownership and update guidance for launchers created by Fleet callers
 
 conda-ship produces the runtimes and metadata those channels can distribute. It
 does not decide whether every runtime includes the same conda plugins or uses
-the same name.
+the same name. Fleet launchers remain caller-owned and do not use the stamped
+runtime executable update path automatically.
 
 ## conda-express
 

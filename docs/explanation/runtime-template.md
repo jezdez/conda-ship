@@ -23,8 +23,9 @@ binary:
 - optional compressed package bundle
 - documentation URL
 - metadata filename
-- bundle, offline, and prefix environment variable names
+- bundle and offline environment variable names
 - optional condarc contents and base-freezing setting
+- optional executable update source and ownership policy
 
 That is what turns the same generic bootstrap code into a specific runtime
 with its own runtime name, delegate, package set, and install location.
@@ -61,6 +62,12 @@ installs the selected package set into its managed prefix, then executes the
 configured delegate with the original arguments. Later invocations execute the
 same delegate directly through the existing prefix.
 
+When update policy is stamped, the native runtime can check, stage, apply, and
+recover executable updates. It can also reconcile a replacement performed by
+an external package manager. This behavior is part of the stamped native
+template. The conda-ship Python package is not installed in the managed prefix
+and is not needed at runtime.
+
 This means `--help`, `--version`, `status`, `shell`, `uninstall`, and every
 other argument belong to the delegate. For a conda delegate, `conda info`
 reports conda and prefix status. A distribution that includes conda-spawn with
@@ -79,7 +86,10 @@ Some runtime behavior is visible to users:
 - automatic bootstrap before the first delegate invocation
 - unchanged delegate arguments, process streams, signals, and exit status
 - optional commands provided by packages such as conda-spawn and conda-self
-- bundle, offline, and prefix environment variables derived from the runtime name
+- bundle and offline variables derived from the runtime name
+- `CONDA_SHIP_PREFIX` and a runtime-specific prefix variable for names other
+  than `conda`
+- optional executable update behavior selected by stamped policy
 
 The package set, runtime name, delegate, documentation URL, and release channel belong to
 the project using conda-ship.

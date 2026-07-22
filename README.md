@@ -77,6 +77,10 @@ It then passes every argument to the configured delegate executable, usually
 `conda`. The delegate and its plugins handle `--help`, `--version`, and every
 subcommand. conda-ship does not reserve those arguments.
 
+The finished executable contains the native bootstrap and optional update
+machinery from `cs-template`. Neither the executable nor its managed prefix
+needs the conda-ship Python package.
+
 During bootstrap, generated runtimes also write constructor-compatible conda
 prefix metadata. The managed prefix gets `conda-meta/history` and
 `conda-meta/initial-state.explicit.txt` in addition to conda-ship's ownership
@@ -166,6 +170,11 @@ before handing them to downstream packaging or signing.
 The staged runtime is a stamped copy of the generic runtime template. It
 bootstraps the managed prefix if needed, then runs the configured delegate.
 
+`CONDA_SHIP_PREFIX` overrides the managed prefix for every runtime. A
+runtime-specific variable such as `DEMO_PREFIX` remains available for other
+runtime names. A runtime named `conda` does not use `CONDA_PREFIX` for this
+purpose because that variable may describe an activated environment.
+
 ## GitHub Actions
 
 The repository root is also a composite GitHub Action for downstream release
@@ -199,9 +208,9 @@ packaging systems, and other release tooling.
 
 The PyPI package installs the `cs` builder, the `cs-template` runtime template,
 and the Python adapter together. The adapter makes `conda ship` a shortcut for
-the same builder when installed in a conda environment; it does not make
-conda-ship part of conda itself. A future conda package should install the same
-pieces into one environment.
+the same builder when installed in a conda environment. It does not make
+conda-ship part of conda itself. A conda package for the builder should install
+the same pieces together in its builder environment.
 
 ## What Belongs Downstream
 

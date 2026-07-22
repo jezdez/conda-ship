@@ -23,12 +23,20 @@ runtimes.
 
 ## Runtime Variables
 
-The actual names of these variables are derived from `runtime-name`.
+`CONDA_SHIP_PREFIX`
+: Universal managed-prefix override. It takes precedence over a
+  runtime-specific prefix variable. Use this for a runtime named `conda`
+  because that runtime does not treat `CONDA_PREFIX` as an install override.
+  `CONDA_PREFIX` can describe an activated conda environment and must not
+  redirect the runtime bootstrap.
+
+The remaining runtime variable names are derived from `runtime-name`.
 Non-alphanumeric characters become underscores and letters are uppercased.
 
 `RUNTIME_PREFIX`
 : Override the managed prefix path. For a runtime named `demo`, the variable is
-  `DEMO_PREFIX`.
+  `DEMO_PREFIX`. This compatibility variable is accepted for runtime names
+  other than `conda`. `CONDA_SHIP_PREFIX` takes precedence when both are set.
 
 `RUNTIME_BUNDLE`
 : Runtime-specific path to an external package bundle directory. The actual
@@ -38,8 +46,29 @@ Non-alphanumeric characters become underscores and letters are uppercased.
 
 `RUNTIME_OFFLINE`
 : Runtime-specific flag for offline bootstrap mode. For `demo`, the variable is
-  `DEMO_OFFLINE`. Empty, `0`, and `false` disable the flag; other non-empty
+  `DEMO_OFFLINE`. Empty, `0`, and `false` disable the flag. Other non-empty
   values enable it.
+
+## Runtime Update Coordinator Variables
+
+These variables define the version-one child-process contract for downstream
+transaction coordinators. They are not normal user-facing runtime controls.
+See {doc}`runtime-cli` for the required bootstrap, lock, and call sequence.
+
+`CONDA_SHIP_INTERNAL_UPDATE`
+: Select the helper action. Version one defines `v1/check`, `v1/stage`, and
+  `v1/apply`. Generated runtimes do not reserve a delegate subcommand for these
+  operations.
+
+`CONDA_SHIP_INTERNAL_UPDATE_CANDIDATE`
+: Lowercase SHA256 selected from the `v1/check` result. It is required by
+  `v1/stage` and is ignored by the other actions.
+
+`CONDA_SHIP_INTERNAL_UPDATE_OFFLINE`
+: Disable network access for update resolution and staging. Empty, `0`, and
+  `false` disable the flag. Other non-empty values enable it. An HTTPS update
+  requires previously cached repodata and package content in this mode. A
+  `file://` channel is read directly.
 
 ## Delegate Environment
 

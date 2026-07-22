@@ -9,7 +9,7 @@ The preferred manifest is `conda.toml` with `conda.lock`. `pyproject.toml` with
 Pixi-compatible workflows.
 
 Downstream distributions maintain these values in their own project manifest.
-conda-ship treats the values as build input; it does not define a universal
+conda-ship treats the values as build input. It does not define a universal
 conda distribution.
 
 `cs inspect`, `cs build`, and `cs run` can read either manifest/lockfile pair.
@@ -94,6 +94,12 @@ install-name = "demo"
 installer = "homebrew"
 condarc-file = "runtime.condarc"
 freeze-base = true
+
+[tool.conda-ship.update]
+channel = "https://packages.example.com/conda"
+package = "demo-runtime"
+build-number = 0
+ownership = "direct"
 ```
 
 For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
@@ -136,7 +142,7 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
 : Executable inside the managed prefix that receives every argument after
   automatic bootstrap. Use `conda` for conda-like runtimes such as `cx`. Other
   values, such as `python`, are supported when a runtime should expose a
-  different commands.
+  different command interface.
 
 `artifact-layout`
 : Artifact layout to build. Supported values are `online`, `external`, and
@@ -144,7 +150,7 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
 
 `source-environment`
 : Name of the solved environment to turn into the runtime lock. This value is
-  required; conda-ship does not fall back to a default environment because that
+  required. conda-ship does not fall back to a default environment because that
   can accidentally ship development or test dependencies.
 
 `exclude-packages`
@@ -168,7 +174,7 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   `runtime-name = "cx"` can use `install-name = "express"` so the `conda-home`
   install scheme resolves to `~/.conda/express`.
   Choose a product-specific install name. conda-ship does not reserve names
-  under `~/.conda`; it relies on runtime metadata to avoid overwriting prefixes
+  under `~/.conda`. It relies on runtime metadata to avoid overwriting prefixes
   owned by other tools.
 
 `installer`
@@ -196,6 +202,56 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
 : Whether bootstrap writes the existing CEP 22 marker to
   `<prefix>/conda-meta/frozen`. Defaults to `false`. When false, conda-ship
   leaves any marker created by an installed package untouched.
+
+## `[tool.conda-ship.update]`
+
+`[tool.conda-ship.update]` opts a stamped runtime into executable update
+metadata and the runtime update engine. Omitting the table preserves the
+normal bootstrap and delegate behavior without executable update handling.
+
+The table is supported for `online` and `embedded` artifact layouts. The
+`external` artifact layout is not supported. External update ownership is a
+separate setting and can be used with either supported layout.
+
+`channel`
+: Absolute conda channel URL used to resolve native runtime update packages.
+  The URL must use `https://` or `file://`. It must not contain credentials, a
+  query, or a fragment.
+
+`package`
+: Conda package name used for runtime update records. The package must contain
+  one finalized native runtime executable produced by `cs package-update` when
+  ownership is `direct`.
+
+`build-number`
+: Build number for the stamped executable. Defaults to `0`. Candidate ordering
+  compares the conda version first and the build number second.
+
+`ownership`
+: Executable update owner. Defaults to `direct`.
+
+  `direct` lets the stamped runtime stage and replace its installed executable
+  through the documented coordinator contract. It must not configure an
+  `instruction`.
+
+  `external` leaves executable replacement to a package manager or installer.
+  The runtime can use the configured package records as a release signal and
+  reconcile a valid externally replaced executable on its next invocation. It
+  does not stage the package payload.
+
+`instruction`
+: Optional non-empty update instruction for `external` ownership. For example:
+
+  ```toml
+  [tool.conda-ship.update]
+  channel = "https://packages.example.com/conda"
+  package = "demo-runtime"
+  ownership = "external"
+  instruction = "Update demo with the package manager that installed it."
+  ```
+
+  The field is metadata for a downstream coordinator. conda-ship does not run
+  the instruction or detect the installer.
 
 Generated runtimes write ownership metadata into every bootstrapped prefix.
 That metadata records the schema version, display name derived from
@@ -236,17 +292,29 @@ set.
 - installer: the configured `installer`, when present
 - condarc contents: the exact text from `condarc-file`, when configured
 - frozen base policy: the configured `freeze-base` value, defaulting to `false`
+- executable update policy: channel, package, build number, ownership, and an
+  optional external instruction when `[tool.conda-ship.update]` is configured
 - metadata file: `.RUNTIME_NAME.json`
 - bundle environment variable: uppercased `RUNTIME_NAME` plus `_BUNDLE`
 - offline environment variable: uppercased `RUNTIME_NAME` plus `_OFFLINE`
 
-The runtime also derives its prefix environment variable from the stamped
-runtime name as uppercased `RUNTIME_NAME` plus `_PREFIX`.
+`CONDA_SHIP_PREFIX` is the universal managed-prefix override and takes
+precedence over runtime-specific variables. For runtime names other than
+`conda`, the runtime also accepts uppercased `RUNTIME_NAME` plus `_PREFIX`.
+A runtime named `conda` ignores `CONDA_PREFIX` as an install override because
+that variable can describe an activated conda environment.
 
 At bootstrap time, the generated runtime writes a separate prefix metadata file
 inside the managed prefix. That file is used for ownership checks before later
 operations touch the prefix. It is written last to mark bootstrap complete.
 The internal installing marker is then removed.
+
+When executable updates are configured, the same `.RUNTIME_NAME.json` file is
+the canonical persistent update and recovery record. It records the stable
+executable path, artifact identity, update channel and package, build number,
+ownership, executable SHA256, optional external instruction, and any pending
+replacement. The adjacent `.RUNTIME_NAME.update.lock` file coordinates
+processes but is not another update state record.
 
 The bootstrap also writes standard conda prefix metadata:
 

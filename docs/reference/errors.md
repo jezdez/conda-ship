@@ -95,8 +95,9 @@ conda without depending on terminal formatting.
 ## Prefix Ownership
 
 `refusing to bootstrap into existing non-empty path`
-: Choose another runtime-specific `_PREFIX` value or remove the existing
-  directory yourself.
+: Set `CONDA_SHIP_PREFIX` to another path or remove the existing directory
+  yourself. Runtime-specific `_PREFIX` variables also work for names other than
+  `conda`.
 
 `refusing to use unmanaged install path`
 : The prefix does not contain ownership metadata for this runtime.

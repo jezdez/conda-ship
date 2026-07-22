@@ -72,6 +72,53 @@ Treat `dist/` as the release unit. If a channel uploads only the runtime binary,
 it needs an equivalent place for checksums, package metadata, and provenance.
 ```
 
+## Publish Executable Updates
+
+An update-enabled runtime discovers finalized executable releases through
+native conda channel repodata. The release sequence is:
+
+1. Build the runtime and keep its `.info.json` file.
+2. Apply platform signing or other processing that changes the executable.
+3. Run `cs package-update` against those finalized bytes.
+4. Add the resulting native `.conda` package to the configured channel index.
+5. Upload the indexed channel with the downstream project's normal tooling.
+
+```bash
+cs package-update \
+  --info dist/demo.info.json \
+  --binary dist/demo \
+  --out-dir update-packages
+```
+
+On Windows, pass the finalized `.exe` through `--binary`. The command snapshots
+the file, verifies its stamp against the build information, and writes a native
+package with one executable payload. It refuses to replace an existing package
+filename.
+
+The package is update transport. A directly owned runtime downloads and
+inspects it before replacing the outer executable. It is not installed into the
+managed prefix. conda-ship does not index or upload the package.
+
+For GitHub Action builds, `cs-path` is the absolute path to the downloaded
+builder. Use that output for the post-sign packaging step:
+
+```yaml
+- name: Package finalized executable
+  shell: bash
+  run: |
+    "${{ steps.cs.outputs.cs-path }}" package-update \
+      --info "${{ steps.cs.outputs.info-path }}" \
+      --binary "${{ steps.cs.outputs.binary-path }}" \
+      --out-dir update-packages
+```
+
+`cs package-update` accepts only a directly owned executable. An externally
+owned variant can point at the same indexed package record produced from the
+direct build of that runtime identity and version. It uses that record only as
+a release signal and does not download its payload. The runtime reports the
+configured instruction and leaves executable replacement to the external
+package manager. The replacement is reconciled on the next runtime invocation.
+
 ## Wrap With Homebrew
 
 For an online runtime, a Homebrew formula usually installs the runtime binary
@@ -148,7 +195,7 @@ Build-time bootstrap gives faster startup:
 
 ```dockerfile
 COPY demo /usr/local/bin/demo
-ENV DEMO_PREFIX=/opt/demo
+ENV CONDA_SHIP_PREFIX=/opt/demo
 RUN demo info
 ```
 
@@ -156,12 +203,13 @@ Run-time bootstrap gives a smaller image layer before first use:
 
 ```dockerfile
 COPY demo /usr/local/bin/demo
-ENV DEMO_PREFIX=/opt/demo
+ENV CONDA_SHIP_PREFIX=/opt/demo
 ENTRYPOINT ["demo"]
 ```
 
-Use the runtime-specific `_PREFIX` variable in images. Avoid relying on a user
-home directory when the image will run as different users.
+Use `CONDA_SHIP_PREFIX` in images. Runtime-specific `_PREFIX` variables remain
+available for names other than `conda`. Avoid relying on a user home directory
+when the image will run as different users.
 
 ## Verify Before Publishing
 
@@ -170,6 +218,11 @@ Before handing files to another system:
 ```bash
 shasum -a 256 --check dist/*.sha256
 ```
+
+The build checksum describes the staged executable. If signing changes those
+bytes, keep the build metadata for identity checks and pass the finalized file
+to `cs package-update --binary`. Its JSON output reports the package and payload
+digests for the finalized bytes.
 
 For GitHub Action builds, also keep the release attestation checks enabled in
 the action. They verify the conda-ship tools used to stamp the downstream

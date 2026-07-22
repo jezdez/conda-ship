@@ -23,6 +23,10 @@ This stages `dist/demo`, stamps `demo` into runtime metadata, writes install
 metadata such as `.demo.json`, and uses runtime-specific environment variables
 such as `DEMO_PREFIX`, `DEMO_BUNDLE`, and `DEMO_OFFLINE`.
 
+`CONDA_SHIP_PREFIX` is the universal prefix override and takes precedence over
+the runtime-specific name. A runtime named `conda` does not treat
+`CONDA_PREFIX` as an override because it may refer to an activated environment.
+
 Add `artifact-name` only when the release command or file stem should differ
 from the base runtime identity:
 

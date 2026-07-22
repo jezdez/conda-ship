@@ -61,6 +61,10 @@ The bundle, offline, and prefix controls are derived from the runtime name. For
 a runtime named `demo`, they are `DEMO_BUNDLE`, `DEMO_OFFLINE`, and
 `DEMO_PREFIX`.
 
+`CONDA_SHIP_PREFIX` is also available and takes precedence over `DEMO_PREFIX`.
+For a runtime named `conda`, use `CONDA_SHIP_PREFIX`. The runtime deliberately
+does not interpret an activated `CONDA_PREFIX` as its installation path.
+
 ```{note}
 External bundles are transport artifacts, not package indexes. Do not add
 `linux-64/`, `noarch/`, or `repodata.json`; pass the directory containing the
