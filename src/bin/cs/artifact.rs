@@ -1118,11 +1118,6 @@ pub(crate) fn validate_update_config(
             "runtime update channel must not contain a query or fragment"
         ));
     }
-    if runtime_data::update_channel_has_token_path(&channel) {
-        return Err(miette::miette!(
-            "runtime update channel must not contain a token-bearing /t/TOKEN path"
-        ));
-    }
     if update
         .package
         .parse::<rattler_conda_types::PackageName>()

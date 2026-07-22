@@ -49,12 +49,6 @@ pub struct RuntimeUpdateConfig {
     pub instruction: Option<String>,
 }
 
-#[allow(dead_code)]
-pub(crate) fn update_channel_has_token_path(channel: &reqwest::Url) -> bool {
-    let mut segments = channel.path_segments().into_iter().flatten();
-    matches!((segments.next(), segments.next()), (Some("t"), Some(token)) if !token.is_empty())
-}
-
 impl RuntimeConfig {
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {

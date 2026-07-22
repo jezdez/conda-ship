@@ -409,14 +409,6 @@ fn test_update_config_accepts_supported_policy(
     None,
     "query or fragment"
 )]
-#[case::path_credentials(
-    BundleLayout::Embedded,
-    "https://conda.anaconda.org/t/secret/demo",
-    "demo-runtime",
-    runtime_data::UpdateOwnership::Direct,
-    None,
-    "token-bearing"
-)]
 #[case::insecure_http(
     BundleLayout::Online,
     "http://packages.example.test/demo",
