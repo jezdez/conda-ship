@@ -2,6 +2,35 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## 0.6.0 - 2026-07-23
+
+### Added
+
+- Added optional `[tool.conda-ship.update]` metadata for runtimes that discover
+  executable releases through conda channel repodata. Online and embedded
+  artifacts can select direct or external executable ownership.
+- Added `cs package-update` to wrap one finalized, stamped native executable in
+  a dependency-free `.conda` package. The GitHub Action now exposes the
+  downloaded builder as `cs-path` for this packaging step.
+- Added staged executable updates with package and stamp validation, cached
+  offline resolution, Unix replacement, Windows deferred replacement,
+  interrupted-update recovery, and reconciliation after external replacement.
+- Added a version-one environment-driven helper so downstream transaction
+  coordinators can hold `.RUNTIME_NAME.update.lock` across check, stage, an
+  inner transaction, and apply. Successful helper calls return one JSON object.
+- Added `CONDA_SHIP_PREFIX` as a common managed-prefix override for generated
+  runtimes and update coordinators.
+
+### Changed
+
+- A runtime named `conda` no longer interprets an activated `CONDA_PREFIX` as
+  its managed installation path. Use `CONDA_SHIP_PREFIX` for an explicit
+  override.
+- Runtimes without update configuration retain their existing behavior. Update
+  configuration does not restrict the configured delegate executable.
+- Fleet launcher ownership remains with Fleet callers and does not use the
+  stamped executable update path automatically.
+
 ## 0.5.0 - 2026-07-21
 
 ### Added

@@ -133,3 +133,47 @@ Options:
 - `--root PATH`: use a project root instead of auto-detecting one.
 - `RUNTIME_ARGS`: arguments passed unchanged to the configured delegate after
   the staged runtime is built and bootstrapped if needed.
+
+## `cs package-update`
+
+Wrap a finalized runtime executable in a native conda package for direct
+executable updates.
+
+```bash
+cs package-update --info PATH [--binary PATH] [--out-dir PATH] [--json]
+```
+
+The command reads the artifact info JSON written by `cs build`. Without
+`--binary`, it packages the recorded runtime executable and requires its size
+and SHA256 to match the artifact info. Use `--binary` after signing or another
+release step changes the executable bytes. The finalized executable must still
+contain a readable conda-ship stamp.
+
+The command validates:
+
+- the artifact info schema
+- runtime name, artifact name, version, layout, and native platform
+- direct update ownership and the configured update source
+- the executable stamp and embedded bundle, when present
+- the recorded executable checksum when `--binary` is omitted
+
+Only `online` and `embedded` runtimes with direct update ownership are
+accepted. The output is a dependency-free native `.conda` package. It contains
+one executable payload at `bin/ARTIFACT_NAME` on Unix or
+`ARTIFACT_NAME.exe` on Windows, plus normal conda package metadata.
+
+The output filename is `PACKAGE-VERSION-BUILD_NUMBER.conda`. The command
+refuses to overwrite an existing file. By default it writes next to `--info`.
+Use `--out-dir` to select another directory.
+
+Without `--json`, stdout contains the output path. With `--json`, stdout
+contains one object with:
+
+- schema version
+- path and filename
+- package name, runtime version, build number, and platform
+- package SHA256 and size
+- executable payload SHA256 and size
+
+`cs package-update` does not index a channel or upload the package. Downstream
+release tooling owns those provider-specific operations.

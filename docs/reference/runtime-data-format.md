@@ -18,6 +18,11 @@ For embedded builds, the compressed bundle bytes are also appended before the
 footer. The runtime reads the footer, validates checksums, and then reads the
 stamped header and optional bundle.
 
+The reader accepts up to 16 MiB of trailing bytes after the footer so common
+platform signing steps can append data without hiding the stamp. A finalized
+file with more trailing data is not accepted by `cs package-update` or the
+runtime update verifier.
+
 ## Header Fields
 
 The stamped header records:
@@ -35,6 +40,13 @@ The stamped header records:
 `runtime_version`
 : Version written to runtime and prefix ownership metadata. This is independent
   from `runtime-name`. See {doc}`names`.
+
+`artifact_layout`
+: Staged artifact layout. Executable updates support `online` and `embedded`.
+
+`platform`
+: Native conda platform for the staged executable and any runtime update
+  package.
 
 `embedded_artifact_name`
 : Artifact executable name used when the artifact carries an embedded bundle.
@@ -63,6 +75,18 @@ The stamped header records:
 
 `installer`
 : Optional package manager or installer metadata.
+
+`update`
+: Optional executable update policy. It contains:
+
+  - `channel`: absolute `https://` or `file://` conda channel URL
+  - `package`: conda package used for update records
+  - `build-number`: current executable build number
+  - `ownership`: `direct` or `external`
+  - `instruction`: optional external update instruction
+
+  Direct ownership permits coordinated executable replacement. External
+  ownership leaves replacement to another package manager or installer.
 
 `runtime_config`
 : Resolved runtime channels and package names used for bootstrap metadata, plus
@@ -93,3 +117,12 @@ an opaque executable plus documented artifact metadata files.
 
 Use `.info.json`, `.runtime.lock`, `.packages.txt`, and `.sha256` for release
 automation instead of parsing the appended runtime data directly.
+
+The version-one update coordinator contract does not make the appended runtime
+format public. A coordinator invokes the stamped executable as a child process
+and exchanges JSON through the environment-driven helper documented in
+{doc}`runtime-cli`.
+
+After bootstrap, executable update and recovery state is stored in the existing
+`.RUNTIME_NAME.json` prefix metadata file. The update engine does not add a
+second persistent receipt or state record.

@@ -75,7 +75,7 @@ inputs do not set up Python.
 
 `artifact-layout`
 : Artifact layout to build. Supported values are `online`, `external`, and
-  `embedded`. Overrides `[tool.conda-ship].artifact-layout` when set; otherwise
+  `embedded`. Overrides `[tool.conda-ship].artifact-layout` when set. Otherwise
   the action leaves layout selection to the manifest and `cs` defaults to
   `online`. External artifacts stage the runtime and bundle as separate files.
   Embedded artifacts carry package archives inside the runtime.
@@ -98,7 +98,7 @@ inputs do not set up Python.
 : Package manager or installer stamped into runtime metadata.
 
 The action does not duplicate `cs build` validation in shell. It passes
-non-empty inputs to `cs build --dry-run` and then to `cs build`; invalid values
+non-empty inputs to `cs build --dry-run` and then to `cs build`. Invalid values
 fail in the builder.
 
 ## Supported Runner Platforms
@@ -113,7 +113,7 @@ runner's operating system and architecture:
 | `macOS` | `X64` | `x86_64-apple-darwin` | End-to-end runtime bootstrap covered. |
 | `macOS` | `ARM64` | `aarch64-apple-darwin` | End-to-end runtime bootstrap covered. |
 | `Windows` | `X64` | `x86_64-pc-windows-msvc` | End-to-end runtime bootstrap covered. |
-| `Windows` | `ARM64` | `aarch64-pc-windows-msvc` | Builder assets, template assets, PyPI wheels, and action target mapping only; full runtime bootstrap is not end-to-end supported yet. |
+| `Windows` | `ARM64` | `aarch64-pc-windows-msvc` | Builder assets, template assets, PyPI wheels, and action target mapping only. Full runtime bootstrap is not end-to-end supported yet. |
 
 Use GitHub-hosted or self-hosted runners that report one of those
 `runner.os`/`runner.arch` combinations. Release workflows should pin the action
@@ -121,6 +121,12 @@ source by full commit SHA and pass the matching conda-ship release through the
 `conda-ship-version` input.
 
 ## Outputs
+
+`cs-path`
+: Absolute path to the downloaded and verified `cs` builder. Use this after
+  downstream signing or other finalization to run `cs package-update` with the
+  action's `info-path` and finalized executable. The action does not generate
+  or upload an update package itself.
 
 `dist-path`
 : Absolute path to the directory containing all generated runtime artifacts.
@@ -146,5 +152,5 @@ source by full commit SHA and pass the matching conda-ship release through the
 : Absolute path to the SHA256 checksum file.
 
 `bundle-path`
-: Absolute path to the external bundle when `artifact-layout: external`; empty for
-  `online` and `embedded`.
+: Absolute path to the external bundle when `artifact-layout: external`. Empty
+  for `online` and `embedded`.

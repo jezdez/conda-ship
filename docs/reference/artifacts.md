@@ -21,7 +21,7 @@ downloads:
 The PyPI release for the same tag publishes platform wheels that install `cs`
 and `cs-template` into the Python environment's scripts directory, plus a
 source distribution for packaging systems. Published release assets are
-immutable; fixes use a new tag rather than replacing files under an existing
+immutable. Fixes use a new tag rather than replacing files under an existing
 tag.
 
 ## Layouts
@@ -38,6 +38,27 @@ filenames also include `.exe`.
 
 For the difference between `runtime-name` and `artifact-name`, see
 {doc}`names`.
+
+## Runtime Update Packages
+
+`cs package-update` writes a dependency-free native `.conda` package from a
+finalized `online` or `embedded` runtime with direct update ownership. This is
+separate from `cs build` and does not add a file to the normal `dist/` set
+unless that directory is selected explicitly.
+
+The package contains one executable payload plus normal conda package metadata:
+
+- `bin/ARTIFACT_NAME` on Unix
+- `ARTIFACT_NAME.exe` on Windows
+
+The package name, version, build number, and platform come from the executable
+stamp and its artifact info JSON. The package has no runtime dependencies. It
+is transport for the executable update engine and is not installed into the
+managed prefix.
+
+The command refuses to overwrite an existing output. Its `--json` result
+reports SHA256 and size values for both the package and finalized executable
+payload. Channel indexing and upload remain downstream release operations.
 
 ## Bundle Contents
 
@@ -83,9 +104,12 @@ install path.
 ## Stamped Runtime Data
 
 conda-ship appends a runtime data block to every staged runtime. The block
-contains the runtime lock, runtime name, delegate executable, install scheme,
-install name, docs URL, bundle, offline, and prefix environment variable names,
-and the embedded bundle bytes for `embedded` builds.
+contains the runtime lock, runtime and artifact identity, version, platform,
+delegate executable, install scheme, install name, docs URL, installer,
+optional executable update policy, bundle and offline environment variable
+names, and the embedded bundle bytes for `embedded` builds. The universal
+`CONDA_SHIP_PREFIX` override is runtime behavior rather than a stamped variable
+name.
 
 The data block ends with:
 
@@ -104,6 +128,11 @@ The binary checksum in `.sha256` covers the final stamped artifact. The
 conda-ship release workflow also publishes GitHub Artifact Attestations for
 the `cs` CLI, runtime templates, and `SHA256SUMS` manifest.
 
+If signing or another downstream step changes the staged executable, the
+original `.sha256` continues to describe the `cs build` output. Pass the
+finalized file to `cs package-update --binary`. The command snapshots those
+bytes and reports the finalized payload digest in its JSON output.
+
 Verify a downloaded release asset with:
 
 ```bash
@@ -120,9 +149,11 @@ after conda-ship finishes staging their runtime artifacts.
 The info JSON contains:
 
 - schema version
-- artifact name
+- artifact stem, artifact name, and runtime name
+- runtime version
 - layout
 - conda platform
+- optional executable update policy
 - runtime filename
 - optional external bundle filename
 - lock filename

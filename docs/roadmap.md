@@ -9,13 +9,17 @@ The builder CLI covers the core local workflow:
   environment, exclusions, and package set
 - `cs build`: stage an `online`, `external`, or `embedded` runtime
 - `cs run`: build and execute a local runtime for smoke testing
+- `cs package-update`: wrap one finalized runtime executable in a native update
+  package
 
 Every staged build writes the runtime plus artifact metadata: the runtime
 lock, a package list, an info JSON file, and SHA256 checksums.
 `cs build --dry-run` validates planned artifact work without writing files.
 
-Generic runtime behavior lives in `cs`; opinionated package sets and
-distribution defaults belong in downstream projects.
+Generic runtime behavior lives in `cs`. This includes automatic bootstrap and
+the executable update path when a stamped runtime opts into update policy.
+Opinionated package sets and distribution defaults belong in downstream
+projects.
 
 The repository stays focused on producing runtimes. Distribution
 wrappers such as Homebrew formulae, constructor-based installers, Docker images,

@@ -36,8 +36,15 @@ With the `conda-home` scheme, that runtime installs below `~/.conda/express`.
 
 ## Runtime Prefix Override
 
-Users can override the resolved install path with the prefix environment
-variable derived from the runtime name:
+`CONDA_SHIP_PREFIX` overrides the resolved install path for every generated
+runtime:
+
+```bash
+CONDA_SHIP_PREFIX=/tmp/demo demo info
+```
+
+Other runtime names also accept the prefix environment variable derived from
+the runtime name:
 
 ```bash
 DEMO_PREFIX=/tmp/demo demo info
@@ -45,7 +52,9 @@ DEMO_PREFIX=/tmp/demo demo info
 
 For a runtime named `demo`, the variable is `DEMO_PREFIX`. Non-alphanumeric
 characters in the runtime name become underscores and letters are uppercased.
-The override remains a runtime choice so build artifacts stay cross-platform.
+`CONDA_SHIP_PREFIX` takes precedence when both variables are set. A runtime
+named `conda` ignores the derived `CONDA_PREFIX` because it may describe an
+activated environment. Use `CONDA_SHIP_PREFIX` for that runtime.
 
 For a local `cs run` smoke test, use the builder-side option instead:
 
@@ -67,6 +76,15 @@ It records:
 - runtime version
 - channels
 - package names
+
+For an update-enabled runtime, the same file also records:
+
+- executable path and artifact name
+- direct or external executable ownership
+- source channel and package name
+- current build number and executable SHA256
+- optional external update instruction
+- any pending replacement phase, version, build number, and executable SHA256
 
 Later runtime invocations check that metadata before reusing a prefix.
 The metadata file marks bootstrap complete. Metadata written by older
@@ -93,6 +111,30 @@ exact packages that were installed from the runtime lock at bootstrap time.
 Tools that understand constructor-style installer snapshots, including
 `conda-self`, can use that explicit file to reset the managed base prefix back
 to the package set originally shipped by the runtime.
+
+## Executable Update Ownership
+
+Managed-prefix ownership and executable update ownership are separate. The
+prefix metadata file is the canonical persistent record for both. Its adjacent
+update lock coordinates processes but does not contain update state.
+
+`direct`
+: A transaction coordinator may hold the runtime update lock, stage a verified
+  executable, complete its inner package transaction, and ask the runtime to
+  replace itself. An uncoordinated change to a directly owned executable is
+  rejected.
+
+`external`
+: The channel package is a release signal. The runtime reports the stamped
+  instruction and leaves replacement to the package manager or installer. On
+  the next invocation, a newly stamped executable at the same stable path is
+  verified and reconciled with the prefix record.
+
+On Unix, a direct replacement is committed through adjacent file renames while
+keeping the previous executable recoverable until the change succeeds. Windows
+starts a copy of the previous executable as a deferred worker. The worker waits
+for the stable path to close, installs the candidate, and leaves any remaining
+cleanup for the next invocation.
 
 ## Why Runtimes Refuse Unmanaged Prefixes
 
