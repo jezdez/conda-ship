@@ -78,6 +78,8 @@ struct ShipConfig {
     condarc_file: Option<PathBuf>,
     #[serde(default, rename = "freeze-base")]
     freeze_base: bool,
+    #[serde(default)]
+    update: Option<runtime_data::RuntimeUpdateConfig>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
@@ -114,6 +116,7 @@ struct RuntimeStampConfig {
     installer: Option<String>,
     condarc: Option<String>,
     freeze_base: bool,
+    update: Option<runtime_data::RuntimeUpdateConfig>,
 }
 
 #[derive(Parser)]

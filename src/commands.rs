@@ -502,6 +502,7 @@ mod tests {
                 version: policy::runtime_version(),
                 delegate_executable: Some(&recorded_delegate),
                 lock_sha256: None,
+                update: None,
             },
             &[],
             &[],
