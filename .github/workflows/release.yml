@@ -528,6 +528,7 @@ jobs:
         uses: ./
         with:
           conda-ship-version: ${{ needs.validate-release.outputs.version }}
+          runtime-name: release-smoke
           root: .
 
       - name: Check released builder output
