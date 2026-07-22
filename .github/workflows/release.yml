@@ -119,6 +119,15 @@ jobs:
       - name: Build cs CLI
         run: pixi run -- cargo rustc --locked --release --bin cs -- -D warnings
 
+      - name: Check update packaging command
+        shell: bash
+        run: |
+          cs="./target/release/cs"
+          if [[ "$TARGET" == *"windows"* ]]; then
+            cs="${cs}.exe"
+          fi
+          "$cs" package-update --help >/dev/null
+
       - name: Build runtime template
         run: pixi run -- cargo rustc --locked --release --bin cs-template --features runtime-template -- -D warnings
 
@@ -149,7 +158,7 @@ jobs:
   github-release:
     name: Publish GitHub release assets
     runs-on: ubuntu-latest
-    needs: [validate-release, build-assets, build-pypi-wheels, build-pypi-sdist]
+    needs: [validate-release, build-assets, validate-pypi-distributions]
 
     permissions:
       contents: write # create the immutable GitHub release for this tag
@@ -223,6 +232,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [validate-release]
 
+    permissions:
+      contents: read
+      id-token: write # mint the OIDC token required for artifact attestations
+      attestations: write # publish provenance attestations for wheel artifacts
+      artifact-metadata: write # create artifact storage records for attestations
+
     strategy:
       fail-fast: false
       matrix:
@@ -282,6 +297,11 @@ jobs:
           manylinux: ${{ matrix.manylinux || 'auto' }}
           args: --release --locked -o dist-pypi
 
+      - name: Attest wheel
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: dist-pypi/*.whl
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pypi-wheel-${{ matrix.target }}
@@ -289,10 +309,70 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  validate-pypi-distributions:
+    name: Validate PyPI distributions
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-pypi-wheels, build-pypi-sdist]
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.validate-release.outputs.tag }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist-pypi
+          pattern: "pypi-*"
+          merge-multiple: true
+
+      - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          environments: test ship
+          cache: false
+
+      - name: Check distribution set
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          wheels=(dist-pypi/*.whl)
+          sdists=(dist-pypi/*.tar.gz)
+          linux_wheels=(dist-pypi/*manylinux*x86_64.whl)
+          if [ "${#wheels[@]}" -ne 6 ]; then
+            echo "Expected six wheels, found ${#wheels[@]}." >&2
+            exit 1
+          fi
+          if [ "${#sdists[@]}" -ne 1 ]; then
+            echo "Expected one source distribution, found ${#sdists[@]}." >&2
+            exit 1
+          fi
+          if [ "${#linux_wheels[@]}" -ne 1 ]; then
+            echo "Expected one Linux x64 wheel, found ${#linux_wheels[@]}." >&2
+            exit 1
+          fi
+          pixi run -e test twine check "${wheels[@]}" "${sdists[@]}"
+          pixi run -e ship python -m pip install --force-reinstall --no-deps "${linux_wheels[0]}"
+          pixi run -e ship conda ship --help >/dev/null
+          pixi run -e ship cs package-update --help >/dev/null
+          template_error="${RUNNER_TEMP}/cs-template-error.txt"
+          if pixi run -e ship cs-template 2>"$template_error"; then
+            echo "Unstamped cs-template unexpectedly ran as a runtime." >&2
+            exit 1
+          fi
+          grep -F "is a runtime template, not a runnable conda runtime" "$template_error"
+
   build-pypi-sdist:
     name: Build PyPI sdist
     runs-on: ubuntu-latest
     needs: [validate-release]
+
+    permissions:
+      contents: read
+      id-token: write # mint the OIDC token required for artifact attestations
+      attestations: write # publish provenance attestation for the source distribution
+      artifact-metadata: write # create artifact storage records for attestations
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -305,6 +385,11 @@ jobs:
           command: sdist
           args: -o dist-pypi
 
+      - name: Attest source distribution
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: dist-pypi/*.tar.gz
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pypi-sdist
@@ -315,7 +400,11 @@ jobs:
   pypi:
     name: Publish PyPI package
     runs-on: ubuntu-latest
-    needs: [build-pypi-wheels, build-pypi-sdist, github-release]
+    needs:
+      - build-pypi-wheels
+      - build-pypi-sdist
+      - validate-pypi-distributions
+      - verify-action
 
     permissions:
       contents: read
@@ -336,3 +425,163 @@ jobs:
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
         with:
           packages-dir: dist-pypi/
+
+  verify-github-release:
+    name: Verify GitHub release
+    runs-on: ubuntu-latest
+    needs: [validate-release, github-release]
+
+    permissions:
+      contents: read
+      attestations: read # verify provenance for every published release asset
+
+    steps:
+      - name: Download and verify release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          mkdir release-assets
+          gh release download "$RELEASE_TAG" --dir release-assets
+
+          expected=(
+            SHA256SUMS
+            cs-aarch64-apple-darwin
+            cs-aarch64-pc-windows-msvc.exe
+            cs-aarch64-unknown-linux-gnu
+            cs-template-aarch64-apple-darwin
+            cs-template-aarch64-pc-windows-msvc.exe
+            cs-template-aarch64-unknown-linux-gnu
+            cs-template-x86_64-apple-darwin
+            cs-template-x86_64-pc-windows-msvc.exe
+            cs-template-x86_64-unknown-linux-gnu
+            cs-x86_64-apple-darwin
+            cs-x86_64-pc-windows-msvc.exe
+            cs-x86_64-unknown-linux-gnu
+          )
+          mapfile -t actual < <(find release-assets -maxdepth 1 -type f -exec basename {} \; | sort)
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          if ! diff -u <(printf '%s\n' "${expected_sorted[@]}") <(printf '%s\n' "${actual[@]}"); then
+            echo "GitHub release asset set does not match the expected files." >&2
+            exit 1
+          fi
+
+          signer_workflow="${GH_REPO}/.github/workflows/release.yml"
+          for asset in release-assets/*; do
+            gh attestation verify "$asset" \
+              --repo "$GH_REPO" \
+              --signer-workflow "$signer_workflow" >/dev/null
+          done
+          (
+            cd release-assets
+            sha256sum --check SHA256SUMS
+          )
+
+          release_json="$(gh release view "$RELEASE_TAG" --json isDraft,isImmutable,name,tagName)"
+          RELEASE_JSON="$release_json" python - <<'PY'
+          import json
+          import os
+
+          release = json.loads(os.environ["RELEASE_JSON"])
+          tag = os.environ["RELEASE_TAG"]
+          if release != {
+              "isDraft": False,
+              "isImmutable": True,
+              "name": tag,
+              "tagName": tag,
+          }:
+              raise SystemExit(f"unexpected GitHub release metadata: {release}")
+          PY
+
+  verify-action:
+    name: Verify released action (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: [validate-release, verify-github-release]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.validate-release.outputs.tag }}
+          persist-credentials: false
+
+      - name: Build with the released action
+        id: conda-ship
+        uses: ./
+        with:
+          conda-ship-version: ${{ needs.validate-release.outputs.version }}
+          root: .
+
+      - name: Check released builder output
+        shell: bash
+        env:
+          CS_PATH: ${{ steps.conda-ship.outputs.cs-path }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f "$CS_PATH" ]; then
+            echo "Released builder was not downloaded for ${TARGET}." >&2
+            exit 1
+          fi
+          "$CS_PATH" package-update --help >/dev/null
+
+  verify-pypi:
+    name: Verify PyPI release
+    runs-on: ubuntu-latest
+    needs: [validate-release, pypi]
+
+    steps:
+      - name: Verify published files
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from urllib.error import HTTPError
+          from urllib.request import urlopen
+
+          version = os.environ["RELEASE_VERSION"]
+          url = f"https://pypi.org/pypi/conda-ship/{version}/json"
+          for attempt in range(30):
+              try:
+                  with urlopen(url, timeout=30) as response:
+                      payload = json.load(response)
+              except HTTPError as error:
+                  if error.code != 404 or attempt == 29:
+                      raise
+                  time.sleep(10)
+                  continue
+              break
+
+          if payload["info"]["version"] != version:
+              raise SystemExit("PyPI reports the wrong release version")
+          files = payload["urls"]
+          wheels = [file["filename"] for file in files if file["packagetype"] == "bdist_wheel"]
+          sdists = [file["filename"] for file in files if file["packagetype"] == "sdist"]
+          if len(wheels) != 6:
+              raise SystemExit(f"expected 6 wheels, found {len(wheels)}")
+          if len(sdists) != 1:
+              raise SystemExit(f"expected 1 source distribution, found {len(sdists)}")
+          print("\n".join(sorted(wheels + sdists)))
+          PY
