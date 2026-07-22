@@ -610,11 +610,6 @@ fn prepare_windows_worker_locked(
     meta: &mut PrefixMetadata,
 ) -> miette::Result<PathBuf> {
     let update = direct_update(meta)?.clone();
-    let pending = update
-        .pending
-        .as_ref()
-        .ok_or_else(|| miette::miette!("no runtime executable update is pending"))?
-        .clone();
     stage_windows_worker_backup(meta, &update)?;
     set_phase(meta, PendingExecutablePhase::Replacing);
     config::persist_metadata_for(prefix, metadata_file, meta)?;
