@@ -4,7 +4,6 @@ use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -22,7 +21,6 @@ use rattler_conda_types::{
     MatchSpec, PackageName, ParseMatchSpecOptions, Platform, PrefixRecord, RepoDataRecord,
 };
 use rattler_lock::LockFile;
-use rattler_networking::AuthenticationMiddleware;
 
 use crate::{config, exec, policy};
 
@@ -101,7 +99,7 @@ pub(crate) async fn from_lockfile_with_specs(
 
     let match_specs = parse_specs(requested_specs)?;
     let installed = PrefixRecord::collect_from_prefix::<PrefixRecord>(prefix).into_diagnostic()?;
-    let client = make_download_client()?;
+    let client = crate::http::download_client()?;
 
     run_installer(
         prefix,
@@ -212,7 +210,7 @@ pub(crate) async fn from_lockfile_with_bundle_and_specs(
         );
 
     if !offline {
-        installer = installer.with_download_client(make_download_client()?);
+        installer = installer.with_download_client(crate::http::download_client()?);
     }
 
     let start = Instant::now();
@@ -574,26 +572,6 @@ pub(crate) fn parse_specs(specs: &[String]) -> miette::Result<Vec<MatchSpec>> {
         .collect::<Result<Vec<_>, _>>()
         .into_diagnostic()
         .context("failed to parse package specs")
-}
-
-fn make_download_client() -> miette::Result<reqwest_middleware::ClientWithMiddleware> {
-    crate::tls::install_default_provider();
-
-    let raw = reqwest::Client::builder()
-        .user_agent(crate::http::USER_AGENT)
-        .no_gzip()
-        .connect_timeout(Duration::from_secs(30))
-        .timeout(Duration::from_secs(600))
-        .build()
-        .into_diagnostic()
-        .context("failed to create HTTP client")?;
-
-    Ok(reqwest_middleware::ClientBuilder::new(raw.clone())
-        .with_arc(Arc::new(
-            AuthenticationMiddleware::from_env_and_defaults().into_diagnostic()?,
-        ))
-        .with(rattler_networking::OciMiddleware::new(raw))
-        .build())
 }
 
 async fn run_installer(

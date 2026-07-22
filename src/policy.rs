@@ -107,6 +107,40 @@ pub(crate) fn path_for_display(path: &Path) -> String {
     normalize_path_display(&path.display().to_string(), std::path::MAIN_SEPARATOR)
 }
 
+/// Return the stable path used to invoke this runtime without resolving links.
+pub(crate) fn invocation_path() -> miette::Result<PathBuf> {
+    let invoked = env::args_os()
+        .next()
+        .ok_or_else(|| miette::miette!("could not determine runtime invocation path"))?;
+    let invoked = PathBuf::from(invoked);
+    if invoked.is_absolute() {
+        return Ok(invoked);
+    }
+    if invoked.components().count() > 1 {
+        return Ok(env::current_dir()
+            .map_err(|error| miette::miette!("could not determine current directory: {error}"))?
+            .join(invoked));
+    }
+    if let Some(path) = env::var_os("PATH") {
+        for directory in env::split_paths(&path) {
+            let candidate = directory.join(&invoked);
+            if candidate.is_file() {
+                return Ok(if candidate.is_absolute() {
+                    candidate
+                } else {
+                    env::current_dir()
+                        .map_err(|error| {
+                            miette::miette!("could not determine current directory: {error}")
+                        })?
+                        .join(candidate)
+                });
+            }
+        }
+    }
+    env::current_exe()
+        .map_err(|error| miette::miette!("could not determine runtime executable: {error}"))
+}
+
 fn normalize_path_display(path: &str, separator: char) -> String {
     if separator == '\\' {
         path.replace('/', "\\")

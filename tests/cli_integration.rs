@@ -2,10 +2,15 @@
 #![cfg(feature = "runtime-template")]
 
 use std::ffi::OsString;
+use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::{Duration, Instant};
 
 use assert_cmd::cargo::cargo_bin_cmd;
+use fs4::fs_std::FileExt as _;
 use predicates::prelude::*;
+use rattler_conda_types::Platform;
 use rstest::rstest;
 use tempfile::TempDir;
 
@@ -77,6 +82,18 @@ fn install_cs_delegate(prefix: &Path) {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o755)).unwrap();
     }
+}
+
+fn hold_runtime_update_lock(prefix: &Path) -> File {
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(prefix.join(".demo.update.lock"))
+        .unwrap();
+    lock.lock_exclusive().unwrap();
+    lock
 }
 
 #[test]
@@ -280,4 +297,410 @@ fn test_first_delegate_command_auto_bootstraps_stamped_runtime() {
     assert!(prefix.join(".demo.json").is_file());
     assert!(!prefix.join(".condarc").exists());
     assert!(!prefix.join("conda-meta").join("frozen").exists());
+}
+
+#[test]
+fn test_update_package_replaces_the_stable_runtime_from_a_file_channel() {
+    let tmp = TempDir::new().unwrap();
+    let project = tmp.path().join("project");
+    let channel = tmp.path().join("channel");
+    let platform = Platform::current().to_string();
+    let subdir = channel.join(&platform);
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::create_dir_all(&subdir).unwrap();
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut manifest = std::fs::read_to_string(root.join("pixi.toml")).unwrap();
+    let channel_url = reqwest::Url::from_directory_path(&channel)
+        .unwrap()
+        .to_string();
+    manifest.push_str(&format!(
+        "\n[tool.conda-ship.update]\nchannel = {channel_url:?}\npackage = \"demo-runtime\"\nbuild-number = 0\n"
+    ));
+    std::fs::write(project.join("pixi.toml"), manifest).unwrap();
+    std::fs::copy(root.join("pixi.lock"), project.join("pixi.lock")).unwrap();
+
+    let template = assert_cmd::cargo::cargo_bin!("cs-template");
+    let first_dir = tmp.path().join("first");
+    let second_dir = tmp.path().join("second");
+    for (version, out_dir) in [("1.0.0", &first_dir), ("2.0.0", &second_dir)] {
+        cargo_bin_cmd!("cs")
+            .args([
+                "build",
+                "--root",
+                project.to_str().unwrap(),
+                "--runtime-name",
+                "demo",
+                "--delegate-executable",
+                "cs",
+                "--runtime-version",
+                version,
+                "--template",
+                template.to_str().unwrap(),
+                "--out-dir",
+                out_dir.to_str().unwrap(),
+            ])
+            .assert()
+            .success();
+    }
+
+    let executable_name = if cfg!(windows) { "demo.exe" } else { "demo" };
+    let first = first_dir.join(executable_name);
+    let second = second_dir.join(executable_name);
+    let info = second_dir.join("demo.info.json");
+    let package_output = Command::new(assert_cmd::cargo::cargo_bin!("cs"))
+        .args([
+            "package-update",
+            "--info",
+            info.to_str().unwrap(),
+            "--binary",
+            second.to_str().unwrap(),
+            "--out-dir",
+            subdir.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        package_output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&package_output.stderr)
+    );
+    let package: serde_json::Value = serde_json::from_slice(&package_output.stdout).unwrap();
+    let filename = package["filename"].as_str().unwrap();
+    let repodata = serde_json::json!({
+        "info": {"subdir": platform},
+        "packages": {},
+        "packages.conda": {
+            (filename): {
+                "name": "demo-runtime",
+                "version": package["runtime_version"],
+                "build": package["build_number"].to_string(),
+                "build_number": package["build_number"],
+                "depends": [],
+                "subdir": platform,
+                "sha256": package["sha256"],
+                "size": package["size"],
+            }
+        },
+        "removed": [],
+        "repodata_version": 1,
+    });
+    std::fs::write(
+        subdir.join("repodata.json"),
+        serde_json::to_vec(&repodata).unwrap(),
+    )
+    .unwrap();
+
+    let prefix = tmp.path().join("prefix");
+    let install_dir = tmp.path().join("bin");
+    let stable = install_dir.join(executable_name);
+    std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
+    std::fs::create_dir_all(&install_dir).unwrap();
+    std::fs::copy(&first, &stable).unwrap();
+    std::fs::write(
+        prefix.join(".demo.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "schema_version": 1,
+            "display_name": "demo",
+            "install_name": "demo",
+            "metadata_file": ".demo.json",
+            "version": "1.0.0",
+            "delegate_executable": "cs",
+            "channels": [],
+            "packages": [],
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    install_cs_delegate(&prefix);
+
+    assert_cmd::Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .arg("--help")
+        .assert()
+        .success();
+
+    let coordinator = hold_runtime_update_lock(&prefix);
+    let check = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/check")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let selected: serde_json::Value = serde_json::from_slice(&check.stdout).unwrap();
+    assert_eq!(selected["version"], "2.0.0");
+    let selected_sha256 = selected["sha256"].as_str().unwrap();
+
+    let stage = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/stage")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_CANDIDATE", selected_sha256)
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(
+        stage.status.success(),
+        "{}",
+        String::from_utf8_lossy(&stage.stderr)
+    );
+    let staged: serde_json::Value = serde_json::from_slice(&stage.stdout).unwrap();
+    assert_eq!(staged, serde_json::json!({"staged": true}));
+    assert_eq!(
+        std::fs::read(&stable).unwrap(),
+        std::fs::read(&first).unwrap()
+    );
+    let staged_metadata: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
+    assert!(staged_metadata["update"].get("version").is_none());
+    assert!(staged_metadata["update"].get("provenance").is_none());
+    assert!(staged_metadata["update"].get("package-sha256").is_none());
+    assert!(staged_metadata["update"].get("package_sha256").is_none());
+    let pending = &staged_metadata["update"]["pending"];
+    assert_eq!(pending["phase"], "staged");
+    assert_eq!(pending["version"], "2.0.0");
+    assert_eq!(pending["build-number"], package["build_number"]);
+    assert_eq!(pending["executable_sha256"], package["payload_sha256"]);
+    assert!(pending.get("candidate").is_none());
+    assert!(pending.get("backup").is_none());
+
+    let recovery = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/check")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(!recovery.status.success());
+    let recovery_error = String::from_utf8_lossy(&recovery.stderr);
+    assert!(
+        recovery_error.contains("recovery completed with DiscardedStaged")
+            && recovery_error.contains("retry")
+            && recovery_error.contains("the command"),
+        "{recovery_error}"
+    );
+    assert_eq!(
+        std::fs::read(&stable).unwrap(),
+        std::fs::read(&first).unwrap()
+    );
+
+    let check = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/check")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let rechecked: serde_json::Value = serde_json::from_slice(&check.stdout).unwrap();
+    assert_eq!(rechecked["sha256"], selected_sha256);
+
+    let stage = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/stage")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_CANDIDATE", selected_sha256)
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(
+        stage.status.success(),
+        "{}",
+        String::from_utf8_lossy(&stage.stderr)
+    );
+
+    let apply = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/apply")
+        .output()
+        .unwrap();
+    assert!(
+        apply.status.success(),
+        "{}",
+        String::from_utf8_lossy(&apply.stderr)
+    );
+    let applied: serde_json::Value = serde_json::from_slice(&apply.stdout).unwrap();
+    assert!(
+        applied["applied"] == true || (cfg!(windows) && applied["replacement_pending"] == true),
+        "{applied}"
+    );
+    drop(coordinator);
+
+    let expected = std::fs::read(&second).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while std::fs::read(&stable).unwrap() != expected && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    assert_eq!(std::fs::read(&stable).unwrap(), expected);
+
+    assert_cmd::Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .arg("--help")
+        .assert()
+        .success();
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
+    assert_eq!(metadata["version"], "2.0.0");
+    assert_eq!(metadata["update"]["build-number"], package["build_number"]);
+    assert_eq!(metadata["update"]["sha256"], package["payload_sha256"]);
+    assert!(metadata["update"].get("pending").is_none());
+    assert!(metadata["update"].get("version").is_none());
+    assert!(metadata["update"].get("provenance").is_none());
+}
+
+#[test]
+fn test_external_manager_replacement_reconciles_the_stable_runtime() {
+    let tmp = TempDir::new().unwrap();
+    let project = tmp.path().join("project");
+    let channel = tmp.path().join("channel");
+    let platform = Platform::current().to_string();
+    let subdir = channel.join(&platform);
+    std::fs::create_dir_all(&project).unwrap();
+    std::fs::create_dir_all(&subdir).unwrap();
+    std::fs::write(
+        subdir.join("repodata.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "info": {"subdir": platform},
+            "packages": {},
+            "packages.conda": {},
+            "removed": [],
+            "repodata_version": 1,
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut manifest = std::fs::read_to_string(root.join("pixi.toml")).unwrap();
+    let channel_url = reqwest::Url::from_directory_path(&channel)
+        .unwrap()
+        .to_string();
+    manifest.push_str(&format!(
+        "\n[tool.conda-ship.update]\nchannel = {channel_url:?}\npackage = \"demo-runtime\"\nownership = \"external\"\ninstruction = \"Run the external package manager.\"\n"
+    ));
+    std::fs::write(project.join("pixi.toml"), manifest).unwrap();
+    std::fs::copy(root.join("pixi.lock"), project.join("pixi.lock")).unwrap();
+
+    let template = assert_cmd::cargo::cargo_bin!("cs-template");
+    let first_dir = tmp.path().join("first");
+    let second_dir = tmp.path().join("second");
+    for (version, out_dir) in [("1.0.0", &first_dir), ("2.0.0", &second_dir)] {
+        cargo_bin_cmd!("cs")
+            .args([
+                "build",
+                "--root",
+                project.to_str().unwrap(),
+                "--runtime-name",
+                "demo",
+                "--delegate-executable",
+                "cs",
+                "--runtime-version",
+                version,
+                "--template",
+                template.to_str().unwrap(),
+                "--out-dir",
+                out_dir.to_str().unwrap(),
+            ])
+            .assert()
+            .success();
+    }
+
+    let executable_name = if cfg!(windows) { "demo.exe" } else { "demo" };
+    let first = first_dir.join(executable_name);
+    let second = second_dir.join(executable_name);
+    let second_info: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(second_dir.join("demo.info.json")).unwrap()).unwrap();
+    let expected_sha256 = second_info["checksums"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|checksum| checksum["path"] == second_info["binary"])
+        .unwrap()["sha256"]
+        .as_str()
+        .unwrap();
+
+    let prefix = tmp.path().join("prefix");
+    let install_dir = tmp.path().join("bin");
+    let stable = install_dir.join(executable_name);
+    std::fs::create_dir_all(prefix.join("conda-meta")).unwrap();
+    std::fs::create_dir_all(&install_dir).unwrap();
+    std::fs::copy(&first, &stable).unwrap();
+    std::fs::write(
+        prefix.join(".demo.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "schema_version": 1,
+            "display_name": "demo",
+            "install_name": "demo",
+            "metadata_file": ".demo.json",
+            "version": "1.0.0",
+            "delegate_executable": "cs",
+            "channels": [],
+            "packages": [],
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    install_cs_delegate(&prefix);
+
+    assert_cmd::Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .arg("--help")
+        .assert()
+        .success();
+    let initial: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
+    assert_eq!(initial["version"], "1.0.0");
+    assert_eq!(initial["update"]["ownership"], "external");
+    assert_eq!(initial["update"]["executable"], stable.to_str().unwrap());
+
+    #[cfg(unix)]
+    {
+        std::fs::remove_file(&stable).unwrap();
+        std::os::unix::fs::symlink(&second, &stable).unwrap();
+    }
+    #[cfg(windows)]
+    std::fs::copy(&second, &stable).unwrap();
+
+    let coordinator = hold_runtime_update_lock(&prefix);
+    let check = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/check")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(
+        check.status.success(),
+        "{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let check: serde_json::Value = serde_json::from_slice(&check.stdout).unwrap();
+    assert_eq!(check["available"], false);
+    drop(coordinator);
+
+    assert_eq!(
+        std::fs::read(&stable).unwrap(),
+        std::fs::read(&second).unwrap()
+    );
+    let metadata: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
+    assert_eq!(metadata["version"], "2.0.0");
+    assert_eq!(metadata["update"]["ownership"], "external");
+    assert_eq!(metadata["update"]["executable"], stable.to_str().unwrap());
+    assert_eq!(metadata["update"]["channel"], channel_url);
+    assert_eq!(metadata["update"]["package"], "demo-runtime");
+    assert_eq!(metadata["update"]["build-number"], 0);
+    assert_eq!(metadata["update"]["sha256"], expected_sha256);
+    assert_eq!(
+        metadata["update"]["instruction"],
+        "Run the external package manager."
+    );
+    assert!(metadata["update"].get("pending").is_none());
+    assert!(metadata["update"].get("version").is_none());
+    assert!(metadata["update"].get("provenance").is_none());
 }
