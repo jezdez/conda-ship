@@ -6,13 +6,18 @@ use std::path::{Path, PathBuf};
 #[cfg(windows)]
 use std::time::{Duration, Instant};
 #[cfg(windows)]
-use std::{ffi::OsString, os::windows::ffi::OsStrExt};
+use std::{
+    cmp::Ordering,
+    ffi::{OsStr, OsString},
+    os::windows::ffi::OsStrExt,
+};
 
 use fs4::fs_std::FileExt as _;
 use miette::{Context, IntoDiagnostic};
 #[cfg(windows)]
 use windows_sys::Win32::{
-    Foundation::CloseHandle,
+    Foundation::{CloseHandle, TRUE},
+    Globalization::{CSTR_EQUAL, CSTR_GREATER_THAN, CSTR_LESS_THAN, CompareStringOrdinal},
     System::Threading::{
         CREATE_NO_WINDOW, CREATE_UNICODE_ENVIRONMENT, CreateProcessW, PROCESS_INFORMATION,
         STARTUPINFOW,
@@ -694,14 +699,14 @@ fn windows_process_environment(
             !remove
                 .iter()
                 .chain(set.iter().map(|(name, _)| name))
-                .any(|name| key.to_string_lossy().eq_ignore_ascii_case(name))
+                .any(|name| windows_environment_key_cmp(key, OsStr::new(*name)) == Ordering::Equal)
         })
         .collect();
     variables.extend(
         set.iter()
             .map(|(name, value)| (OsString::from(name), value.clone())),
     );
-    variables.sort_by_cached_key(|(key, _)| key.to_string_lossy().to_uppercase());
+    variables.sort_by(|(left, _), (right, _)| windows_environment_key_cmp(left, right));
 
     let mut block = Vec::new();
     for (key, value) in &variables {
@@ -722,6 +727,25 @@ fn windows_process_environment(
     }
     block.push(0);
     Ok(block)
+}
+
+#[cfg(windows)]
+fn windows_environment_key_cmp(left: &OsStr, right: &OsStr) -> Ordering {
+    let left: Vec<_> = left.encode_wide().collect();
+    let right: Vec<_> = right.encode_wide().collect();
+    let left_len = i32::try_from(left.len()).expect("Windows environment key is too long");
+    let right_len = i32::try_from(right.len()).expect("Windows environment key is too long");
+    let result =
+        unsafe { CompareStringOrdinal(left.as_ptr(), left_len, right.as_ptr(), right_len, TRUE) };
+    match result {
+        CSTR_LESS_THAN => Ordering::Less,
+        CSTR_EQUAL => Ordering::Equal,
+        CSTR_GREATER_THAN => Ordering::Greater,
+        _ => panic!(
+            "failed to compare Windows environment keys: {}",
+            std::io::Error::last_os_error()
+        ),
+    }
 }
 
 #[cfg(windows)]
@@ -2144,6 +2168,35 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         assert!(done.exists(), "child process did not exit");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_process_environment_uses_ordinal_key_order() {
+        let block = windows_process_environment(
+            &[
+                ("CONDA_SHIP_ß", OsString::from("sharp")),
+                ("CONDA_SHIP_T", OsString::from("tee")),
+            ],
+            &[],
+        )
+        .unwrap();
+        let entries: Vec<_> = block
+            .split(|code_unit| *code_unit == 0)
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        let tee: Vec<_> = "CONDA_SHIP_T=tee".encode_utf16().collect();
+        let sharp: Vec<_> = "CONDA_SHIP_ß=sharp".encode_utf16().collect();
+        let tee = entries
+            .iter()
+            .position(|entry| *entry == tee.as_slice())
+            .unwrap();
+        let sharp = entries
+            .iter()
+            .position(|entry| *entry == sharp.as_slice())
+            .unwrap();
+
+        assert!(tee < sharp);
     }
 
     #[test]
