@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "*.*.*"
@@ -14,40 +15,28 @@ permissions:
 
 jobs:
   validate-release:
-    name: Validate release tag
+    name: Validate release source
     runs-on: ubuntu-latest
     outputs:
+      action-version: ${{ steps.release.outputs.action-version }}
+      ref: ${{ steps.release.outputs.ref }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
     steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
       - name: Validate release tag
         id: release
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_REF: ${{ github.sha }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-
-          if [[ ! "$RELEASE_TAG" =~ ^[0-9]+[.][0-9]+[.][0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid release tag: ${RELEASE_TAG}" >&2
-            echo "Use a version tag such as 0.3.0." >&2
-            exit 1
-          fi
-
-          {
-            echo "tag=${RELEASE_TAG}"
-            echo "version=${RELEASE_TAG}"
-          } >> "$GITHUB_OUTPUT"
-
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          ref: ${{ steps.release.outputs.tag }}
-          persist-credentials: false
-
-      - name: Verify package versions
-        shell: bash
-        env:
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
           set -euo pipefail
 
@@ -58,14 +47,35 @@ jobs:
             python -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])'
           )"
 
-          if [ "$pyproject_version" != "$RELEASE_VERSION" ]; then
-            echo "pyproject.toml version ${pyproject_version} does not match release tag ${RELEASE_VERSION}" >&2
+          if [ "$pyproject_version" != "$cargo_version" ]; then
+            echo "pyproject.toml version ${pyproject_version} does not match Cargo.toml version ${cargo_version}" >&2
             exit 1
           fi
-          if [ "$cargo_version" != "$RELEASE_VERSION" ]; then
-            echo "Cargo.toml version ${cargo_version} does not match release tag ${RELEASE_VERSION}" >&2
-            exit 1
+
+          tag=""
+          action_version="$pyproject_version"
+          if [ "$RELEASE_EVENT" = "push" ]; then
+            if [[ ! "$RELEASE_TAG" =~ ^[0-9]+[.][0-9]+[.][0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Invalid release tag: ${RELEASE_TAG}" >&2
+              echo "Use a version tag such as 0.3.0." >&2
+              exit 1
+            fi
+            if [ "$pyproject_version" != "$RELEASE_TAG" ]; then
+              echo "Package version ${pyproject_version} does not match release tag ${RELEASE_TAG}" >&2
+              exit 1
+            fi
+            tag="$RELEASE_TAG"
+            action_version="$RELEASE_TAG"
+          else
+            action_version="$(gh release view --repo "$GH_REPO" --json tagName --jq .tagName)"
           fi
+
+          {
+            echo "action-version=${action_version}"
+            echo "ref=${RELEASE_REF}"
+            echo "tag=${tag}"
+            echo "version=${pyproject_version}"
+          } >> "$GITHUB_OUTPUT"
 
   build-assets:
     name: Build release assets (${{ matrix.target }})
@@ -98,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ needs.validate-release.outputs.tag }}
+          ref: ${{ needs.validate-release.outputs.ref }}
           persist-credentials: false
 
       - uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
@@ -155,8 +165,8 @@ jobs:
           path: release-assets/*
           retention-days: 7
 
-  github-release:
-    name: Publish GitHub release assets
+  stage-release:
+    name: Stage release assets
     runs-on: ubuntu-latest
     needs: [validate-release, build-assets, validate-pypi-distributions]
 
@@ -190,7 +200,17 @@ jobs:
         with:
           subject-path: release-assets/SHA256SUMS
 
-      - name: Publish assets
+      - name: Upload candidate release assets
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-candidate-${{ needs.validate-release.outputs.version }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Stage draft release
+        if: github.event_name == 'push'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -201,10 +221,14 @@ jobs:
 
           shopt -s nullglob
           files=(release-assets/*)
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "Release ${RELEASE_TAG} already exists." >&2
-            echo "Release immutability is enabled; create a new tag instead of replacing assets." >&2
-            exit 1
+          if is_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$is_draft" = "true" ]; then
+              gh release delete "$RELEASE_TAG" --yes
+            else
+              echo "Published release ${RELEASE_TAG} already exists." >&2
+              echo "Release immutability is enabled; create a new tag instead of replacing assets." >&2
+              exit 1
+            fi
           fi
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No release assets found." >&2
@@ -223,7 +247,6 @@ jobs:
           trap cleanup_draft ERR
 
           gh release upload "$RELEASE_TAG" "${files[@]}"
-          gh release edit "$RELEASE_TAG" --draft=false
 
           trap - ERR
 
@@ -287,7 +310,7 @@ jobs:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ needs.validate-release.outputs.tag }}
+          ref: ${{ needs.validate-release.outputs.ref }}
           persist-credentials: false
 
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
@@ -317,7 +340,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ needs.validate-release.outputs.tag }}
+          ref: ${{ needs.validate-release.outputs.ref }}
           persist-credentials: false
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -377,7 +400,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ needs.validate-release.outputs.tag }}
+          ref: ${{ needs.validate-release.outputs.ref }}
           persist-credentials: false
 
       - uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
@@ -400,11 +423,9 @@ jobs:
   pypi:
     name: Publish PyPI package
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
     needs:
-      - build-pypi-wheels
-      - build-pypi-sdist
-      - validate-pypi-distributions
-      - verify-action
+      - verify-published-release
 
     permissions:
       contents: read
@@ -426,27 +447,41 @@ jobs:
         with:
           packages-dir: dist-pypi/
 
-  verify-github-release:
-    name: Verify GitHub release
+  verify-release-assets:
+    name: Verify release assets
     runs-on: ubuntu-latest
-    needs: [validate-release, github-release]
+    needs: [validate-release, stage-release]
 
     permissions:
-      contents: read
+      contents: write # download a private draft before publication
       attestations: read # verify provenance for every published release asset
 
     steps:
-      - name: Download and verify release assets
+      - name: Download candidate release assets
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-candidate-${{ needs.validate-release.outputs.version }}
+          path: release-assets
+
+      - name: Download published release assets
+        if: github.event_name == 'push'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
         run: |
-          set -euo pipefail
-
           mkdir release-assets
           gh release download "$RELEASE_TAG" --dir release-assets
+
+      - name: Verify release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
 
           expected=(
             SHA256SUMS
@@ -481,6 +516,14 @@ jobs:
             sha256sum --check SHA256SUMS
           )
 
+      - name: Verify draft release metadata
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
           release_json="$(gh release view "$RELEASE_TAG" --json isDraft,isImmutable,name,tagName)"
           RELEASE_JSON="$release_json" python - <<'PY'
           import json
@@ -489,18 +532,22 @@ jobs:
           release = json.loads(os.environ["RELEASE_JSON"])
           tag = os.environ["RELEASE_TAG"]
           if release != {
-              "isDraft": False,
-              "isImmutable": True,
+              "isDraft": True,
+              "isImmutable": False,
               "name": tag,
               "tagName": tag,
           }:
-              raise SystemExit(f"unexpected GitHub release metadata: {release}")
+              raise SystemExit(f"unexpected GitHub draft metadata: {release}")
           PY
 
   verify-action:
-    name: Verify released action (${{ matrix.target }})
+    name: Verify action (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    needs: [validate-release, verify-github-release]
+    needs: [validate-release, verify-release-assets]
+
+    permissions:
+      contents: write # download private draft assets during a tagged release
+      attestations: read # verify downloaded release asset provenance
 
     strategy:
       fail-fast: false
@@ -520,19 +567,19 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ needs.validate-release.outputs.tag }}
+          ref: ${{ needs.validate-release.outputs.ref }}
           persist-credentials: false
 
-      - name: Build with the released action
+      - name: Build with the action
         id: conda-ship
         uses: ./
         with:
-          conda-ship-version: ${{ needs.validate-release.outputs.version }}
+          conda-ship-version: ${{ needs.validate-release.outputs.action-version }}
           runtime-name: release-smoke
           delegate-executable: conda
           root: .
 
-      - name: Check released builder output
+      - name: Check builder output
         shell: bash
         env:
           CS_PATH: ${{ steps.conda-ship.outputs.cs-path }}
@@ -546,9 +593,71 @@ jobs:
           fi
           "$CS_PATH" package-update --help >/dev/null
 
+  finalize-github-release:
+    name: Publish verified GitHub release
+    if: always() && github.event_name == 'push' && needs.stage-release.result == 'success'
+    runs-on: ubuntu-latest
+    needs: [validate-release, stage-release, verify-release-assets, verify-action]
+
+    permissions:
+      contents: write # publish a verified draft or remove a failed draft
+
+    steps:
+      - name: Publish or remove draft
+        shell: bash
+        env:
+          ACTION_RESULT: ${{ needs.verify-action.result }}
+          ASSET_RESULT: ${{ needs.verify-release-assets.result }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "$ASSET_RESULT" != "success" ] || [ "$ACTION_RESULT" != "success" ]; then
+            gh release delete "$RELEASE_TAG" --yes
+            echo "Release checks failed. The draft was removed." >&2
+            exit 1
+          fi
+          gh release edit "$RELEASE_TAG" --draft=false
+
+  verify-published-release:
+    name: Verify published GitHub release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    needs: [validate-release, finalize-github-release]
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Verify immutable release metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+        run: |
+          release_json="$(gh release view "$RELEASE_TAG" --json isDraft,isImmutable,name,tagName)"
+          RELEASE_JSON="$release_json" python - <<'PY'
+          import json
+          import os
+
+          release = json.loads(os.environ["RELEASE_JSON"])
+          tag = os.environ["RELEASE_TAG"]
+          if release != {
+              "isDraft": False,
+              "isImmutable": True,
+              "name": tag,
+              "tagName": tag,
+          }:
+              raise SystemExit(f"unexpected GitHub release metadata: {release}")
+          PY
+
   verify-pypi:
     name: Verify PyPI release
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
     needs: [validate-release, pypi]
 
     steps:

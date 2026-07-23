@@ -168,3 +168,9 @@ environment.
 `cargo deny check` enforces the repository's Rust advisory, license, dependency
 ban, and source policies. Duplicate dependency versions are warnings for now
 because the rattler dependency graph still contains expected overlap.
+
+After merging release preparation, run the `Release` workflow manually on the
+exact commit that would be tagged. A manual run builds and verifies all native
+assets, wheels, the source distribution, checksums, attestations, and the
+composite action without publishing GitHub or PyPI releases. Create the release
+tag only after that candidate run succeeds.

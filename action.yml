@@ -195,21 +195,17 @@ runs:
       run: |
         set -euo pipefail
 
-        base_url="https://github.com/${CONDA_SHIP_REPOSITORY}/releases/download/${CONDA_SHIP_VERSION}"
-        curl --fail --location --show-error --silent --retry 3 \
-          --output "${TOOL_DIR}/${CS_ASSET}" \
-          "${base_url}/${CS_ASSET}"
-        curl --fail --location --show-error --silent --retry 3 \
-          --output "${TOOL_DIR}/${TEMPLATE_ASSET}" \
-          "${base_url}/${TEMPLATE_ASSET}"
-        curl --fail --location --show-error --silent --retry 3 \
-          --output "${TOOL_DIR}/SHA256SUMS" \
-          "${base_url}/SHA256SUMS"
-
         if ! command -v gh >/dev/null 2>&1; then
           echo "GitHub CLI is required to verify release attestations." >&2
           exit 1
         fi
+        gh release download "$CONDA_SHIP_VERSION" \
+          --repo "$CONDA_SHIP_REPOSITORY" \
+          --dir "$TOOL_DIR" \
+          --pattern "$CS_ASSET" \
+          --pattern "$TEMPLATE_ASSET" \
+          --pattern SHA256SUMS
+
         signer_workflow="${CONDA_SHIP_REPOSITORY}/.github/workflows/release.yml"
         gh attestation verify "${TOOL_DIR}/${CS_ASSET}" \
           --repo "$CONDA_SHIP_REPOSITORY" \
