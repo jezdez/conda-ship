@@ -2,6 +2,13 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## 0.6.3 - 2026-07-23
+
+### Fixed
+
+- Fixed deferred Windows executable replacement when helper output is captured
+  by preventing the update worker from inheriting the helper's open handles.
+
 ## 0.6.2 - 2026-07-23
 
 ### Fixed
