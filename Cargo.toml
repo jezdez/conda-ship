@@ -86,6 +86,14 @@ tempfile = "3"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 zstd = "0.13"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Globalization",
+  "Win32_Security",
+  "Win32_System_Threading",
+] }
+
 [profile.dev.package."*"]
 opt-level = 2
 

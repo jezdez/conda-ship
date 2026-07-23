@@ -4,12 +4,25 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(windows)]
-use std::process::{Command, Stdio};
-#[cfg(windows)]
 use std::time::{Duration, Instant};
+#[cfg(windows)]
+use std::{
+    cmp::Ordering,
+    ffi::{OsStr, OsString},
+    os::windows::ffi::OsStrExt,
+};
 
 use fs4::fs_std::FileExt as _;
 use miette::{Context, IntoDiagnostic};
+#[cfg(windows)]
+use windows_sys::Win32::{
+    Foundation::{CloseHandle, TRUE},
+    Globalization::{CSTR_EQUAL, CSTR_GREATER_THAN, CSTR_LESS_THAN, CompareStringOrdinal},
+    System::Threading::{
+        CREATE_NO_WINDOW, CREATE_UNICODE_ENVIRONMENT, CreateProcessW, PROCESS_INFORMATION,
+        STARTUPINFOW,
+    },
+};
 
 use crate::bootstrap_lock::BootstrapLock;
 use crate::config::{
@@ -657,24 +670,144 @@ fn remove_regular_file_if_present(path: &Path, description: &str) -> miette::Res
 #[cfg(windows)]
 fn spawn_windows_worker(prefix: &Path, worker: &Path) -> miette::Result<()> {
     require_regular_file(worker, "runtime update worker")?;
-    Command::new(worker)
-        .env(
-            crate::runtime_update::INTERNAL_UPDATE_ENV,
-            crate::runtime_update::WINDOWS_REPLACE_ACTION,
+    let environment = windows_process_environment(
+        &[
+            (
+                crate::runtime_update::INTERNAL_UPDATE_ENV,
+                OsString::from(crate::runtime_update::WINDOWS_REPLACE_ACTION),
+            ),
+            (policy::PREFIX_ENV_VAR, prefix.as_os_str().to_os_string()),
+        ],
+        &[crate::runtime_update::INTERNAL_CANDIDATE_ENV],
+    )?;
+    let mut command_line = windows_application_command_line(worker)?;
+    spawn_windows_process(worker, &mut command_line, &environment).with_context(|| {
+        format!(
+            "failed to start runtime update worker at {}",
+            policy::path_for_display(worker)
         )
-        .env(policy::PREFIX_ENV_VAR, prefix)
-        .env_remove(crate::runtime_update::INTERNAL_CANDIDATE_ENV)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .into_diagnostic()
-        .with_context(|| {
-            format!(
-                "failed to start runtime update worker at {}",
-                policy::path_for_display(worker)
-            )
-        })?;
+    })
+}
+
+#[cfg(windows)]
+fn windows_process_environment(
+    set: &[(&str, OsString)],
+    remove: &[&str],
+) -> miette::Result<Vec<u16>> {
+    let mut variables: Vec<_> = std::env::vars_os()
+        .filter(|(key, _)| {
+            !remove
+                .iter()
+                .chain(set.iter().map(|(name, _)| name))
+                .any(|name| windows_environment_key_cmp(key, OsStr::new(*name)) == Ordering::Equal)
+        })
+        .collect();
+    variables.extend(
+        set.iter()
+            .map(|(name, value)| (OsString::from(name), value.clone())),
+    );
+    variables.sort_by(|(left, _), (right, _)| windows_environment_key_cmp(left, right));
+
+    let mut block = Vec::new();
+    for (key, value) in &variables {
+        let key: Vec<_> = key.encode_wide().collect();
+        let value: Vec<_> = value.encode_wide().collect();
+        if key.is_empty() || key.iter().chain(&value).any(|code_unit| *code_unit == 0) {
+            return Err(miette::miette!(
+                "runtime update worker environment contains an invalid variable"
+            ));
+        }
+        block.extend(key);
+        block.push('=' as u16);
+        block.extend(value);
+        block.push(0);
+    }
+    if variables.is_empty() {
+        block.push(0);
+    }
+    block.push(0);
+    Ok(block)
+}
+
+#[cfg(windows)]
+fn windows_environment_key_cmp(left: &OsStr, right: &OsStr) -> Ordering {
+    let left: Vec<_> = left.encode_wide().collect();
+    let right: Vec<_> = right.encode_wide().collect();
+    let left_len = i32::try_from(left.len()).expect("Windows environment key is too long");
+    let right_len = i32::try_from(right.len()).expect("Windows environment key is too long");
+    let result =
+        unsafe { CompareStringOrdinal(left.as_ptr(), left_len, right.as_ptr(), right_len, TRUE) };
+    match result {
+        CSTR_LESS_THAN => Ordering::Less,
+        CSTR_EQUAL => Ordering::Equal,
+        CSTR_GREATER_THAN => Ordering::Greater,
+        _ => panic!(
+            "failed to compare Windows environment keys: {}",
+            std::io::Error::last_os_error()
+        ),
+    }
+}
+
+#[cfg(windows)]
+fn windows_application_command_line(application: &Path) -> miette::Result<Vec<u16>> {
+    let application: Vec<_> = application.as_os_str().encode_wide().collect();
+    if application.iter().any(|code_unit| *code_unit == 0) {
+        return Err(miette::miette!(
+            "runtime update worker path contains an invalid NUL character"
+        ));
+    }
+    let mut command_line = Vec::with_capacity(application.len() + 3);
+    command_line.push('"' as u16);
+    command_line.extend(application);
+    command_line.push('"' as u16);
+    command_line.push(0);
+    Ok(command_line)
+}
+
+#[cfg(windows)]
+fn spawn_windows_process(
+    application: &Path,
+    command_line: &mut [u16],
+    environment: &[u16],
+) -> miette::Result<()> {
+    let mut application: Vec<_> = application.as_os_str().encode_wide().collect();
+    if application.iter().any(|code_unit| *code_unit == 0) {
+        return Err(miette::miette!(
+            "runtime update worker path contains an invalid NUL character"
+        ));
+    }
+    application.push(0);
+
+    let mut startup = STARTUPINFOW {
+        cb: std::mem::size_of::<STARTUPINFOW>() as u32,
+        ..Default::default()
+    };
+    let mut process = PROCESS_INFORMATION::default();
+    // No handles may cross this boundary. In particular, inheriting the
+    // helper's captured output pipes would keep its caller blocked until the
+    // worker exits while the worker waits for that caller's executable to
+    // close.
+    let created = unsafe {
+        CreateProcessW(
+            application.as_ptr(),
+            command_line.as_mut_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            0,
+            CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+            environment.as_ptr().cast(),
+            std::ptr::null(),
+            &raw mut startup,
+            &raw mut process,
+        )
+    };
+    if created == 0 {
+        return Err(std::io::Error::last_os_error()).into_diagnostic();
+    }
+    unsafe {
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+    }
     Ok(())
 }
 
@@ -1956,6 +2089,114 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         assert!(Path::new(&release).exists());
+        if let Some(done) = std::env::var_os("CONDA_SHIP_UPDATE_HOLDER_DONE") {
+            std::fs::write(done, b"done").unwrap();
+        }
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_worker_process_does_not_inherit_helper_handles() {
+        use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+        use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let ready = tmp.path().join("ready");
+        let release = tmp.path().join("release");
+        let done = tmp.path().join("done");
+        let sentinel_path = tmp.path().join("captured-output-handle");
+        let sentinel = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .share_mode(0)
+            .open(&sentinel_path)
+            .unwrap();
+        let inherited = unsafe {
+            SetHandleInformation(
+                sentinel.as_raw_handle(),
+                HANDLE_FLAG_INHERIT,
+                HANDLE_FLAG_INHERIT,
+            )
+        };
+        assert_ne!(
+            inherited, 0,
+            "failed to mark the sentinel handle inheritable"
+        );
+
+        let application = std::env::current_exe().unwrap();
+        let mut command_line = windows_application_command_line(&application).unwrap();
+        command_line.pop();
+        command_line.extend(
+            " --exact executable_update::tests::windows_holds_test_executable --nocapture"
+                .encode_utf16(),
+        );
+        command_line.push(0);
+        let environment = windows_process_environment(
+            &[
+                (
+                    "CONDA_SHIP_UPDATE_HOLDER_READY",
+                    ready.as_os_str().to_os_string(),
+                ),
+                (
+                    "CONDA_SHIP_UPDATE_HOLDER_RELEASE",
+                    release.as_os_str().to_os_string(),
+                ),
+                (
+                    "CONDA_SHIP_UPDATE_HOLDER_DONE",
+                    done.as_os_str().to_os_string(),
+                ),
+            ],
+            &[],
+        )
+        .unwrap();
+        spawn_windows_process(&application, &mut command_line, &environment).unwrap();
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !ready.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(ready.exists(), "child process did not start");
+
+        drop(sentinel);
+        std::fs::remove_file(&sentinel_path)
+            .expect("child process inherited an unrelated helper handle");
+        std::fs::write(&release, b"release").unwrap();
+
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !done.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(done.exists(), "child process did not exit");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn windows_process_environment_uses_ordinal_key_order() {
+        let block = windows_process_environment(
+            &[
+                ("CONDA_SHIP_ß", OsString::from("sharp")),
+                ("CONDA_SHIP_T", OsString::from("tee")),
+            ],
+            &[],
+        )
+        .unwrap();
+        let entries: Vec<_> = block
+            .split(|code_unit| *code_unit == 0)
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        let tee: Vec<_> = "CONDA_SHIP_T=tee".encode_utf16().collect();
+        let sharp: Vec<_> = "CONDA_SHIP_ß=sharp".encode_utf16().collect();
+        let tee = entries
+            .iter()
+            .position(|entry| *entry == tee.as_slice())
+            .unwrap();
+        let sharp = entries
+            .iter()
+            .position(|entry| *entry == sharp.as_slice())
+            .unwrap();
+
+        assert!(tee < sharp);
     }
 
     #[test]
