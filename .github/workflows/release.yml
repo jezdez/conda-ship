@@ -721,16 +721,26 @@ jobs:
                       raise
                   time.sleep(10)
                   continue
-              break
-
-          if payload["info"]["version"] != version:
-              raise SystemExit("PyPI reports the wrong release version")
-          files = payload["urls"]
-          wheels = [file["filename"] for file in files if file["packagetype"] == "bdist_wheel"]
-          sdists = [file["filename"] for file in files if file["packagetype"] == "sdist"]
-          if len(wheels) != 6:
-              raise SystemExit(f"expected 6 wheels, found {len(wheels)}")
-          if len(sdists) != 1:
-              raise SystemExit(f"expected 1 source distribution, found {len(sdists)}")
+              if payload["info"]["version"] != version:
+                  raise SystemExit("PyPI reports the wrong release version")
+              files = payload["urls"]
+              wheels = [
+                  file["filename"]
+                  for file in files
+                  if file["packagetype"] == "bdist_wheel"
+              ]
+              sdists = [
+                  file["filename"]
+                  for file in files
+                  if file["packagetype"] == "sdist"
+              ]
+              if len(wheels) == 6 and len(sdists) == 1:
+                  break
+              if attempt == 29:
+                  raise SystemExit(
+                      f"expected 6 wheels and 1 source distribution, "
+                      f"found {len(wheels)} and {len(sdists)}"
+                  )
+              time.sleep(10)
           print("\n".join(sorted(wheels + sdists)))
           PY
