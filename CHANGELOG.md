@@ -2,6 +2,13 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## 0.6.2 - 2026-07-23
+
+### Fixed
+
+- Fixed verification of the released GitHub Action by configuring its required
+  conda delegate.
+
 ## 0.6.1 - 2026-07-23
 
 ### Fixed
