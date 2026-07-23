@@ -2,6 +2,13 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## 0.6.4 - 2026-07-23
+
+### Fixed
+
+- Added native platform and architecture metadata to executable update
+  packages so Anaconda.org receives their complete upload identity.
+
 ## 0.6.3 - 2026-07-23
 
 ### Fixed
