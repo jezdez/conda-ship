@@ -233,6 +233,12 @@ fn stage_package_contents(
     payload_sha256: &str,
     payload_size: u64,
 ) -> miette::Result<()> {
+    let package_platform = platform
+        .only_platform()
+        .ok_or_else(|| miette::miette!("update package platform must be native"))?;
+    let package_arch = platform
+        .arch()
+        .ok_or_else(|| miette::miette!("update package platform must have an architecture"))?;
     let info_dir = root.join("info");
     let payload_path = root.join(payload);
     fs::create_dir_all(&info_dir)
@@ -252,11 +258,13 @@ fn stage_package_contents(
     write_json(
         &info_dir.join("index.json"),
         &serde_json::json!({
+            "arch": package_arch,
             "name": package_name,
             "version": runtime_version,
             "build": build_number.to_string(),
             "build_number": build_number,
             "depends": [],
+            "platform": package_platform,
             "subdir": platform.to_string(),
         }),
     )?;
@@ -463,6 +471,7 @@ mod tests {
     use std::io::{Seek as _, SeekFrom, Write as _};
 
     use rattler_conda_types::package::{IndexJson, PackageFile, PathType, PathsJson};
+    use rstest::rstest;
     use tempfile::TempDir;
 
     use super::*;
@@ -547,6 +556,9 @@ mod tests {
         assert_eq!(index.version.to_string(), "1.2.3");
         assert_eq!(index.build_number, 3);
         assert!(index.depends.is_empty());
+        assert_eq!(index.platform.as_deref(), Some("linux"));
+        assert_eq!(index.arch.as_deref(), Some("x86_64"));
+        assert_eq!(index.subdir.as_deref(), Some("linux-64"));
         let paths = PathsJson::from_package_directory(extracted.path()).unwrap();
         assert_eq!(paths.paths_version, 1);
         let [payload] = paths.paths.as_slice() else {
@@ -571,6 +583,42 @@ mod tests {
                 .mode();
             assert_ne!(mode & 0o111, 0);
         }
+    }
+
+    #[rstest]
+    #[case(Platform::Linux64, "linux", "x86_64")]
+    #[case(Platform::LinuxAarch64, "linux", "aarch64")]
+    #[case(Platform::Osx64, "osx", "x86_64")]
+    #[case(Platform::OsxArm64, "osx", "arm64")]
+    #[case(Platform::Win64, "win", "x86_64")]
+    #[case(Platform::WinArm64, "win", "arm64")]
+    fn packages_native_platform_identity(
+        #[case] platform: Platform,
+        #[case] expected_platform: &str,
+        #[case] expected_arch: &str,
+    ) {
+        let tmp = TempDir::new().unwrap();
+        let package_root = tmp.path().join("package");
+        let binary = tmp.path().join("runtime");
+        fs::write(&binary, b"runtime executable").unwrap();
+
+        stage_package_contents(
+            &package_root,
+            &binary,
+            "bin/demo",
+            platform,
+            "demo-runtime",
+            "1.2.3",
+            3,
+            &"0".repeat(64),
+            18,
+        )
+        .unwrap();
+
+        let index = IndexJson::from_package_directory(&package_root).unwrap();
+        assert_eq!(index.platform.as_deref(), Some(expected_platform));
+        assert_eq!(index.arch.as_deref(), Some(expected_arch));
+        assert_eq!(index.subdir.as_deref(), Some(platform.as_str()));
     }
 
     #[test]
