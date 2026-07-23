@@ -202,6 +202,7 @@ runs:
         gh release download "$CONDA_SHIP_VERSION" \
           --repo "$CONDA_SHIP_REPOSITORY" \
           --dir "$TOOL_DIR" \
+          --clobber \
           --pattern "$CS_ASSET" \
           --pattern "$TEMPLATE_ASSET" \
           --pattern SHA256SUMS
