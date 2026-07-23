@@ -19,9 +19,11 @@ This protects the builder path from accidentally executing an unverified
 downloaded binary in CI.
 
 Published conda-ship GitHub releases are immutable. The release workflow creates
-a draft release, uploads the complete asset set, and publishes the release once.
-After publication, the tag and assets are not replaced. If a release is wrong,
-the project should publish a new version instead of modifying the existing one.
+a draft release, uploads the complete asset set, then verifies the assets and
+composite action before publication. A failed check removes the draft. After
+publication, the tag and assets are not replaced. If a published release is
+wrong, the project should publish a new version instead of modifying the
+existing one.
 
 ## Source Lock Trust
 
