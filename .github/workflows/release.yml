@@ -529,6 +529,7 @@ jobs:
         with:
           conda-ship-version: ${{ needs.validate-release.outputs.version }}
           runtime-name: release-smoke
+          delegate-executable: conda
           root: .
 
       - name: Check released builder output
