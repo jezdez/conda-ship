@@ -77,16 +77,16 @@ The stamped header records:
 : Optional package manager or installer metadata.
 
 `update`
-: Optional executable update policy. It contains:
+: Optional executable update configuration. It contains:
 
   - `channel`: absolute `https://` or `file://` conda channel URL
   - `package`: conda package used for update records
   - `build-number`: current executable build number
-  - `ownership`: `direct` or `external`
-  - `instruction`: optional external update instruction
 
-  Direct ownership permits coordinated executable replacement. External
-  ownership leaves replacement to another package manager or installer.
+  Installed ownership is recorded in `.RUNTIME_NAME.json`, together with the
+  stable executable path, installation kind, and optional external update
+  instruction. Existing 0.6.x stamps containing `ownership` or `instruction`
+  remain readable, but new builds do not write those fields.
 
 `runtime_config`
 : Resolved runtime channels and package names used for bootstrap metadata, plus

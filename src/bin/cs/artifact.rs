@@ -1128,18 +1128,9 @@ pub(crate) fn validate_update_config(
             update.package
         ));
     }
-    if update.ownership == runtime_data::UpdateOwnership::Direct && update.instruction.is_some() {
+    if update.has_compatibility_policy() {
         return Err(miette::miette!(
-            "direct runtime updates must not configure an external update instruction"
-        ));
-    }
-    if update
-        .instruction
-        .as_deref()
-        .is_some_and(|instruction| instruction.trim().is_empty())
-    {
-        return Err(miette::miette!(
-            "runtime update instruction must not be empty"
+            "runtime update ownership and instruction are installed state, not build settings"
         ));
     }
     Ok(())

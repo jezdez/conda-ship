@@ -36,7 +36,7 @@ conda-ship owns the reusable build and runtime machinery:
 - staging `online`, `external`, and `embedded` artifact layouts
 - writing artifact metadata: `.runtime.lock`, `.packages.txt`, `.info.json`,
   and `.sha256`
-- stamping optional executable update policy
+- stamping optional executable update configuration
 - creating native executable update packages from finalized runtime bytes
 - exposing the composite GitHub Action and local builder CLI
 
@@ -74,6 +74,8 @@ Downstream projects decide what their users get:
 - constructor-based installers or enterprise package manager recipes
 - orchestrator catalogs, onboarding, login, policy, and user-facing shim names
 - publication and indexing of executable update packages
+- detecting supported package-manager receipts and recording installed
+  executable ownership
 - user prompting and coordination with the inner package transaction
 - credentials supplied through an explicit `RATTLER_AUTH_FILE`
 - commands used to replace an externally owned executable

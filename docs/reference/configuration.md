@@ -99,7 +99,6 @@ freeze-base = true
 channel = "https://packages.example.com/conda"
 package = "demo-runtime"
 build-number = 0
-ownership = "direct"
 ```
 
 For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
@@ -210,8 +209,7 @@ metadata and the runtime update engine. Omitting the table preserves the
 normal bootstrap and delegate behavior without executable update handling.
 
 The table is supported for `online` and `embedded` artifact layouts. The
-`external` artifact layout is not supported. External update ownership is a
-separate setting and can be used with either supported layout.
+`external` artifact layout is not supported.
 
 `channel`
 : Absolute conda channel URL used to resolve native runtime update packages.
@@ -220,38 +218,20 @@ separate setting and can be used with either supported layout.
 
 `package`
 : Conda package name used for runtime update records. The package must contain
-  one finalized native runtime executable produced by `cs package-update` when
-  ownership is `direct`.
+  one finalized native runtime executable produced by `cs package-update`.
 
 `build-number`
 : Build number for the stamped executable. Defaults to `0`. Candidate ordering
   compares the conda version first and the build number second.
 
-`ownership`
-: Executable update owner. Defaults to `direct`.
+Every update-enabled executable contains the direct update engine. Installed
+ownership and any external update instruction belong to the installed copy,
+not the build. An installer or delivery detector records them in
+`.RUNTIME_NAME.json` through `v1/record-installation`. The same executable bytes
+can therefore be installed directly or by an external package manager.
 
-  `direct` lets the stamped runtime stage and replace its installed executable
-  through the documented coordinator contract. It must not configure an
-  `instruction`.
-
-  `external` leaves executable replacement to a package manager or installer.
-  The runtime can use the configured package records as a release signal and
-  reconcile a valid externally replaced executable on its next invocation. It
-  does not stage the package payload.
-
-`instruction`
-: Optional non-empty update instruction for `external` ownership. For example:
-
-  ```toml
-  [tool.conda-ship.update]
-  channel = "https://packages.example.com/conda"
-  package = "demo-runtime"
-  ownership = "external"
-  instruction = "Update demo with the package manager that installed it."
-  ```
-
-  The field is metadata for a downstream coordinator. conda-ship does not run
-  the instruction or detect the installer.
+`ownership` and `instruction` are rejected as new build settings. They remain
+readable only in stamps produced by conda-ship 0.6.x.
 
 Generated runtimes write ownership metadata into every bootstrapped prefix.
 That metadata records the schema version, display name derived from
@@ -292,8 +272,8 @@ set.
 - installer: the configured `installer`, when present
 - condarc contents: the exact text from `condarc-file`, when configured
 - frozen base policy: the configured `freeze-base` value, defaulting to `false`
-- executable update policy: channel, package, build number, ownership, and an
-  optional external instruction when `[tool.conda-ship.update]` is configured
+- executable update configuration: channel, package, and build number when
+  `[tool.conda-ship.update]` is configured
 - metadata file: `.RUNTIME_NAME.json`
 - bundle environment variable: uppercased `RUNTIME_NAME` plus `_BUNDLE`
 - offline environment variable: uppercased `RUNTIME_NAME` plus `_OFFLINE`
@@ -312,9 +292,10 @@ The internal installing marker is then removed.
 When executable updates are configured, the same `.RUNTIME_NAME.json` file is
 the canonical persistent update and recovery record. It records the stable
 executable path, artifact identity, update channel and package, build number,
-ownership, executable SHA256, optional external instruction, and any pending
-replacement. The adjacent `.RUNTIME_NAME.update.lock` file coordinates
-processes but is not another update state record.
+installed ownership, installation kind, executable SHA256, optional external
+instruction, and any pending replacement. The adjacent
+`.RUNTIME_NAME.update.lock` file coordinates processes but is not another
+update state record.
 
 The bootstrap also writes standard conda prefix metadata:
 
