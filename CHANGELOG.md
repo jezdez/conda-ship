@@ -2,7 +2,7 @@
 
 All notable changes to `conda-ship` are documented here.
 
-## Unreleased
+## 0.7.0 - 2026-07-24
 
 ### Added
 
@@ -16,9 +16,9 @@ All notable changes to `conda-ship` are documented here.
   source. One direct-capable runtime can be delivered by a standalone
   installer, Homebrew, a Python package, or another external manager.
 - New builds stamp only the update channel, package, and build number.
-  `ownership` and `instruction` are installed state recorded through
-  `v1/record-installation`. Runtimes still read those fields from existing
-  0.6.x artifacts.
+  `ownership` and `instruction` are rejected as build settings. An installer
+  or delivery integration records them through `v1/record-installation`.
+  Runtimes still read those fields from existing 0.6.x artifacts.
 - External package-manager replacement preserves the recorded installation
   kind and verifies the replacement against the original runtime identity and
   update source.
