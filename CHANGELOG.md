@@ -2,6 +2,23 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## Unreleased
+
+### Added
+
+- Added `v1/record-installation` to record direct or external executable
+  ownership, the installation kind, and the stable executable path in the
+  existing runtime metadata file.
+
+### Changed
+
+- Installed executable ownership is now independent of the stamped update
+  source. One direct-capable runtime can be delivered by a standalone
+  installer, Homebrew, a Python package, or another external manager.
+- External package-manager replacement preserves the recorded installation
+  kind and verifies the replacement against the original runtime identity and
+  update source.
+
 ## 0.6.4 - 2026-07-23
 
 ### Fixed

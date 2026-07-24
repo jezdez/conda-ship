@@ -56,9 +56,9 @@ transaction coordinators. They are not normal user-facing runtime controls.
 See {doc}`runtime-cli` for the required bootstrap, lock, and call sequence.
 
 `CONDA_SHIP_INTERNAL_UPDATE`
-: Select the helper action. Version one defines `v1/check`, `v1/stage`, and
-  `v1/apply`. Generated runtimes do not reserve a delegate subcommand for these
-  operations.
+: Select the helper action. Version one defines `v1/record-installation`,
+  `v1/check`, `v1/stage`, and `v1/apply`. Generated runtimes do not reserve a
+  delegate subcommand for these operations.
 
 `CONDA_SHIP_INTERNAL_UPDATE_CANDIDATE`
 : Lowercase SHA256 selected from the `v1/check` result. It is required by
@@ -69,6 +69,23 @@ See {doc}`runtime-cli` for the required bootstrap, lock, and call sequence.
   `false` disable the flag. Other non-empty values enable it. An HTTPS update
   requires previously cached repodata and package content in this mode. A
   `file://` channel is read directly.
+
+`CONDA_SHIP_INTERNAL_UPDATE_OWNERSHIP`
+: Installed executable ownership for `v1/record-installation`. Supported values
+  are `direct` and `external`.
+
+`CONDA_SHIP_INTERNAL_UPDATE_INSTALLATION`
+: Lowercase installation identifier for `v1/record-installation`, such as
+  `standalone`, `constructor`, `homebrew`, `pipx`, or `uv-tool`.
+
+`CONDA_SHIP_INTERNAL_UPDATE_EXECUTABLE`
+: Optional absolute stable executable path for `v1/record-installation`. The
+  path must resolve to the running executable. When omitted, the runtime uses
+  its invocation path.
+
+`CONDA_SHIP_INTERNAL_UPDATE_INSTRUCTION`
+: Optional non-empty external-manager instruction for
+  `v1/record-installation`. Direct ownership rejects this variable.
 
 ## Delegate Environment
 

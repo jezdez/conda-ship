@@ -81,6 +81,7 @@ For an update-enabled runtime, the same file also records:
 
 - executable path and artifact name
 - direct or external executable ownership
+- installation kind, when an installer or delivery detector recorded one
 - source channel and package name
 - current build number and executable SHA256
 - optional external update instruction
@@ -125,10 +126,31 @@ update lock coordinates processes but does not contain update state.
   rejected.
 
 `external`
-: The channel package is a release signal. The runtime reports the stamped
-  instruction and leaves replacement to the package manager or installer. On
-  the next invocation, a newly stamped executable at the same stable path is
-  verified and reconciled with the prefix record.
+: The channel package is a release signal. A downstream coordinator reports an
+  instruction chosen from the recorded installation kind and leaves
+  replacement to the package manager or installer. On the next invocation, a
+  newly stamped executable at the recorded stable path is verified and
+  reconciled with the prefix record.
+
+The executable stamp records update capability and source identity. Installed
+ownership is a property of the copy on disk. A standalone installer and an
+external package manager can therefore install identical runtime bytes while
+recording different ownership in the existing prefix metadata file.
+
+Metadata without an installation kind is an unclassified compatibility state.
+It preserves existing direct-update behavior, but it may reconcile a valid
+newer executable with the same identity and update source before a delivery
+detector records external ownership. Direct installers should record their
+installation kind immediately so later uncoordinated replacement is rejected.
+
+`v1/record-installation` records this decision. It can make a direct-capable
+runtime external but cannot make an external installation direct. The
+external installation kind is immutable once present. A one-way transition
+from direct to external may change the kind and stable path when a package
+manager adopts an existing installation. Once external ownership is recorded,
+a missing package-manager receipt cannot silently enable direct replacement.
+That adoption must record the new ownership during installation, before a
+normal invocation attempts to reconcile the changed executable.
 
 On Unix, a direct replacement is committed through adjacent file renames while
 keeping the previous executable recoverable until the change succeeds. Windows

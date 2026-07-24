@@ -51,6 +51,12 @@ pub struct RuntimeUpdateConfig {
     pub instruction: Option<String>,
 }
 
+impl RuntimeUpdateConfig {
+    pub fn supports_direct_update(&self) -> bool {
+        self.ownership == UpdateOwnership::Direct
+    }
+}
+
 impl RuntimeConfig {
     #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {

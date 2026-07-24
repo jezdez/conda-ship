@@ -22,9 +22,14 @@ use crate::{config, executable_update, hash, http, policy, runtime_data};
 pub(crate) const INTERNAL_UPDATE_ENV: &str = "CONDA_SHIP_INTERNAL_UPDATE";
 pub(crate) const INTERNAL_OFFLINE_ENV: &str = "CONDA_SHIP_INTERNAL_UPDATE_OFFLINE";
 pub(crate) const INTERNAL_CANDIDATE_ENV: &str = "CONDA_SHIP_INTERNAL_UPDATE_CANDIDATE";
+pub(crate) const INTERNAL_OWNERSHIP_ENV: &str = "CONDA_SHIP_INTERNAL_UPDATE_OWNERSHIP";
+pub(crate) const INTERNAL_INSTALLATION_ENV: &str = "CONDA_SHIP_INTERNAL_UPDATE_INSTALLATION";
+pub(crate) const INTERNAL_EXECUTABLE_ENV: &str = "CONDA_SHIP_INTERNAL_UPDATE_EXECUTABLE";
+pub(crate) const INTERNAL_INSTRUCTION_ENV: &str = "CONDA_SHIP_INTERNAL_UPDATE_INSTRUCTION";
 pub(crate) const CHECK_ACTION: &str = "v1/check";
 pub(crate) const STAGE_ACTION: &str = "v1/stage";
 pub(crate) const APPLY_ACTION: &str = "v1/apply";
+pub(crate) const RECORD_INSTALLATION_ACTION: &str = "v1/record-installation";
 #[cfg(windows)]
 pub(crate) const WINDOWS_REPLACE_ACTION: &str = "v1/windows-replace";
 
@@ -46,6 +51,7 @@ struct CheckResponse {
     package: Option<String>,
     sha256: Option<String>,
     ownership: UpdateOwnership,
+    installation: Option<String>,
     instruction: Option<String>,
 }
 
@@ -104,6 +110,9 @@ pub(crate) async fn run_internal_helper(action: &str, prefix: &Path) -> miette::
             executable_update::run_windows_worker(prefix, &header.metadata_file)?;
         }
         CHECK_ACTION => {
+            let recorded = metadata.update.as_ref().ok_or_else(|| {
+                miette::miette!("runtime metadata does not configure executable updates")
+            })?;
             let candidate = resolve_candidate(prefix, header, update, offline).await?;
             let response = CheckResponse {
                 available: candidate.is_some(),
@@ -117,8 +126,9 @@ pub(crate) async fn run_internal_helper(action: &str, prefix: &Path) -> miette::
                     .map(|candidate| candidate.record.package_record.build_number),
                 package: candidate.as_ref().map(|_| update.package.clone()),
                 sha256: candidate.as_ref().map(|candidate| candidate.sha256.clone()),
-                ownership: update.ownership,
-                instruction: update.instruction.clone(),
+                ownership: recorded.ownership,
+                installation: recorded.installation.clone(),
+                instruction: recorded.instruction.clone(),
             };
             serde_json::to_writer(std::io::stdout().lock(), &response)
                 .into_diagnostic()
@@ -129,8 +139,16 @@ pub(crate) async fn run_internal_helper(action: &str, prefix: &Path) -> miette::
                 .into_diagnostic()?;
         }
         STAGE_ACTION => {
-            if update.ownership != UpdateOwnership::Direct {
-                let instruction = update
+            if !update.supports_direct_update() {
+                return Err(miette::miette!(
+                    "this runtime executable does not support direct updates"
+                ));
+            }
+            let recorded = metadata.update.as_ref().ok_or_else(|| {
+                miette::miette!("runtime metadata does not configure executable updates")
+            })?;
+            if recorded.ownership != UpdateOwnership::Direct {
+                let instruction = recorded
                     .instruction
                     .as_deref()
                     .map(|instruction| format!(": {instruction}"))
@@ -188,6 +206,34 @@ pub(crate) async fn run_internal_helper(action: &str, prefix: &Path) -> miette::
                 }
             }
         }
+        RECORD_INSTALLATION_ACTION => {
+            let ownership = requested_ownership()?;
+            let installation = required_environment(INTERNAL_INSTALLATION_ENV)?;
+            let executable = std::env::var_os(INTERNAL_EXECUTABLE_ENV)
+                .map(PathBuf::from)
+                .map_or_else(policy::invocation_path, Ok)?;
+            let instruction = optional_environment(INTERNAL_INSTRUCTION_ENV)?;
+            executable_update::record_installation(
+                prefix,
+                &header.metadata_file,
+                &executable,
+                ownership,
+                &installation,
+                instruction.as_deref(),
+            )?;
+            let recorded = config::read_metadata_for(prefix, &header.metadata_file)?
+                .update
+                .ok_or_else(|| {
+                    miette::miette!("runtime metadata does not configure executable updates")
+                })?;
+            write_response(&serde_json::json!({
+                "recorded": true,
+                "ownership": recorded.ownership,
+                "installation": recorded.installation,
+                "executable": recorded.executable,
+                "instruction": recorded.instruction,
+            }))?;
+        }
         other => {
             return Err(miette::miette!(
                 "unknown internal runtime update action: {other}"
@@ -195,6 +241,37 @@ pub(crate) async fn run_internal_helper(action: &str, prefix: &Path) -> miette::
         }
     }
     Ok(())
+}
+
+fn required_environment(name: &str) -> miette::Result<String> {
+    let value = std::env::var(name)
+        .into_diagnostic()
+        .with_context(|| format!("{name} is required"))?;
+    if value.is_empty() {
+        return Err(miette::miette!("{name} must not be empty"));
+    }
+    Ok(value)
+}
+
+fn optional_environment(name: &str) -> miette::Result<Option<String>> {
+    match std::env::var(name) {
+        Ok(value) if value.is_empty() => Err(miette::miette!("{name} must not be empty")),
+        Ok(value) => Ok(Some(value)),
+        Err(std::env::VarError::NotPresent) => Ok(None),
+        Err(error) => Err(error)
+            .into_diagnostic()
+            .with_context(|| format!("{name} is invalid")),
+    }
+}
+
+fn requested_ownership() -> miette::Result<UpdateOwnership> {
+    match required_environment(INTERNAL_OWNERSHIP_ENV)?.as_str() {
+        "direct" => Ok(UpdateOwnership::Direct),
+        "external" => Ok(UpdateOwnership::External),
+        ownership => Err(miette::miette!(
+            "invalid runtime installation ownership: {ownership}"
+        )),
+    }
 }
 
 fn write_response(response: &impl Serialize) -> miette::Result<()> {
@@ -267,12 +344,10 @@ pub(crate) fn initialize_current(prefix: &Path) -> miette::Result<()> {
     if previous.pending.is_some() {
         return Ok(());
     }
-    if previous.ownership != update.ownership
-        || previous.artifact_name != header.artifact_name
+    if previous.artifact_name != header.artifact_name
         || previous.channel != update.channel
         || previous.package != update.package
         || previous.build_number != update.build_number
-        || previous.instruction != update.instruction
         || metadata.version != header.runtime_version
     {
         return reconcile_current(prefix);
@@ -286,11 +361,28 @@ pub(crate) fn reconcile_current(prefix: &Path) -> miette::Result<()> {
         return Ok(());
     };
     let metadata = config::read_metadata_for(prefix, &header.metadata_file)?;
-    let executable = match metadata.update.as_ref() {
-        Some(previous) if !previous.executable.as_os_str().is_empty() => {
-            previous.executable.clone()
+    let (executable, ownership, installation, instruction) = match metadata.update.as_ref() {
+        Some(previous)
+            if previous.installation.is_some() && !previous.executable.as_os_str().is_empty() =>
+        {
+            (
+                previous.executable.clone(),
+                previous.ownership,
+                previous.installation.as_deref(),
+                previous.instruction.as_deref(),
+            )
         }
-        _ => initial_executable_path(update.ownership)?,
+        previous => {
+            let ownership = previous.map_or(update.ownership, |previous| previous.ownership);
+            (
+                initial_executable_path(ownership)?,
+                ownership,
+                None,
+                previous
+                    .and_then(|previous| previous.instruction.as_deref())
+                    .or(update.instruction.as_deref()),
+            )
+        }
     };
     verify_current_executable(&executable)?;
     let (digest, _) = hash::sha256_file(&executable)
@@ -305,12 +397,13 @@ pub(crate) fn reconcile_current(prefix: &Path) -> miette::Result<()> {
         prefix,
         &header.metadata_file,
         &executable,
-        update.ownership,
+        ownership,
+        installation,
         &header.artifact_name,
         &update.channel,
         &update.package,
         update.build_number,
-        update.instruction.as_deref(),
+        instruction,
         &header.runtime_version,
         &hash::hex(&digest),
     )
@@ -695,8 +788,7 @@ fn validate_extracted_candidate(
     validate_update_config(stamped_update)?;
     if stamped_update.channel != update.channel
         || stamped_update.package != update.package
-        || stamped_update.ownership != update.ownership
-        || stamped_update.instruction != update.instruction
+        || !stamped_update.supports_direct_update()
         || stamped_update.build_number != index.build_number
     {
         return Err(miette::miette!(

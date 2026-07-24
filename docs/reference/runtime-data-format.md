@@ -82,11 +82,13 @@ The stamped header records:
   - `channel`: absolute `https://` or `file://` conda channel URL
   - `package`: conda package used for update records
   - `build-number`: current executable build number
-  - `ownership`: `direct` or `external`
-  - `instruction`: optional external update instruction
+  - `ownership`: initial direct capability or compatibility external default
+  - `instruction`: optional instruction paired with the stamped external default
 
-  Direct ownership permits coordinated executable replacement. External
-  ownership leaves replacement to another package manager or installer.
+  Installed ownership is not fixed by this stamped object. It is recorded in
+  `.RUNTIME_NAME.json`, together with the stable executable path and optional
+  installation kind. This lets package managers distribute the canonical
+  direct-capable executable without changing its bytes.
 
 `runtime_config`
 : Resolved runtime channels and package names used for bootstrap metadata, plus

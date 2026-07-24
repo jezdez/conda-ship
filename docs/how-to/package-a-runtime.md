@@ -112,12 +112,11 @@ builder. Use that output for the post-sign packaging step:
       --out-dir update-packages
 ```
 
-`cs package-update` accepts only a directly owned executable. An externally
-owned variant can point at the same indexed package record produced from the
-direct build of that runtime identity and version. It uses that record only as
-a release signal and does not download its payload. The runtime reports the
-configured instruction and leaves executable replacement to the external
-package manager. The replacement is reconciled on the next runtime invocation.
+`cs package-update` accepts the canonical direct-capable executable. Package
+managers can install those same bytes and record the installed copy as external
+with `v1/record-installation`. The indexed package remains the common release
+signal. An external installation does not stage its payload, and a replacement
+at the recorded stable path is reconciled on the next runtime invocation.
 
 ## Wrap With Homebrew
 
@@ -132,7 +131,9 @@ cs build --installer homebrew
 
 The formula should install the runtime onto `PATH`. It should not modify the
 managed prefix directly. The first invocation automatically bootstraps the
-prefix, then every invocation delegates its arguments.
+prefix, then every invocation delegates its arguments. The downstream runtime
+coordinator should validate the Homebrew keg receipt and record external
+ownership with the stable Homebrew `bin` link before checking for an update.
 
 ## Wrap With A Conda Package
 

@@ -290,6 +290,7 @@ pub(crate) fn reconcile_current_executable(
     metadata_file: &str,
     executable: &Path,
     ownership: UpdateOwnership,
+    installation: Option<&str>,
     artifact_name: &str,
     channel: &str,
     package: &str,
@@ -313,6 +314,7 @@ pub(crate) fn reconcile_current_executable(
     {
         let unchanged = previous.executable == executable
             && previous.ownership == ownership
+            && previous.installation.as_deref() == installation
             && previous.artifact_name == artifact_name
             && previous.channel == channel
             && previous.package == package
@@ -332,14 +334,25 @@ pub(crate) fn reconcile_current_executable(
         verify_stamped_file(&meta, previous, executable, runtime_version, runtime_digest)?;
         return Ok(ExecutableUpdateOutcome::None);
     }
+    if meta
+        .update
+        .as_ref()
+        .is_some_and(|previous| update_source_changed(previous, artifact_name, channel, package))
+    {
+        return Err(miette::miette!(
+            "runtime executable update source changed outside its coordinated update"
+        ));
+    }
     if meta.update.as_ref().is_some_and(|previous| {
         let initialized = !previous.executable.as_os_str().is_empty()
             || !previous.artifact_name.is_empty()
             || !previous.sha256.is_empty();
         initialized
             && previous.ownership == UpdateOwnership::Direct
+            && previous.installation.is_some()
             && (ownership != UpdateOwnership::Direct
                 || previous.executable != executable
+                || previous.installation.as_deref() != installation
                 || previous.artifact_name != artifact_name
                 || previous.channel != channel
                 || previous.package != package
@@ -355,6 +368,7 @@ pub(crate) fn reconcile_current_executable(
     let replacement = ExecutableUpdateMetadata {
         executable: executable.to_path_buf(),
         ownership,
+        installation: installation.map(str::to_string),
         artifact_name: artifact_name.to_string(),
         channel: channel.to_string(),
         package: package.to_string(),
@@ -377,6 +391,233 @@ pub(crate) fn reconcile_current_executable(
     meta.update = Some(replacement);
     config::persist_metadata_for(prefix, metadata_file, &meta)?;
     Ok(ExecutableUpdateOutcome::Reconciled)
+}
+
+/// Record how the current executable installation is managed.
+///
+/// Installation records may make a directly managed executable external, but
+/// they never reclaim an externally managed executable. Once external
+/// ownership is recorded, a missing or moved package-manager receipt cannot
+/// silently enable self-replacement.
+pub(crate) fn record_installation(
+    prefix: &Path,
+    metadata_file: &str,
+    executable: &Path,
+    ownership: UpdateOwnership,
+    installation: &str,
+    instruction: Option<&str>,
+) -> miette::Result<ExecutableUpdateOutcome> {
+    validate_installation(installation)?;
+    match ownership {
+        UpdateOwnership::Direct if instruction.is_some() => {
+            return Err(miette::miette!(
+                "a directly managed runtime installation cannot have an external update instruction"
+            ));
+        }
+        UpdateOwnership::External
+            if instruction.is_some_and(|instruction| instruction.trim().is_empty()) =>
+        {
+            return Err(miette::miette!(
+                "an external runtime installation instruction must not be empty"
+            ));
+        }
+        _ => {}
+    }
+
+    let _lock = BootstrapLock::acquire(prefix)?;
+    let mut meta = config::read_metadata_for(prefix, metadata_file)?;
+    validate_current_metadata(&meta, metadata_file)?;
+    let previous = meta
+        .update
+        .as_ref()
+        .ok_or_else(|| miette::miette!("runtime executable updates are not configured"))?;
+    let header = &runtime_data::current().header;
+    let update = header
+        .update
+        .as_ref()
+        .ok_or_else(|| miette::miette!("runtime executable updates are not configured"))?;
+    let initialized = !previous.executable.as_os_str().is_empty()
+        || !previous.artifact_name.is_empty()
+        || !previous.sha256.is_empty();
+    if previous.pending.is_some() {
+        return Err(miette::miette!(
+            "cannot record runtime installation ownership while replacement is pending"
+        ));
+    }
+    if update_source_changed(
+        previous,
+        &header.artifact_name,
+        &update.channel,
+        &update.package,
+    ) {
+        return Err(miette::miette!(
+            "runtime executable update source changed outside its coordinated update"
+        ));
+    }
+    if previous.ownership == UpdateOwnership::External && ownership == UpdateOwnership::Direct {
+        return Err(miette::miette!(
+            "an externally managed runtime installation cannot become directly managed"
+        ));
+    }
+    if previous
+        .installation
+        .as_deref()
+        .is_some_and(|recorded| recorded != installation)
+        && !(previous.ownership == UpdateOwnership::Direct
+            && ownership == UpdateOwnership::External)
+    {
+        return Err(miette::miette!(
+            "runtime installation changed from {} to {installation}",
+            previous
+                .installation
+                .as_deref()
+                .expect("checked installation should be present")
+        ));
+    }
+    let executable = if ownership == UpdateOwnership::Direct
+        && std::fs::symlink_metadata(executable)
+            .into_diagnostic()
+            .with_context(|| {
+                format!(
+                    "failed to inspect directly managed runtime executable at {}",
+                    policy::path_for_display(executable)
+                )
+            })?
+            .file_type()
+            .is_symlink()
+    {
+        std::fs::canonicalize(executable)
+            .into_diagnostic()
+            .with_context(|| {
+                format!(
+                    "failed to resolve directly managed runtime executable at {}",
+                    policy::path_for_display(executable)
+                )
+            })?
+    } else {
+        executable.to_path_buf()
+    };
+    if previous.ownership == UpdateOwnership::External
+        && previous.installation.is_some()
+        && previous.executable != executable
+    {
+        return Err(miette::miette!(
+            "runtime installation executable path cannot be changed"
+        ));
+    }
+    verify_running_executable(&executable)?;
+    let runtime_digest = sha256_hex(&executable)?;
+    if initialized
+        && previous.ownership == UpdateOwnership::Direct
+        && ownership == UpdateOwnership::Direct
+        && (previous.executable != executable
+            || previous.artifact_name != header.artifact_name
+            || previous.channel != update.channel
+            || previous.package != update.package
+            || previous.build_number != update.build_number
+            || previous.sha256 != runtime_digest
+            || meta.version != header.runtime_version)
+    {
+        return Err(miette::miette!(
+            "directly managed runtime executable changed outside its coordinated update"
+        ));
+    }
+
+    let instruction = match ownership {
+        UpdateOwnership::Direct => None,
+        UpdateOwnership::External => instruction.map(str::to_string).or_else(|| {
+            (previous.ownership == UpdateOwnership::External)
+                .then(|| previous.instruction.clone())
+                .flatten()
+        }),
+    };
+    if previous.ownership == UpdateOwnership::External
+        && previous.installation.is_some()
+        && previous.instruction != instruction
+    {
+        return Err(miette::miette!(
+            "runtime installation update instruction cannot be changed"
+        ));
+    }
+    let replacement = ExecutableUpdateMetadata {
+        executable,
+        ownership,
+        installation: Some(installation.to_string()),
+        artifact_name: header.artifact_name.clone(),
+        channel: update.channel.clone(),
+        package: update.package.clone(),
+        build_number: update.build_number,
+        sha256: runtime_digest,
+        instruction,
+        pending: None,
+    };
+    verify_stamped_file(
+        &meta,
+        &replacement,
+        &replacement.executable,
+        &header.runtime_version,
+        &replacement.sha256,
+    )?;
+    if meta.update.as_ref() == Some(&replacement) && meta.version == header.runtime_version {
+        return Ok(ExecutableUpdateOutcome::None);
+    }
+    meta.version = header.runtime_version.clone();
+    meta.update = Some(replacement);
+    config::persist_metadata_for(prefix, metadata_file, &meta)?;
+    Ok(ExecutableUpdateOutcome::Reconciled)
+}
+
+fn validate_installation(installation: &str) -> miette::Result<()> {
+    if installation.is_empty()
+        || installation.len() > 64
+        || !installation.bytes().enumerate().all(|(index, byte)| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || (index > 0 && byte == b'-')
+        })
+    {
+        return Err(miette::miette!(
+            "runtime installation must be a lowercase ASCII identifier"
+        ));
+    }
+    Ok(())
+}
+
+fn update_source_changed(
+    previous: &ExecutableUpdateMetadata,
+    artifact_name: &str,
+    channel: &str,
+    package: &str,
+) -> bool {
+    (!previous.artifact_name.is_empty() && previous.artifact_name != artifact_name)
+        || (!previous.channel.is_empty() && previous.channel != channel)
+        || (!previous.package.is_empty() && previous.package != package)
+}
+
+fn verify_running_executable(recorded: &Path) -> miette::Result<()> {
+    if !recorded.is_absolute() {
+        return Err(miette::miette!(
+            "recorded runtime executable path is not absolute"
+        ));
+    }
+    let current = std::env::current_exe()
+        .into_diagnostic()
+        .context("failed to determine current runtime executable")?;
+    let current = std::fs::canonicalize(&current)
+        .into_diagnostic()
+        .context("failed to resolve current runtime executable")?;
+    let recorded = std::fs::canonicalize(recorded)
+        .into_diagnostic()
+        .with_context(|| {
+            format!(
+                "failed to resolve runtime executable at {}",
+                policy::path_for_display(recorded)
+            )
+        })?;
+    if current != recorded {
+        return Err(miette::miette!(
+            "runtime installation executable does not resolve to the running executable"
+        ));
+    }
+    Ok(())
 }
 
 fn read_owned_metadata(prefix: &Path, metadata_file: &str) -> miette::Result<PrefixMetadata> {
@@ -678,7 +919,13 @@ fn spawn_windows_worker(prefix: &Path, worker: &Path) -> miette::Result<()> {
             ),
             (policy::PREFIX_ENV_VAR, prefix.as_os_str().to_os_string()),
         ],
-        &[crate::runtime_update::INTERNAL_CANDIDATE_ENV],
+        &[
+            crate::runtime_update::INTERNAL_CANDIDATE_ENV,
+            crate::runtime_update::INTERNAL_OWNERSHIP_ENV,
+            crate::runtime_update::INTERNAL_INSTALLATION_ENV,
+            crate::runtime_update::INTERNAL_EXECUTABLE_ENV,
+            crate::runtime_update::INTERNAL_INSTRUCTION_ENV,
+        ],
     )?;
     let mut command_line = windows_application_command_line(worker)?;
     spawn_windows_process(worker, &mut command_line, &environment).with_context(|| {
@@ -1118,9 +1365,7 @@ fn verify_stamped_file(
         || header.metadata_file != meta.metadata_file
         || header.runtime_version != version
         || header.update.as_ref().is_none_or(|header_update| {
-            header_update.channel != update.channel
-                || header_update.package != update.package
-                || header_update.ownership != update.ownership
+            header_update.channel != update.channel || header_update.package != update.package
         })
         || meta
             .delegate_executable
@@ -1533,6 +1778,7 @@ mod tests {
             update: Some(ExecutableUpdateMetadata {
                 executable,
                 ownership,
+                installation: None,
                 artifact_name: "demo".to_string(),
                 channel: CHANNEL.to_string(),
                 package: PACKAGE.to_string(),
@@ -1561,6 +1807,12 @@ mod tests {
         config::persist_metadata_for(&prefix, ".demo.json", &meta).unwrap();
         ensure_update_lock(&prefix, ".demo.json").unwrap();
         (tmp, prefix, executable, digest)
+    }
+
+    fn confirm_direct_installation(prefix: &Path) {
+        let mut meta = config::read_metadata_for(prefix, ".demo.json").unwrap();
+        meta.update.as_mut().unwrap().installation = Some("standalone".to_string());
+        config::persist_metadata_for(prefix, ".demo.json", &meta).unwrap();
     }
 
     fn stage_update(
@@ -1789,6 +2041,7 @@ mod tests {
                 ".demo.json",
                 &executable,
                 UpdateOwnership::Direct,
+                None,
                 "demo",
                 CHANNEL,
                 PACKAGE,
@@ -1895,6 +2148,7 @@ mod tests {
                 ".demo.json",
                 &executable,
                 UpdateOwnership::Direct,
+                None,
                 "demo",
                 CHANNEL,
                 PACKAGE,
@@ -1906,6 +2160,45 @@ mod tests {
             .unwrap(),
             ExecutableUpdateOutcome::None
         );
+    }
+
+    #[test]
+    fn unclassified_direct_reconciliation_accepts_external_replacement() {
+        let (_tmp, prefix, executable, _) = setup();
+        let digest = stamped_executable_with(
+            &executable,
+            "2.0",
+            1,
+            UpdateOwnership::Direct,
+            CHANNEL,
+            PACKAGE,
+            None,
+        );
+
+        assert_eq!(
+            reconcile_current_executable(
+                &prefix,
+                ".demo.json",
+                &executable,
+                UpdateOwnership::Direct,
+                None,
+                "demo",
+                CHANNEL,
+                PACKAGE,
+                1,
+                None,
+                "2.0",
+                &digest,
+            )
+            .unwrap(),
+            ExecutableUpdateOutcome::Reconciled
+        );
+        let update = config::read_metadata_for(&prefix, ".demo.json")
+            .unwrap()
+            .update
+            .unwrap();
+        assert_eq!(update.ownership, UpdateOwnership::Direct);
+        assert!(update.installation.is_none());
     }
 
     #[test]
@@ -1926,6 +2219,7 @@ mod tests {
             ".demo.json",
             &executable,
             UpdateOwnership::Direct,
+            None,
             "demo",
             "https://new.example.test/channel",
             "renamed-runtime",
@@ -1941,8 +2235,39 @@ mod tests {
     }
 
     #[test]
+    fn reconciliation_protects_bootstrap_source_metadata() {
+        let (_tmp, prefix, executable, digest) = setup();
+        let mut meta = config::read_metadata_for(&prefix, ".demo.json").unwrap();
+        let update = meta.update.as_mut().unwrap();
+        update.executable = PathBuf::new();
+        update.artifact_name.clear();
+        update.sha256.clear();
+        config::persist_metadata_for(&prefix, ".demo.json", &meta).unwrap();
+
+        let error = reconcile_current_executable(
+            &prefix,
+            ".demo.json",
+            &executable,
+            UpdateOwnership::Direct,
+            None,
+            "demo",
+            "https://new.example.test/channel",
+            PACKAGE,
+            0,
+            None,
+            "1.0",
+            &digest,
+        )
+        .unwrap_err()
+        .to_string();
+
+        assert!(error.contains("outside its coordinated update"), "{error}");
+    }
+
+    #[test]
     fn direct_reconciliation_rejects_digest_changes_outside_an_update() {
         let (_tmp, prefix, executable, _) = setup();
+        confirm_direct_installation(&prefix);
         OpenOptions::new()
             .append(true)
             .open(&executable)
@@ -1956,6 +2281,7 @@ mod tests {
             ".demo.json",
             &executable,
             UpdateOwnership::Direct,
+            None,
             "demo",
             CHANNEL,
             PACKAGE,
@@ -1973,6 +2299,7 @@ mod tests {
     #[test]
     fn direct_reconciliation_rejects_a_different_executable_path() {
         let (tmp, prefix, executable, digest) = setup();
+        confirm_direct_installation(&prefix);
         let alternate = tmp
             .path()
             .join(format!("alternate{}", std::env::consts::EXE_SUFFIX));
@@ -1983,6 +2310,7 @@ mod tests {
             ".demo.json",
             &alternate,
             UpdateOwnership::Direct,
+            None,
             "demo",
             CHANNEL,
             PACKAGE,
@@ -2013,6 +2341,7 @@ mod tests {
                 ".demo.json",
                 &executable,
                 UpdateOwnership::Direct,
+                None,
                 "demo",
                 CHANNEL,
                 PACKAGE,
@@ -2055,6 +2384,7 @@ mod tests {
                 ".demo.json",
                 &executable,
                 UpdateOwnership::External,
+                None,
                 "demo",
                 CHANNEL,
                 PACKAGE,

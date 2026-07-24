@@ -47,6 +47,9 @@ async fn async_main() -> miette::Result<()> {
         let action = action
             .to_str()
             .ok_or_else(|| miette::miette!("invalid internal runtime update action"))?;
+        if action == runtime_update::RECORD_INSTALLATION_ACTION {
+            ensure_bootstrapped(&prefix).await?;
+        }
         return runtime_update::run_internal_helper(action, &prefix).await;
     }
     ensure_bootstrapped(&prefix).await?;

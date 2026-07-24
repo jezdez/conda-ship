@@ -143,17 +143,67 @@ packages directly.
 ## Version-One Coordinator Contract
 
 The helper is a compatibility contract for downstream transaction
-coordinators. It is not a user-facing command. A normal runtime invocation must
-first complete bootstrap so the managed prefix, ownership metadata, and update
-lock exist. The coordinator then invokes the stamped executable as a child
-process with `CONDA_SHIP_PREFIX` set to that managed prefix.
+coordinators and installers. It is not a user-facing command. The coordinator
+invokes the stamped executable as a child process with `CONDA_SHIP_PREFIX` set
+to the managed prefix when it needs to override the runtime's stamped install
+location.
 
-Before invoking the helper, the coordinator opens
+Before invoking check, stage, or apply, the coordinator opens
 `<prefix>/.RUNTIME_NAME.update.lock` and holds an exclusive operating-system
 file lock. The runtime creates this one-byte regular file during update
 initialization. The coordinator must hold it through check, stage, the inner
 transaction, and apply. Each version-one action fails when the lock is not
 held.
+
+### Record Installation
+
+An installer or delivery detector records how this copy of the executable is
+managed:
+
+```text
+CONDA_SHIP_INTERNAL_UPDATE=v1/record-installation
+CONDA_SHIP_INTERNAL_UPDATE_OWNERSHIP=external
+CONDA_SHIP_INTERNAL_UPDATE_INSTALLATION=homebrew
+CONDA_SHIP_INTERNAL_UPDATE_EXECUTABLE=/opt/homebrew/bin/demo
+```
+
+This action completes bootstrap when needed and does not invoke the delegate.
+The executable path must be absolute and resolve to the running executable.
+External package managers should pass their stable executable path rather than
+a versioned target.
+
+Direct installers use `direct` ownership and an installation identifier such
+as `standalone` or `constructor`. An external installer may also set
+`CONDA_SHIP_INTERNAL_UPDATE_INSTRUCTION` when its update command cannot be
+derived from the installation identifier.
+
+Bootstrap metadata created before an installer records this value has no
+installation identifier. This compatibility state may reconcile a valid newer
+executable with the same runtime identity and update source. The installer or
+delivery detector should record ownership before the first update check.
+
+The action writes one JSON object:
+
+```json
+{
+  "recorded": true,
+  "ownership": "external",
+  "installation": "homebrew",
+  "executable": "/opt/homebrew/bin/demo",
+  "instruction": null
+}
+```
+
+Recording may change a direct installation to external. It cannot make an
+external installation direct or change an existing external instruction.
+Changing direct to external may also replace the installation identifier and
+stable path, which supports moving an existing standalone runtime under a
+package manager. Other attempts to change an existing installation identifier
+are rejected. The action also rejects pending executable replacement state.
+An adopting package manager must invoke this action during installation,
+before the replacement executable is run normally. Post-delegation receipt
+detection cannot adopt a confirmed direct installation after its executable
+has already changed.
 
 ### Check
 
@@ -175,13 +225,15 @@ A successful check writes one JSON object to stdout:
   "package": "demo-runtime",
   "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
   "ownership": "direct",
+  "installation": "standalone",
   "instruction": null
 }
 ```
 
 When no candidate exists, `available` is `false` and the candidate fields are
-`null`. External ownership uses the same result and can include an
-`instruction`. It must not continue to stage.
+`null`. Ownership, installation, and instruction come from the installed
+runtime metadata rather than the executable stamp. External ownership must not
+continue to stage.
 
 If check completes recovery of an interrupted update, it exits with an error
 that asks the coordinator to retry. This keeps recovery separate from candidate
