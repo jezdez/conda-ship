@@ -23,6 +23,11 @@ All notable changes to `conda-ship` are documented here.
   kind and verifies the replacement against the original runtime identity and
   update source.
 
+### Fixed
+
+- Updated rattler so Linux builds use `quick-xml` 0.41, addressing
+  RUSTSEC-2026-0194 and RUSTSEC-2026-0195.
+
 ## 0.6.4 - 2026-07-23
 
 ### Fixed
