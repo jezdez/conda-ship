@@ -17,7 +17,8 @@ lock, a package list, an info JSON file, and SHA256 checksums.
 `cs build --dry-run` validates planned artifact work without writing files.
 
 Generic runtime behavior lives in `cs`. This includes automatic bootstrap and
-the executable update path when a stamped runtime opts into update policy.
+the executable update path when a stamped runtime opts into update
+configuration.
 Opinionated package sets and distribution defaults belong in downstream
 projects.
 

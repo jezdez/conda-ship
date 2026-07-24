@@ -293,7 +293,6 @@ freeze-base = true
 channel = "https://prefix.dev/demo"
 package = "demo-runtime"
 build-number = 2
-ownership = "direct"
 "#,
     )
     .unwrap();
@@ -321,18 +320,16 @@ ownership = "direct"
     assert!(manifest.tool.conda_ship.freeze_base);
     assert_eq!(
         manifest.tool.conda_ship.update,
-        Some(runtime_data::RuntimeUpdateConfig {
-            channel: "https://prefix.dev/demo".to_string(),
-            package: "demo-runtime".to_string(),
-            build_number: 2,
-            ownership: runtime_data::UpdateOwnership::Direct,
-            instruction: None,
-        })
+        Some(runtime_data::RuntimeUpdateConfig::new(
+            "https://prefix.dev/demo".to_string(),
+            "demo-runtime".to_string(),
+            2,
+        ))
     );
 }
 
 #[test]
-fn test_update_config_defaults_to_direct_build_zero() {
+fn test_update_config_defaults_to_build_zero() {
     let manifest: super::ProjectManifest = toml::from_str(
         r#"
 [tool.conda-ship.update]
@@ -344,32 +341,18 @@ package = "conda-runtime"
 
     let update = manifest.tool.conda_ship.update.unwrap();
     assert_eq!(update.build_number, 0);
-    assert_eq!(update.ownership, runtime_data::UpdateOwnership::Direct);
-    assert!(update.instruction.is_none());
 }
 
 #[rstest]
-#[case::online(BundleLayout::Online, runtime_data::UpdateOwnership::Direct, None)]
-#[case::embedded(BundleLayout::Embedded, runtime_data::UpdateOwnership::Direct, None)]
-#[case::external_owner(BundleLayout::Online, runtime_data::UpdateOwnership::External, None)]
-#[case::external_owner_with_instruction(
-    BundleLayout::Embedded,
-    runtime_data::UpdateOwnership::External,
-    Some("brew update && brew upgrade conda")
-)]
-fn test_update_config_accepts_supported_policy(
-    #[case] layout: BundleLayout,
-    #[case] ownership: runtime_data::UpdateOwnership,
-    #[case] instruction: Option<&str>,
-) {
+#[case::online(BundleLayout::Online)]
+#[case::embedded(BundleLayout::Embedded)]
+fn test_update_config_accepts_supported_layout(#[case] layout: BundleLayout) {
     let config = RuntimeStampConfig {
-        update: Some(runtime_data::RuntimeUpdateConfig {
-            channel: "https://conda.anaconda.org/jezdez".to_string(),
-            package: "conda-runtime".to_string(),
-            build_number: 0,
-            ownership,
-            instruction: instruction.map(str::to_string),
-        }),
+        update: Some(runtime_data::RuntimeUpdateConfig::new(
+            "https://conda.anaconda.org/jezdez".to_string(),
+            "conda-runtime".to_string(),
+            0,
+        )),
         ..RuntimeStampConfig::default()
     };
 
@@ -381,82 +364,45 @@ fn test_update_config_accepts_supported_policy(
     BundleLayout::External,
     "https://prefix.dev/demo",
     "demo-runtime",
-    runtime_data::UpdateOwnership::Direct,
-    None,
     "only for online and embedded"
 )]
-#[case::empty_channel(
-    BundleLayout::Online,
-    "",
-    "demo-runtime",
-    runtime_data::UpdateOwnership::Direct,
-    None,
-    "must not be empty"
-)]
+#[case::empty_channel(BundleLayout::Online, "", "demo-runtime", "must not be empty")]
 #[case::userinfo(
     BundleLayout::Embedded,
     "https://user@prefix.dev/demo",
     "demo-runtime",
-    runtime_data::UpdateOwnership::Direct,
-    None,
     "must not contain credentials"
 )]
 #[case::fragment(
     BundleLayout::Embedded,
     "https://prefix.dev/demo#release",
     "demo-runtime",
-    runtime_data::UpdateOwnership::Direct,
-    None,
     "query or fragment"
 )]
 #[case::insecure_http(
     BundleLayout::Online,
     "http://packages.example.test/demo",
     "demo-runtime",
-    runtime_data::UpdateOwnership::Direct,
-    None,
     "must use https:// or file://"
 )]
 #[case::invalid_package(
     BundleLayout::Online,
     "https://prefix.dev/demo",
     "Invalid Package",
-    runtime_data::UpdateOwnership::Direct,
-    None,
     "invalid runtime update package name"
-)]
-#[case::direct_instruction(
-    BundleLayout::Online,
-    "https://prefix.dev/demo",
-    "demo-runtime",
-    runtime_data::UpdateOwnership::Direct,
-    Some("Run an installer."),
-    "must not configure"
-)]
-#[case::empty_instruction(
-    BundleLayout::Online,
-    "https://prefix.dev/demo",
-    "demo-runtime",
-    runtime_data::UpdateOwnership::External,
-    Some("  "),
-    "instruction must not be empty"
 )]
 fn test_update_config_rejects_invalid_policy(
     #[case] layout: BundleLayout,
     #[case] channel: &str,
     #[case] package: &str,
-    #[case] ownership: runtime_data::UpdateOwnership,
-    #[case] instruction: Option<&str>,
     #[case] expected: &str,
 ) {
     let config = RuntimeStampConfig {
-        update: Some(runtime_data::RuntimeUpdateConfig {
-            channel: channel.to_string(),
-            package: package.to_string(),
-            build_number: 0,
-            ownership,
-            instruction: instruction.map(str::to_string),
-        }),
+        update: Some(runtime_data::RuntimeUpdateConfig::new(
+            channel.to_string(),
+            package.to_string(),
+            0,
+        )),
         ..RuntimeStampConfig::default()
     };
 
@@ -465,6 +411,34 @@ fn test_update_config_rejects_invalid_policy(
         .to_string();
 
     assert!(error.contains(expected), "{error}");
+}
+
+#[rstest]
+#[case::ownership("ownership = \"direct\"")]
+#[case::instruction("instruction = \"Run an installer.\"")]
+fn test_update_config_rejects_installed_state(#[case] setting: &str) {
+    let manifest: super::ProjectManifest = toml::from_str(&format!(
+        r#"
+[tool.conda-ship.update]
+channel = "https://prefix.dev/demo"
+package = "demo-runtime"
+{setting}
+"#
+    ))
+    .unwrap();
+    let config = RuntimeStampConfig {
+        update: manifest.tool.conda_ship.update,
+        ..RuntimeStampConfig::default()
+    };
+
+    let error = validate_update_config(&config, BundleLayout::Online)
+        .unwrap_err()
+        .to_string();
+
+    assert!(
+        error.contains("installed state, not build settings"),
+        "{error}"
+    );
 }
 
 #[test]
@@ -878,13 +852,11 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
             packages: vec!["conda".to_string()],
             delegate_executable: Some("conda".to_string()),
             runtime_version: Some("9.8.7".to_string()),
-            update: Some(runtime_data::RuntimeUpdateConfig {
-                channel: "https://conda.anaconda.org/jezdez".to_string(),
-                package: "conda-runtime".to_string(),
-                build_number: 3,
-                ownership: runtime_data::UpdateOwnership::External,
-                instruction: Some("brew update && brew upgrade conda".to_string()),
-            }),
+            update: Some(runtime_data::RuntimeUpdateConfig::new(
+                "https://conda.anaconda.org/jezdez".to_string(),
+                "conda-runtime".to_string(),
+                3,
+            )),
             ..RuntimeStampConfig::default()
         },
         platforms: vec![platform],

@@ -45,15 +45,41 @@ pub struct RuntimeUpdateConfig {
     pub package: String,
     #[serde(default, rename = "build-number")]
     pub build_number: u64,
-    #[serde(default)]
-    pub ownership: UpdateOwnership,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub instruction: Option<String>,
+    #[serde(default, rename = "ownership", skip_serializing)]
+    compatibility_ownership: Option<UpdateOwnership>,
+    #[serde(default, rename = "instruction", skip_serializing)]
+    compatibility_instruction: Option<String>,
 }
 
+#[allow(dead_code)]
 impl RuntimeUpdateConfig {
-    pub fn supports_direct_update(&self) -> bool {
-        self.ownership == UpdateOwnership::Direct
+    pub(crate) fn new(channel: String, package: String, build_number: u64) -> Self {
+        Self {
+            channel,
+            package,
+            build_number,
+            compatibility_ownership: None,
+            compatibility_instruction: None,
+        }
+    }
+
+    pub(crate) fn initial_ownership(&self) -> UpdateOwnership {
+        self.compatibility_ownership.unwrap_or_default()
+    }
+
+    pub(crate) fn initial_instruction(&self) -> Option<&str> {
+        self.compatibility_instruction.as_deref()
+    }
+
+    pub(crate) fn has_compatibility_policy(&self) -> bool {
+        self.compatibility_ownership.is_some() || self.compatibility_instruction.is_some()
+    }
+
+    pub(crate) fn supports_direct_update(&self) -> bool {
+        !matches!(
+            self.compatibility_ownership,
+            Some(UpdateOwnership::External)
+        ) && self.compatibility_instruction.is_none()
     }
 }
 
@@ -455,6 +481,57 @@ fn invalid_data(error: impl std::fmt::Display) -> io::Error {
 mod tests {
     use super::*;
     use std::io::Read;
+
+    #[test]
+    fn test_legacy_update_policy_is_read_but_not_written() {
+        let update: RuntimeUpdateConfig = serde_json::from_value(serde_json::json!({
+            "channel": "https://packages.example.test/runtime",
+            "package": "demo-runtime",
+            "build-number": 2,
+            "ownership": "external",
+            "instruction": "Use the installer."
+        }))
+        .unwrap();
+
+        assert_eq!(update.initial_ownership(), UpdateOwnership::External);
+        assert_eq!(update.initial_instruction(), Some("Use the installer."));
+
+        let serialized = serde_json::to_value(update).unwrap();
+        assert!(serialized.get("ownership").is_none());
+        assert!(serialized.get("instruction").is_none());
+    }
+
+    #[test]
+    fn test_legacy_external_update_policy_is_not_direct_capable() {
+        let direct: RuntimeUpdateConfig = serde_json::from_value(serde_json::json!({
+            "channel": "https://packages.example.test/runtime",
+            "package": "demo-runtime",
+            "ownership": "direct"
+        }))
+        .unwrap();
+        let external: RuntimeUpdateConfig = serde_json::from_value(serde_json::json!({
+            "channel": "https://packages.example.test/runtime",
+            "package": "demo-runtime",
+            "ownership": "external"
+        }))
+        .unwrap();
+        let malformed_direct: RuntimeUpdateConfig = serde_json::from_value(serde_json::json!({
+            "channel": "https://packages.example.test/runtime",
+            "package": "demo-runtime",
+            "instruction": "Use an external installer."
+        }))
+        .unwrap();
+        let current = RuntimeUpdateConfig::new(
+            "https://packages.example.test/runtime".to_string(),
+            "demo-runtime".to_string(),
+            0,
+        );
+
+        assert!(direct.supports_direct_update());
+        assert!(current.supports_direct_update());
+        assert!(!external.supports_direct_update());
+        assert!(!malformed_direct.supports_direct_update());
+    }
 
     #[test]
     fn test_missing_runtime_data_returns_none() {

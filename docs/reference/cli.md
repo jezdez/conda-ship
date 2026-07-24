@@ -153,13 +153,13 @@ The command validates:
 
 - the artifact info schema
 - runtime name, artifact name, version, layout, and native platform
-- direct update capability and the configured update source
+- executable update configuration and source
 - the executable stamp and embedded bundle, when present
 - the recorded executable checksum when `--binary` is omitted
 
-Only `online` and `embedded` runtimes with direct update capability are
-accepted. The output is a dependency-free native `.conda` package. It contains
-one executable payload at `bin/ARTIFACT_NAME` on Unix or
+Only update-enabled `online` and `embedded` runtimes are accepted. The output
+is a dependency-free native `.conda` package. It contains one executable
+payload at `bin/ARTIFACT_NAME` on Unix or
 `ARTIFACT_NAME.exe` on Windows, plus normal conda package metadata.
 
 The output filename is `PACKAGE-VERSION-BUILD_NUMBER.conda`. The command

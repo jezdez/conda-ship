@@ -112,7 +112,7 @@ builder. Use that output for the post-sign packaging step:
       --out-dir update-packages
 ```
 
-`cs package-update` accepts the canonical direct-capable executable. Package
+`cs package-update` accepts the canonical update-enabled executable. Package
 managers can install those same bytes and record the installed copy as external
 with `v1/record-installation`. The indexed package remains the common release
 signal. An external installation does not stage its payload, and a replacement

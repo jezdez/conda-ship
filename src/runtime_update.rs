@@ -139,11 +139,6 @@ pub(crate) async fn run_internal_helper(action: &str, prefix: &Path) -> miette::
                 .into_diagnostic()?;
         }
         STAGE_ACTION => {
-            if !update.supports_direct_update() {
-                return Err(miette::miette!(
-                    "this runtime executable does not support direct updates"
-                ));
-            }
             let recorded = metadata.update.as_ref().ok_or_else(|| {
                 miette::miette!("runtime metadata does not configure executable updates")
             })?;
@@ -221,18 +216,7 @@ pub(crate) async fn run_internal_helper(action: &str, prefix: &Path) -> miette::
                 &installation,
                 instruction.as_deref(),
             )?;
-            let recorded = config::read_metadata_for(prefix, &header.metadata_file)?
-                .update
-                .ok_or_else(|| {
-                    miette::miette!("runtime metadata does not configure executable updates")
-                })?;
-            write_response(&serde_json::json!({
-                "recorded": true,
-                "ownership": recorded.ownership,
-                "installation": recorded.installation,
-                "executable": recorded.executable,
-                "instruction": recorded.instruction,
-            }))?;
+            write_response(&serde_json::json!({"recorded": true}))?;
         }
         other => {
             return Err(miette::miette!(
@@ -373,18 +357,19 @@ pub(crate) fn reconcile_current(prefix: &Path) -> miette::Result<()> {
             )
         }
         previous => {
-            let ownership = previous.map_or(update.ownership, |previous| previous.ownership);
+            let ownership =
+                previous.map_or(update.initial_ownership(), |previous| previous.ownership);
             (
                 initial_executable_path(ownership)?,
                 ownership,
                 None,
                 previous
                     .and_then(|previous| previous.instruction.as_deref())
-                    .or(update.instruction.as_deref()),
+                    .or(update.initial_instruction()),
             )
         }
     };
-    verify_current_executable(&executable)?;
+    executable_update::verify_running_executable(&executable)?;
     let (digest, _) = hash::sha256_file(&executable)
         .into_diagnostic()
         .with_context(|| {
@@ -408,30 +393,6 @@ pub(crate) fn reconcile_current(prefix: &Path) -> miette::Result<()> {
         &hash::hex(&digest),
     )
     .map(|_| ())
-}
-
-fn verify_current_executable(recorded: &Path) -> miette::Result<()> {
-    let current = std::env::current_exe()
-        .into_diagnostic()
-        .context("failed to determine current runtime executable")?;
-    let current = std::fs::canonicalize(&current)
-        .into_diagnostic()
-        .context("failed to resolve current runtime executable")?;
-    let recorded_resolved = std::fs::canonicalize(recorded)
-        .into_diagnostic()
-        .with_context(|| {
-            format!(
-                "failed to resolve recorded runtime executable at {}",
-                policy::path_for_display(recorded)
-            )
-        })?;
-    if current != recorded_resolved {
-        return Err(miette::miette!(
-            "current runtime executable does not match the recorded stable path at {}",
-            policy::path_for_display(recorded)
-        ));
-    }
-    Ok(())
 }
 
 fn initial_executable_path(ownership: UpdateOwnership) -> miette::Result<PathBuf> {
@@ -820,22 +781,7 @@ fn validate_update_config(update: &RuntimeUpdateConfig) -> miette::Result<()> {
     PackageName::from_str(&update.package)
         .into_diagnostic()
         .context("failed to parse runtime update package name")?;
-    match update.ownership {
-        UpdateOwnership::Direct if update.instruction.is_some() => Err(miette::miette!(
-            "direct runtime updates must not configure an external update instruction"
-        )),
-        UpdateOwnership::External
-            if update
-                .instruction
-                .as_deref()
-                .is_some_and(|instruction| instruction.trim().is_empty()) =>
-        {
-            Err(miette::miette!(
-                "external runtime update instructions must not be empty"
-            ))
-        }
-        _ => Ok(()),
-    }
+    Ok(())
 }
 
 fn update_cache_dir(prefix: &Path) -> miette::Result<PathBuf> {
@@ -993,13 +939,7 @@ mod tests {
     }
 
     fn test_update(channel: impl Into<String>, build_number: u64) -> RuntimeUpdateConfig {
-        RuntimeUpdateConfig {
-            channel: channel.into(),
-            package: TEST_PACKAGE.to_string(),
-            build_number,
-            ownership: UpdateOwnership::Direct,
-            instruction: None,
-        }
+        RuntimeUpdateConfig::new(channel.into(), TEST_PACKAGE.to_string(), build_number)
     }
 
     fn test_digest(byte: u8) -> String {
@@ -1249,31 +1189,6 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("HTTPS downgrade"), "{error}");
-    }
-
-    #[test]
-    fn external_update_instruction_is_optional_but_cannot_be_empty() {
-        let mut update = test_update("https://packages.example.test/runtime", 0);
-        update.ownership = UpdateOwnership::External;
-
-        validate_update_config(&update).unwrap();
-
-        update.instruction = Some("   ".to_string());
-        let error = validate_update_config(&update).unwrap_err().to_string();
-        assert!(error.contains("must not be empty"), "{error}");
-
-        update.instruction = Some("brew upgrade conda".to_string());
-        validate_update_config(&update).unwrap();
-    }
-
-    #[test]
-    fn direct_update_rejects_an_external_instruction() {
-        let mut update = test_update("https://packages.example.test/runtime", 0);
-        update.instruction = Some("brew upgrade conda".to_string());
-
-        let error = validate_update_config(&update).unwrap_err().to_string();
-
-        assert!(error.contains("must not configure"), "{error}");
     }
 
     #[test]

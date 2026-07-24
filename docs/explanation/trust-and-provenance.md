@@ -58,7 +58,8 @@ channel. Before staging an executable it verifies:
 - package name, version, build number, platform, dependencies, and payload count
 - the payload size and SHA256 recorded by the package
 - the executable stamp, runtime and artifact identity, platform, and version
-- update channel, package, build number, and installed direct ownership
+- update channel, package, and build number
+- installed direct ownership before staging
 
 The runtime accepts only a newer version or build number. It refuses a package
 that rotates the stamped update source. Installed ownership and installation

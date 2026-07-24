@@ -759,11 +759,7 @@ fn test_external_manager_replacement_reconciles_the_stable_runtime() {
         String::from_utf8_lossy(&recorded.stderr)
     );
     let recorded: serde_json::Value = serde_json::from_slice(&recorded.stdout).unwrap();
-    assert_eq!(recorded["recorded"], true);
-    assert_eq!(recorded["ownership"], "external");
-    assert_eq!(recorded["installation"], "homebrew");
-    assert_eq!(recorded["executable"], stable.to_str().unwrap());
-    assert!(recorded["instruction"].is_null());
+    assert_eq!(recorded, serde_json::json!({"recorded": true}));
 
     assert_cmd::Command::new(&stable)
         .env("CONDA_SHIP_PREFIX", &prefix)

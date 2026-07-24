@@ -568,15 +568,8 @@ pub(crate) fn record_installation(
 }
 
 fn validate_installation(installation: &str) -> miette::Result<()> {
-    if installation.is_empty()
-        || installation.len() > 64
-        || !installation.bytes().enumerate().all(|(index, byte)| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || (index > 0 && byte == b'-')
-        })
-    {
-        return Err(miette::miette!(
-            "runtime installation must be a lowercase ASCII identifier"
-        ));
+    if installation.trim().is_empty() {
+        return Err(miette::miette!("runtime installation must not be empty"));
     }
     Ok(())
 }
@@ -592,7 +585,7 @@ fn update_source_changed(
         || (!previous.package.is_empty() && previous.package != package)
 }
 
-fn verify_running_executable(recorded: &Path) -> miette::Result<()> {
+pub(crate) fn verify_running_executable(recorded: &Path) -> miette::Result<()> {
     if !recorded.is_absolute() {
         return Err(miette::miette!(
             "recorded runtime executable path is not absolute"
@@ -1689,49 +1682,29 @@ mod tests {
     const EXTERNAL_INSTRUCTION: &str = "upgrade with the external package manager";
 
     fn stamped_executable(path: &Path, version: &str) -> String {
-        stamped_executable_with(
-            path,
-            version,
-            0,
-            UpdateOwnership::Direct,
-            CHANNEL,
-            PACKAGE,
-            None,
-        )
+        stamped_executable_with(path, version, 0, CHANNEL, PACKAGE)
     }
 
     fn stamped_candidate(path: &Path, version: &str, build_number: u64) -> String {
-        stamped_executable_with(
-            path,
-            version,
-            build_number,
-            UpdateOwnership::Direct,
-            CHANNEL,
-            PACKAGE,
-            None,
-        )
+        stamped_executable_with(path, version, build_number, CHANNEL, PACKAGE)
     }
 
     fn stamped_executable_with(
         path: &Path,
         version: &str,
         build_number: u64,
-        ownership: UpdateOwnership,
         channel: &str,
         package: &str,
-        instruction: Option<&str>,
     ) -> String {
         std::fs::write(path, format!("binary-{version}-{build_number}")).unwrap();
         let mut header = runtime_data::RuntimeDataHeader::for_name("demo");
         header.artifact_name = "demo".to_string();
         header.runtime_version = version.to_string();
-        header.update = Some(runtime_data::RuntimeUpdateConfig {
-            channel: channel.to_string(),
-            package: package.to_string(),
+        header.update = Some(runtime_data::RuntimeUpdateConfig::new(
+            channel.to_string(),
+            package.to_string(),
             build_number,
-            ownership,
-            instruction: instruction.map(str::to_string),
-        });
+        ));
         runtime_data::append_to_binary(path, &header, None).unwrap();
         #[cfg(unix)]
         {
@@ -1747,13 +1720,11 @@ mod tests {
         let mut header = runtime_data::RuntimeDataHeader::for_name("demo");
         header.artifact_name = "demo".to_string();
         header.runtime_version = version.to_string();
-        header.update = Some(runtime_data::RuntimeUpdateConfig {
-            channel: CHANNEL.to_string(),
-            package: PACKAGE.to_string(),
+        header.update = Some(runtime_data::RuntimeUpdateConfig::new(
+            CHANNEL.to_string(),
+            PACKAGE.to_string(),
             build_number,
-            ownership: UpdateOwnership::Direct,
-            instruction: None,
-        });
+        ));
         runtime_data::append_to_binary(path, &header, None).unwrap();
         sha256_hex(path).unwrap()
     }
@@ -1813,6 +1784,13 @@ mod tests {
         let mut meta = config::read_metadata_for(prefix, ".demo.json").unwrap();
         meta.update.as_mut().unwrap().installation = Some("standalone".to_string());
         config::persist_metadata_for(prefix, ".demo.json", &meta).unwrap();
+    }
+
+    #[test]
+    fn installation_labels_are_opaque() {
+        validate_installation("Homebrew user install").unwrap();
+        assert!(validate_installation("").is_err());
+        assert!(validate_installation("   ").is_err());
     }
 
     fn stage_update(
@@ -2165,15 +2143,7 @@ mod tests {
     #[test]
     fn unclassified_direct_reconciliation_accepts_external_replacement() {
         let (_tmp, prefix, executable, _) = setup();
-        let digest = stamped_executable_with(
-            &executable,
-            "2.0",
-            1,
-            UpdateOwnership::Direct,
-            CHANNEL,
-            PACKAGE,
-            None,
-        );
+        let digest = stamped_executable_with(&executable, "2.0", 1, CHANNEL, PACKAGE);
 
         assert_eq!(
             reconcile_current_executable(
@@ -2208,10 +2178,8 @@ mod tests {
             &executable,
             "2.0",
             1,
-            UpdateOwnership::Direct,
             "https://new.example.test/channel",
             "renamed-runtime",
-            None,
         );
 
         let error = reconcile_current_executable(
@@ -2368,15 +2336,7 @@ mod tests {
         update.ownership = UpdateOwnership::External;
         update.instruction = Some(EXTERNAL_INSTRUCTION.to_string());
         config::persist_metadata_for(&prefix, ".demo.json", &meta).unwrap();
-        let digest = stamped_executable_with(
-            &executable,
-            "2.0",
-            1,
-            UpdateOwnership::External,
-            CHANNEL,
-            PACKAGE,
-            Some(EXTERNAL_INSTRUCTION),
-        );
+        let digest = stamped_executable_with(&executable, "2.0", 1, CHANNEL, PACKAGE);
 
         assert_eq!(
             reconcile_current_executable(

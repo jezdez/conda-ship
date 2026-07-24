@@ -85,14 +85,14 @@ impl ExecutableUpdateMetadata {
     fn from_config(update: &runtime_data::RuntimeUpdateConfig) -> Self {
         Self {
             executable: PathBuf::new(),
-            ownership: update.ownership,
+            ownership: update.initial_ownership(),
             installation: None,
             artifact_name: String::new(),
             channel: update.channel.clone(),
             package: update.package.clone(),
             build_number: update.build_number,
             sha256: String::new(),
-            instruction: update.instruction.clone(),
+            instruction: update.initial_instruction().map(str::to_string),
             pending: None,
         }
     }
@@ -535,15 +535,13 @@ mod tests {
     }
 
     #[test]
-    fn test_update_metadata_starts_with_only_stamped_policy() {
+    fn test_update_metadata_starts_with_stamped_configuration() {
         let tmp = TempDir::new().unwrap();
-        let update = runtime_data::RuntimeUpdateConfig {
-            channel: "https://conda.anaconda.org/jezdez".to_string(),
-            package: "conda-runtime".to_string(),
-            build_number: 4,
-            ownership: runtime_data::UpdateOwnership::External,
-            instruction: Some("brew update && brew upgrade conda".to_string()),
-        };
+        let update = runtime_data::RuntimeUpdateConfig::new(
+            "https://conda.anaconda.org/jezdez".to_string(),
+            "conda-runtime".to_string(),
+            4,
+        );
 
         write_metadata_for_identity(
             tmp.path(),
@@ -561,26 +559,18 @@ mod tests {
         )
         .unwrap();
 
-        let mut meta = read_metadata_from_path(&tmp.path().join(".conda.json")).unwrap();
-        let recorded = meta.update.as_mut().unwrap();
-        assert_eq!(recorded.ownership, update.ownership);
+        let meta = read_metadata_from_path(&tmp.path().join(".conda.json")).unwrap();
+        let recorded = meta.update.unwrap();
+        assert_eq!(recorded.ownership, runtime_data::UpdateOwnership::Direct);
         assert!(recorded.installation.is_none());
         assert_eq!(recorded.channel, update.channel);
         assert_eq!(recorded.package, update.package);
         assert_eq!(recorded.build_number, update.build_number);
-        assert_eq!(recorded.instruction, update.instruction);
+        assert!(recorded.instruction.is_none());
         assert!(recorded.executable.as_os_str().is_empty());
         assert!(recorded.artifact_name.is_empty());
         assert!(recorded.sha256.is_empty());
         assert!(recorded.pending.is_none());
-
-        recorded.installation = Some("homebrew".to_string());
-        persist_metadata_for(tmp.path(), ".conda.json", &meta).unwrap();
-        let recorded = read_metadata_from_path(&tmp.path().join(".conda.json"))
-            .unwrap()
-            .update
-            .unwrap();
-        assert_eq!(recorded.installation.as_deref(), Some("homebrew"));
     }
 
     #[test]

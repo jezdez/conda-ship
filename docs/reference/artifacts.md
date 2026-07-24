@@ -42,9 +42,9 @@ For the difference between `runtime-name` and `artifact-name`, see
 ## Runtime Update Packages
 
 `cs package-update` writes a dependency-free native `.conda` package from a
-finalized `online` or `embedded` runtime with direct update capability. This is
-separate from `cs build` and does not add a file to the normal `dist/` set
-unless that directory is selected explicitly.
+finalized update-enabled `online` or `embedded` runtime. This is separate from
+`cs build` and does not add a file to the normal `dist/` set unless that
+directory is selected explicitly.
 
 The package contains one executable payload plus normal conda package metadata:
 
@@ -106,10 +106,10 @@ install path.
 conda-ship appends a runtime data block to every staged runtime. The block
 contains the runtime lock, runtime and artifact identity, version, platform,
 delegate executable, install scheme, install name, docs URL, installer,
-optional executable update policy, bundle and offline environment variable
-names, and the embedded bundle bytes for `embedded` builds. The universal
-`CONDA_SHIP_PREFIX` override is runtime behavior rather than a stamped variable
-name.
+optional executable update configuration, bundle and offline environment
+variable names, and the embedded bundle bytes for `embedded` builds. The
+universal `CONDA_SHIP_PREFIX` override is runtime behavior rather than a
+stamped variable name.
 
 The data block ends with:
 
@@ -153,7 +153,7 @@ The info JSON contains:
 - runtime version
 - layout
 - conda platform
-- optional executable update policy
+- optional executable update configuration
 - runtime filename
 - optional external bundle filename
 - lock filename

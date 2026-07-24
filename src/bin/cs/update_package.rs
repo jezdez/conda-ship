@@ -98,7 +98,7 @@ fn package_update(
         .ok_or_else(|| miette::miette!("runtime executable has no update configuration"))?;
     if !update.supports_direct_update() {
         return Err(miette::miette!(
-            "update packages must be built from a directly managed runtime"
+            "legacy externally managed runtimes cannot be packaged for direct executable updates"
         ));
     }
     validate_channel(&update.channel)?;
@@ -478,13 +478,11 @@ mod tests {
     use crate::artifact::{ArtifactChecksum, ArtifactInfo};
 
     fn update_config() -> runtime_data::RuntimeUpdateConfig {
-        runtime_data::RuntimeUpdateConfig {
-            channel: "https://prefix.dev/demo".to_string(),
-            package: "demo-runtime".to_string(),
-            build_number: 3,
-            ownership: runtime_data::UpdateOwnership::Direct,
-            instruction: None,
-        }
+        runtime_data::RuntimeUpdateConfig::new(
+            "https://prefix.dev/demo".to_string(),
+            "demo-runtime".to_string(),
+            3,
+        )
     }
 
     fn write_fixture(root: &Path, layout: &str) -> (PathBuf, PathBuf) {
@@ -717,34 +715,6 @@ mod tests {
         let error = package_update(&info, None, None).unwrap_err().to_string();
 
         assert!(error.contains("only for online and embedded"), "{error}");
-    }
-
-    #[test]
-    fn externally_managed_runtime_is_rejected() {
-        let tmp = TempDir::new().unwrap();
-        let (info_path, binary) = write_fixture(tmp.path(), "online");
-        let mut stamped = runtime_data::read_from_path(&binary).unwrap().unwrap();
-        stamped.header.update.as_mut().unwrap().ownership = runtime_data::UpdateOwnership::External;
-        fs::write(&binary, b"runtime executable").unwrap();
-        runtime_data::append_to_binary(&binary, &stamped.header, None).unwrap();
-        let (digest, bytes) = hash::sha256_file(&binary).unwrap();
-        let mut info: ArtifactInfo =
-            serde_json::from_slice(&fs::read(&info_path).unwrap()).unwrap();
-        info.update.as_mut().unwrap().ownership = runtime_data::UpdateOwnership::External;
-        let checksum = info
-            .checksums
-            .iter_mut()
-            .find(|checksum| checksum.path == info.binary)
-            .unwrap();
-        checksum.sha256 = hash::hex(&digest);
-        checksum.bytes = bytes;
-        write_json(&info_path, &info).unwrap();
-
-        let error = package_update(&info_path, None, None)
-            .unwrap_err()
-            .to_string();
-
-        assert!(error.contains("directly managed"), "{error}");
     }
 
     #[test]

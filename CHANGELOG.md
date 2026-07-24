@@ -15,6 +15,10 @@ All notable changes to `conda-ship` are documented here.
 - Installed executable ownership is now independent of the stamped update
   source. One direct-capable runtime can be delivered by a standalone
   installer, Homebrew, a Python package, or another external manager.
+- New builds stamp only the update channel, package, and build number.
+  `ownership` and `instruction` are installed state recorded through
+  `v1/record-installation`. Runtimes still read those fields from existing
+  0.6.x artifacts.
 - External package-manager replacement preserves the recorded installation
   kind and verifies the replacement against the original runtime identity and
   update source.

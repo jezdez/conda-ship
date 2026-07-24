@@ -97,7 +97,9 @@ Executable updates are disabled unless the runtime was built with
 bootstrap and delegate behavior. The update engine does not reserve an
 `update`, `self`, or other delegate subcommand.
 
-The stamped policy has two ownership modes:
+The stamp records the update channel, package, and current build number. Every
+update-enabled executable contains the direct update engine. The installed
+metadata has two ownership modes:
 
 `direct`
 : A downstream coordinator can check, stage, and apply a native executable
@@ -126,8 +128,8 @@ package into the managed prefix.
 
 Direct staging verifies the repodata size and SHA256, conda package metadata,
 payload size and SHA256, executable stamp, runtime and artifact identity,
-platform, version, build number, ownership, and update source. A candidate
-cannot rotate its direct update channel or package.
+platform, version, build number, and update source. A candidate cannot rotate
+its update channel or package.
 
 Update channels must use `https://` or `file://`. Stamped URLs cannot contain
 credentials, a query, or a fragment. HTTPS requests can read credentials from
@@ -172,13 +174,13 @@ The executable path must be absolute and resolve to the running executable.
 External package managers should pass their stable executable path rather than
 a versioned target.
 
-Direct installers use `direct` ownership and an installation identifier such
-as `standalone` or `constructor`. An external installer may also set
-`CONDA_SHIP_INTERNAL_UPDATE_INSTRUCTION` when its update command cannot be
-derived from the installation identifier.
+Direct installers use `direct` ownership and an installation label such as
+`standalone` or `constructor`. An external installer should also set
+`CONDA_SHIP_INTERNAL_UPDATE_INSTRUCTION` to the final user-facing update
+instruction when one is available.
 
 Bootstrap metadata created before an installer records this value has no
-installation identifier. This compatibility state may reconcile a valid newer
+installation label. This compatibility state may reconcile a valid newer
 executable with the same runtime identity and update source. The installer or
 delivery detector should record ownership before the first update check.
 
@@ -186,19 +188,18 @@ The action writes one JSON object:
 
 ```json
 {
-  "recorded": true,
-  "ownership": "external",
-  "installation": "homebrew",
-  "executable": "/opt/homebrew/bin/demo",
-  "instruction": null
+  "recorded": true
 }
 ```
 
+The updated values are persisted in `.RUNTIME_NAME.json`, which is the source
+of truth for later checks.
+
 Recording may change a direct installation to external. It cannot make an
 external installation direct or change an existing external instruction.
-Changing direct to external may also replace the installation identifier and
+Changing direct to external may also replace the installation label and
 stable path, which supports moving an existing standalone runtime under a
-package manager. Other attempts to change an existing installation identifier
+package manager. Other attempts to change an existing installation label
 are rejected. The action also rejects pending executable replacement state.
 An adopting package manager must invoke this action during installation,
 before the replacement executable is run normally. Post-delegation receipt

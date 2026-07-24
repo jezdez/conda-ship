@@ -127,10 +127,10 @@ update lock coordinates processes but does not contain update state.
 
 `external`
 : The channel package is a release signal. A downstream coordinator reports an
-  instruction chosen from the recorded installation kind and leaves
-  replacement to the package manager or installer. On the next invocation, a
-  newly stamped executable at the recorded stable path is verified and
-  reconciled with the prefix record.
+  instruction recorded for that installation and leaves replacement to the
+  package manager or installer. On the next invocation, a newly stamped
+  executable at the recorded stable path is verified and reconciled with the
+  prefix record.
 
 The executable stamp records update capability and source identity. Installed
 ownership is a property of the copy on disk. A standalone installer and an

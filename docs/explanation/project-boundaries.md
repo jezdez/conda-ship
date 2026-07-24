@@ -36,7 +36,7 @@ conda-ship owns the reusable build and runtime machinery:
 - staging `online`, `external`, and `embedded` artifact layouts
 - writing artifact metadata: `.runtime.lock`, `.packages.txt`, `.info.json`,
   and `.sha256`
-- stamping optional executable update policy
+- stamping optional executable update configuration
 - creating native executable update packages from finalized runtime bytes
 - exposing the composite GitHub Action and local builder CLI
 

@@ -75,8 +75,9 @@ See {doc}`runtime-cli` for the required bootstrap, lock, and call sequence.
   are `direct` and `external`.
 
 `CONDA_SHIP_INTERNAL_UPDATE_INSTALLATION`
-: Lowercase installation identifier for `v1/record-installation`, such as
-  `standalone`, `constructor`, `homebrew`, `pipx`, or `uv-tool`.
+: Non-blank installation label for `v1/record-installation`, such as
+  `standalone`, `constructor`, `homebrew`, `pipx`, or `uv-tool`. The value is
+  stored unchanged.
 
 `CONDA_SHIP_INTERNAL_UPDATE_EXECUTABLE`
 : Optional absolute stable executable path for `v1/record-installation`. The
