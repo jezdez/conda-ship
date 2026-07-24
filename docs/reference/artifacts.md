@@ -42,7 +42,7 @@ For the difference between `runtime-name` and `artifact-name`, see
 ## Runtime Update Packages
 
 `cs package-update` writes a dependency-free native `.conda` package from a
-finalized `online` or `embedded` runtime with direct update ownership. This is
+finalized `online` or `embedded` runtime with direct update capability. This is
 separate from `cs build` and does not add a file to the normal `dist/` set
 unless that directory is selected explicitly.
 

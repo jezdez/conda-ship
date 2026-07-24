@@ -96,7 +96,7 @@ fn package_update(
         .update
         .as_ref()
         .ok_or_else(|| miette::miette!("runtime executable has no update configuration"))?;
-    if update.ownership != runtime_data::UpdateOwnership::Direct {
+    if !update.supports_direct_update() {
         return Err(miette::miette!(
             "update packages must be built from a directly managed runtime"
         ));

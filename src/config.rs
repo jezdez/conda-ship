@@ -65,6 +65,8 @@ pub(crate) struct ExecutableUpdateMetadata {
     pub executable: PathBuf,
     #[serde(default)]
     pub ownership: runtime_data::UpdateOwnership,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub installation: Option<String>,
     #[serde(default)]
     pub artifact_name: String,
     pub channel: String,
@@ -84,6 +86,7 @@ impl ExecutableUpdateMetadata {
         Self {
             executable: PathBuf::new(),
             ownership: update.ownership,
+            installation: None,
             artifact_name: String::new(),
             channel: update.channel.clone(),
             package: update.package.clone(),
@@ -558,9 +561,10 @@ mod tests {
         )
         .unwrap();
 
-        let meta = read_metadata_from_path(&tmp.path().join(".conda.json")).unwrap();
-        let recorded = meta.update.unwrap();
+        let mut meta = read_metadata_from_path(&tmp.path().join(".conda.json")).unwrap();
+        let recorded = meta.update.as_mut().unwrap();
         assert_eq!(recorded.ownership, update.ownership);
+        assert!(recorded.installation.is_none());
         assert_eq!(recorded.channel, update.channel);
         assert_eq!(recorded.package, update.package);
         assert_eq!(recorded.build_number, update.build_number);
@@ -569,6 +573,14 @@ mod tests {
         assert!(recorded.artifact_name.is_empty());
         assert!(recorded.sha256.is_empty());
         assert!(recorded.pending.is_none());
+
+        recorded.installation = Some("homebrew".to_string());
+        persist_metadata_for(tmp.path(), ".conda.json", &meta).unwrap();
+        let recorded = read_metadata_from_path(&tmp.path().join(".conda.json"))
+            .unwrap()
+            .update
+            .unwrap();
+        assert_eq!(recorded.installation.as_deref(), Some("homebrew"));
     }
 
     #[test]

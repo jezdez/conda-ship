@@ -74,6 +74,8 @@ Downstream projects decide what their users get:
 - constructor-based installers or enterprise package manager recipes
 - orchestrator catalogs, onboarding, login, policy, and user-facing shim names
 - publication and indexing of executable update packages
+- detecting supported package-manager receipts and recording installed
+  executable ownership
 - user prompting and coordination with the inner package transaction
 - credentials supplied through an explicit `RATTLER_AUTH_FILE`
 - commands used to replace an externally owned executable

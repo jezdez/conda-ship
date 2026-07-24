@@ -96,6 +96,27 @@ fn hold_runtime_update_lock(prefix: &Path) -> File {
     lock
 }
 
+fn record_installation(
+    runtime: &Path,
+    prefix: &Path,
+    ownership: &str,
+    installation: &str,
+    executable: &Path,
+    instruction: Option<&str>,
+) -> std::process::Output {
+    let mut command = Command::new(runtime);
+    command
+        .env("CONDA_SHIP_PREFIX", prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/record-installation")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OWNERSHIP", ownership)
+        .env("CONDA_SHIP_INTERNAL_UPDATE_INSTALLATION", installation)
+        .env("CONDA_SHIP_INTERNAL_UPDATE_EXECUTABLE", executable);
+    if let Some(instruction) = instruction {
+        command.env("CONDA_SHIP_INTERNAL_UPDATE_INSTRUCTION", instruction);
+    }
+    command.output().unwrap()
+}
+
 #[test]
 fn test_runtime_template_refuses_to_run_without_stamp() {
     cargo_bin_cmd!("cs-template")
@@ -420,6 +441,12 @@ fn test_update_package_replaces_the_stable_runtime_from_a_file_channel() {
         .arg("--help")
         .assert()
         .success();
+    let recorded = record_installation(&stable, &prefix, "direct", "standalone", &stable, None);
+    assert!(
+        recorded.status.success(),
+        "{}",
+        String::from_utf8_lossy(&recorded.stderr)
+    );
 
     let coordinator = hold_runtime_update_lock(&prefix);
     let check = Command::new(&stable)
@@ -468,6 +495,14 @@ fn test_update_package_replaces_the_stable_runtime_from_a_file_channel() {
     assert_eq!(pending["executable_sha256"], package["payload_sha256"]);
     assert!(pending.get("candidate").is_none());
     assert!(pending.get("backup").is_none());
+
+    let record_while_pending =
+        record_installation(&stable, &prefix, "direct", "standalone", &stable, None);
+    assert!(!record_while_pending.status.success());
+    assert!(
+        String::from_utf8_lossy(&record_while_pending.stderr)
+            .contains("while replacement is pending")
+    );
 
     let recovery = Command::new(&stable)
         .env("CONDA_SHIP_PREFIX", &prefix)
@@ -547,6 +582,8 @@ fn test_update_package_replaces_the_stable_runtime_from_a_file_channel() {
     let metadata: serde_json::Value =
         serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
     assert_eq!(metadata["version"], "2.0.0");
+    assert_eq!(metadata["update"]["ownership"], "direct");
+    assert_eq!(metadata["update"]["installation"], "standalone");
     assert_eq!(metadata["update"]["build-number"], package["build_number"]);
     assert_eq!(metadata["update"]["sha256"], package["payload_sha256"]);
     assert!(metadata["update"].get("pending").is_none());
@@ -582,7 +619,7 @@ fn test_external_manager_replacement_reconciles_the_stable_runtime() {
         .unwrap()
         .to_string();
     manifest.push_str(&format!(
-        "\n[tool.conda-ship.update]\nchannel = {channel_url:?}\npackage = \"demo-runtime\"\nownership = \"external\"\ninstruction = \"Run the external package manager.\"\n"
+        "\n[tool.conda-ship.update]\nchannel = {channel_url:?}\npackage = \"demo-runtime\"\n"
     ));
     std::fs::write(project.join("pixi.toml"), manifest).unwrap();
     std::fs::copy(root.join("pixi.lock"), project.join("pixi.lock")).unwrap();
@@ -625,6 +662,62 @@ fn test_external_manager_replacement_reconciles_the_stable_runtime() {
         .as_str()
         .unwrap();
 
+    #[cfg(unix)]
+    {
+        let predetection_prefix = tmp.path().join("predetection-prefix");
+        let predetection_dir = tmp.path().join("predetection-bin");
+        let predetection_stable = predetection_dir.join(executable_name);
+        std::fs::create_dir_all(predetection_prefix.join("conda-meta")).unwrap();
+        std::fs::create_dir_all(&predetection_dir).unwrap();
+        std::os::unix::fs::symlink(&first, &predetection_stable).unwrap();
+        std::fs::write(
+            predetection_prefix.join(".demo.json"),
+            serde_json::to_vec(&serde_json::json!({
+                "schema_version": 1,
+                "display_name": "demo",
+                "install_name": "demo",
+                "metadata_file": ".demo.json",
+                "version": "1.0.0",
+                "delegate_executable": "cs",
+                "channels": [],
+                "packages": [],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        install_cs_delegate(&predetection_prefix);
+        assert_cmd::Command::new(&predetection_stable)
+            .env("CONDA_SHIP_PREFIX", &predetection_prefix)
+            .arg("--help")
+            .assert()
+            .success();
+
+        std::fs::remove_file(&predetection_stable).unwrap();
+        std::os::unix::fs::symlink(&second, &predetection_stable).unwrap();
+        let recorded = record_installation(
+            &predetection_stable,
+            &predetection_prefix,
+            "external",
+            "package-manager",
+            &predetection_stable,
+            None,
+        );
+        assert!(
+            recorded.status.success(),
+            "{}",
+            String::from_utf8_lossy(&recorded.stderr)
+        );
+        let metadata: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(predetection_prefix.join(".demo.json")).unwrap())
+                .unwrap();
+        assert_eq!(metadata["version"], "2.0.0");
+        assert_eq!(metadata["update"]["ownership"], "external");
+        assert_eq!(
+            metadata["update"]["executable"],
+            predetection_stable.to_str().unwrap()
+        );
+    }
+
     let prefix = tmp.path().join("prefix");
     let install_dir = tmp.path().join("bin");
     let stable = install_dir.join(executable_name);
@@ -656,8 +749,128 @@ fn test_external_manager_replacement_reconciles_the_stable_runtime() {
     let initial: serde_json::Value =
         serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
     assert_eq!(initial["version"], "1.0.0");
-    assert_eq!(initial["update"]["ownership"], "external");
+    assert_eq!(initial["update"]["ownership"], "direct");
     assert_eq!(initial["update"]["executable"], stable.to_str().unwrap());
+
+    let recorded = record_installation(&stable, &prefix, "external", "homebrew", &stable, None);
+    assert!(
+        recorded.status.success(),
+        "{}",
+        String::from_utf8_lossy(&recorded.stderr)
+    );
+    let recorded: serde_json::Value = serde_json::from_slice(&recorded.stdout).unwrap();
+    assert_eq!(recorded["recorded"], true);
+    assert_eq!(recorded["ownership"], "external");
+    assert_eq!(recorded["installation"], "homebrew");
+    assert_eq!(recorded["executable"], stable.to_str().unwrap());
+    assert!(recorded["instruction"].is_null());
+
+    assert_cmd::Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .arg("--help")
+        .assert()
+        .success();
+    let persisted: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
+    assert_eq!(persisted["update"]["ownership"], "external");
+    assert_eq!(persisted["update"]["installation"], "homebrew");
+
+    let alternate = install_dir.join(format!("alternate-{executable_name}"));
+    std::fs::hard_link(&stable, &alternate).unwrap();
+    for (case, ownership, installation, executable, instruction, expected) in [
+        (
+            "add an external instruction",
+            "external",
+            "homebrew",
+            stable.as_path(),
+            Some("Run the external package manager."),
+            "instruction cannot be changed",
+        ),
+        (
+            "change the stable path",
+            "external",
+            "homebrew",
+            alternate.as_path(),
+            None,
+            "executable path cannot be changed",
+        ),
+        (
+            "reclaim direct ownership",
+            "direct",
+            "standalone",
+            stable.as_path(),
+            None,
+            "cannot become directly managed",
+        ),
+        (
+            "change the installation kind",
+            "external",
+            "pipx",
+            stable.as_path(),
+            None,
+            "changed from homebrew to pipx",
+        ),
+    ] {
+        let rejected = record_installation(
+            &stable,
+            &prefix,
+            ownership,
+            installation,
+            executable,
+            instruction,
+        );
+        assert!(!rejected.status.success(), "{case}");
+        assert!(
+            String::from_utf8_lossy(&rejected.stderr).contains(expected),
+            "{case}: {}",
+            String::from_utf8_lossy(&rejected.stderr)
+        );
+    }
+
+    let mut tampered = persisted.clone();
+    tampered["update"]["channel"] =
+        serde_json::Value::String("https://different.example.test/channel".to_string());
+    std::fs::write(
+        prefix.join(".demo.json"),
+        serde_json::to_vec(&tampered).unwrap(),
+    )
+    .unwrap();
+    let rotate_source =
+        record_installation(&stable, &prefix, "external", "homebrew", &stable, None);
+    assert!(!rotate_source.status.success());
+    assert!(
+        String::from_utf8_lossy(&rotate_source.stderr)
+            .contains("source changed outside its coordinated update")
+    );
+    std::fs::write(
+        prefix.join(".demo.json"),
+        serde_json::to_vec(&persisted).unwrap(),
+    )
+    .unwrap();
+
+    let coordinator = hold_runtime_update_lock(&prefix);
+    let check = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/check")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(check.status.success());
+    let check: serde_json::Value = serde_json::from_slice(&check.stdout).unwrap();
+    assert_eq!(check["ownership"], "external");
+    assert_eq!(check["installation"], "homebrew");
+    assert!(check["instruction"].is_null());
+
+    let stage = Command::new(&stable)
+        .env("CONDA_SHIP_PREFIX", &prefix)
+        .env("CONDA_SHIP_INTERNAL_UPDATE", "v1/stage")
+        .env("CONDA_SHIP_INTERNAL_UPDATE_CANDIDATE", "a".repeat(64))
+        .env("CONDA_SHIP_INTERNAL_UPDATE_OFFLINE", "1")
+        .output()
+        .unwrap();
+    assert!(!stage.status.success());
+    assert!(String::from_utf8_lossy(&stage.stderr).contains("managed externally"));
+    drop(coordinator);
 
     #[cfg(unix)]
     {
@@ -691,15 +904,13 @@ fn test_external_manager_replacement_reconciles_the_stable_runtime() {
         serde_json::from_slice(&std::fs::read(prefix.join(".demo.json")).unwrap()).unwrap();
     assert_eq!(metadata["version"], "2.0.0");
     assert_eq!(metadata["update"]["ownership"], "external");
+    assert_eq!(metadata["update"]["installation"], "homebrew");
     assert_eq!(metadata["update"]["executable"], stable.to_str().unwrap());
     assert_eq!(metadata["update"]["channel"], channel_url);
     assert_eq!(metadata["update"]["package"], "demo-runtime");
     assert_eq!(metadata["update"]["build-number"], 0);
     assert_eq!(metadata["update"]["sha256"], expected_sha256);
-    assert_eq!(
-        metadata["update"]["instruction"],
-        "Run the external package manager."
-    );
+    assert!(metadata["update"].get("instruction").is_none());
     assert!(metadata["update"].get("pending").is_none());
     assert!(metadata["update"].get("version").is_none());
     assert!(metadata["update"].get("provenance").is_none());

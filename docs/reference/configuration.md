@@ -99,7 +99,6 @@ freeze-base = true
 channel = "https://packages.example.com/conda"
 package = "demo-runtime"
 build-number = 0
-ownership = "direct"
 ```
 
 For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
@@ -228,16 +227,22 @@ separate setting and can be used with either supported layout.
   compares the conda version first and the build number second.
 
 `ownership`
-: Executable update owner. Defaults to `direct`.
+: Initial executable update capability and compatibility default. Defaults to
+  `direct`.
 
-  `direct` lets the stamped runtime stage and replace its installed executable
-  through the documented coordinator contract. It must not configure an
-  `instruction`.
+  `direct` lets an installation recorded as directly managed stage and replace
+  its executable through the documented coordinator contract. This is the
+  normal setting for one canonical runtime that may later be delivered by a
+  standalone installer, Homebrew, a Python package, or another manager. It must
+  not configure an `instruction`.
 
-  `external` leaves executable replacement to a package manager or installer.
-  The runtime can use the configured package records as a release signal and
-  reconcile a valid externally replaced executable on its next invocation. It
-  does not stage the package payload.
+  `external` remains available for artifacts that are always externally
+  managed. It leaves executable replacement to a package manager or installer
+  and cannot produce a direct update package.
+
+  The installed value is recorded separately in `.RUNTIME_NAME.json`.
+  `v1/record-installation` can make a direct-capable executable external without
+  rebuilding or changing its stamped bytes.
 
 `instruction`
 : Optional non-empty update instruction for `external` ownership. For example:
@@ -250,8 +255,10 @@ separate setting and can be used with either supported layout.
   instruction = "Update demo with the package manager that installed it."
   ```
 
-  The field is metadata for a downstream coordinator. conda-ship does not run
-  the instruction or detect the installer.
+  The field is a compatibility default for an artifact stamped as external.
+  Installers and downstream coordinators can instead record an external
+  installation kind and optional instruction after installing the canonical
+  direct-capable executable.
 
 Generated runtimes write ownership metadata into every bootstrapped prefix.
 That metadata records the schema version, display name derived from
@@ -292,8 +299,9 @@ set.
 - installer: the configured `installer`, when present
 - condarc contents: the exact text from `condarc-file`, when configured
 - frozen base policy: the configured `freeze-base` value, defaulting to `false`
-- executable update policy: channel, package, build number, ownership, and an
-  optional external instruction when `[tool.conda-ship.update]` is configured
+- executable update policy: channel, package, build number, initial capability,
+  and an optional compatibility instruction when `[tool.conda-ship.update]` is
+  configured
 - metadata file: `.RUNTIME_NAME.json`
 - bundle environment variable: uppercased `RUNTIME_NAME` plus `_BUNDLE`
 - offline environment variable: uppercased `RUNTIME_NAME` plus `_OFFLINE`
@@ -312,9 +320,10 @@ The internal installing marker is then removed.
 When executable updates are configured, the same `.RUNTIME_NAME.json` file is
 the canonical persistent update and recovery record. It records the stable
 executable path, artifact identity, update channel and package, build number,
-ownership, executable SHA256, optional external instruction, and any pending
-replacement. The adjacent `.RUNTIME_NAME.update.lock` file coordinates
-processes but is not another update state record.
+installed ownership, installation kind, executable SHA256, optional external
+instruction, and any pending replacement. The adjacent
+`.RUNTIME_NAME.update.lock` file coordinates processes but is not another
+update state record.
 
 The bootstrap also writes standard conda prefix metadata:
 

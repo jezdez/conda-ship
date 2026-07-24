@@ -25,7 +25,7 @@ binary:
 - metadata filename
 - bundle and offline environment variable names
 - optional condarc contents and base-freezing setting
-- optional executable update source and ownership policy
+- optional executable update source and initial capability
 
 That is what turns the same generic bootstrap code into a specific runtime
 with its own runtime name, delegate, package set, and install location.
@@ -64,9 +64,11 @@ same delegate directly through the existing prefix.
 
 When update policy is stamped, the native runtime can check, stage, apply, and
 recover executable updates. It can also reconcile a replacement performed by
-an external package manager. This behavior is part of the stamped native
-template. The conda-ship Python package is not installed in the managed prefix
-and is not needed at runtime.
+an external package manager. The installed ownership and installation kind are
+recorded in the managed prefix, so the same stamped bytes can be directly or
+externally managed. This behavior is part of the stamped native template. The
+conda-ship Python package is not installed in the managed prefix and is not
+needed at runtime.
 
 This means `--help`, `--version`, `status`, `shell`, `uninstall`, and every
 other argument belong to the delegate. For a conda delegate, `conda info`

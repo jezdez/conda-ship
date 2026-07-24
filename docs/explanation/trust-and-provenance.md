@@ -58,10 +58,11 @@ channel. Before staging an executable it verifies:
 - package name, version, build number, platform, dependencies, and payload count
 - the payload size and SHA256 recorded by the package
 - the executable stamp, runtime and artifact identity, platform, and version
-- update ownership, channel, package, build number, and instruction continuity
+- update channel, package, build number, and installed direct ownership
 
 The runtime accepts only a newer version or build number. It refuses a package
-that rotates the stamped update source or changes ownership.
+that rotates the stamped update source. Installed ownership and installation
+kind remain in the prefix metadata and are not taken from candidate bytes.
 
 These checks do not verify GitHub attestations, a provider-specific signature,
 or an external package manager's signature. Downstream publication and signing
