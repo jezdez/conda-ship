@@ -34,8 +34,9 @@ Then it:
 2. copies the concrete conda package records into a new lock
 3. applies `[tool.conda-ship].exclude-packages`
 4. validates the required runtime packages
-5. writes `dist/RUNTIME.runtime.lock`
-6. stamps the same lock into the generated runtime binary
+5. stamps the derived lock into the generated runtime binary
+6. writes `dist/RUNTIME.runtime.lock`
+7. writes `dist/RUNTIME.cdx.json` from the resolved package graph
 
 The runtime lock is the lock the generated runtime uses during bootstrap.
 
@@ -81,11 +82,11 @@ conda.lock / pixi.lock          source lock
         v
 selected source-environment
         |
-        | filtered and validated
+        | filtered, validated, and stamped
         v
-dist/demo.runtime.lock          runtime lock
+dist/demo + dist/demo.runtime.lock
         |
-        | stamped into runtime
+        | component graph documented as dist/demo.cdx.json
         v
 first demo invocation installs from that lock, then runs the delegate
 ```

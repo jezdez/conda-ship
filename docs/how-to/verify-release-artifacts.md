@@ -48,8 +48,8 @@ On Linux, `sha256sum` works too:
 sha256sum --check dist/demo.sha256
 ```
 
-The checksum file covers the staged runtime, runtime lock, package list, info
-JSON, and external bundle when present.
+The checksum file covers the staged runtime, runtime lock, package list,
+CycloneDX SBOM, info JSON, and external bundle when present.
 
 ## Inspect Artifact Metadata
 
@@ -77,6 +77,29 @@ Check:
 
 This file is intended for release tooling and package-manager wrappers. It
 describes what conda-ship wrote, not what an external installer later did.
+
+## Inspect The SBOM
+
+Open the `.cdx.json` file:
+
+```bash
+python -m json.tool dist/demo.cdx.json
+```
+
+For strict schema validation, use the official CycloneDX CLI:
+
+```bash
+cyclonedx validate \
+  --input-file dist/demo.cdx.json \
+  --input-version v1_7 \
+  --fail-on-errors
+```
+
+Check that the metadata component names the final runtime, every expected
+conda package appears in `components`, and direct dependency relationships
+appear in `dependencies`. The composition is intentionally `incomplete`
+because conda metadata cannot account for every system, vendored, or statically
+linked component.
 
 ## Inspect The Runtime Lock
 
@@ -138,7 +161,7 @@ steps:
       subject-path: ${{ steps.cs.outputs.dist-path }}/*
 ```
 
-That attests the runtime binary, `.runtime.lock`, `.packages.txt`,
+That attests the runtime binary, `.runtime.lock`, `.packages.txt`, `.cdx.json`,
 `.info.json`, `.sha256`, and the optional external bundle as the output of the
 downstream workflow. Verify a published file against that workflow identity:
 

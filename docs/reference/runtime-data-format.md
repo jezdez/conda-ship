@@ -6,8 +6,8 @@ general-purpose file format for other tools to write.
 
 ```{important}
 Treat the stamped runtime data as private executable metadata. Release tooling
-should read `.info.json`, `.runtime.lock`, `.packages.txt`, and `.sha256`
-instead of parsing or writing bytes inside the runtime binary.
+should read `.info.json`, `.runtime.lock`, `.packages.txt`, `.cdx.json`, and
+`.sha256` instead of parsing or writing bytes inside the runtime binary.
 ```
 
 ## Location
@@ -115,8 +115,8 @@ Generated runtimes are expected to read the format written by the same
 conda-ship release family. Downstream tools should treat the staged runtime as
 an opaque executable plus documented artifact metadata files.
 
-Use `.info.json`, `.runtime.lock`, `.packages.txt`, and `.sha256` for release
-automation instead of parsing the appended runtime data directly.
+Use `.info.json`, `.runtime.lock`, `.packages.txt`, `.cdx.json`, and `.sha256`
+for release automation instead of parsing the appended runtime data directly.
 
 The version-one update coordinator contract does not make the appended runtime
 format public. A coordinator invokes the stamped executable as a child process

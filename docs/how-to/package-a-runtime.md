@@ -60,6 +60,7 @@ For direct GitHub Releases, upload the full `dist/` contents:
 - optional `.bundle.tar.zst`
 - `.runtime.lock`
 - `.packages.txt`
+- `.cdx.json`
 - `.info.json`
 - `.sha256`
 

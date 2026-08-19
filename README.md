@@ -68,6 +68,7 @@ conda-ship stages a runtime binary plus release metadata:
 
 - `.runtime.lock`: the lockfile stamped into the runtime
 - `.packages.txt`: tab-separated package records for quick inspection
+- `.cdx.json`: CycloneDX 1.7 SBOM for the resolved conda package graph
 - `.info.json`: artifact metadata for release tooling
 - `.sha256`: checksums for staged files
 - optional `.bundle.tar.zst`: compressed package archives for offline builds
@@ -222,7 +223,8 @@ Downstream distributions decide:
 - install schemes and install names
 - documentation URLs
 - release channels and installers
-- signing, SBOM, and in-toto provenance for final artifacts
+- signing, SBOM publication and retention policy, and in-toto provenance for
+  final artifacts
 
 conda-ship verifies the inputs it consumes and the package archives it stages or
 installs, but downstream release systems should sign and attest the final

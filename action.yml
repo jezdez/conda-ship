@@ -79,6 +79,9 @@ outputs:
   package-list-path:
     description: "Absolute path to the package list."
     value: ${{ steps.stage.outputs.package_list_path }}
+  sbom-path:
+    description: "Absolute path to the CycloneDX SBOM."
+    value: ${{ steps.stage.outputs.sbom_path }}
   checksums-path:
     description: "Absolute path to the SHA256 checksum file."
     value: ${{ steps.stage.outputs.checksums_path }}
@@ -382,8 +385,9 @@ runs:
         fi
         lock_path="${stem_path}.runtime.lock"
         package_list_path="${stem_path}.packages.txt"
+        sbom_path="${stem_path}.cdx.json"
         checksums_path="${stem_path}.sha256"
-        for required in "$binary_path" "$info_path" "$lock_path" "$package_list_path" "$checksums_path"; do
+        for required in "$binary_path" "$info_path" "$lock_path" "$package_list_path" "$sbom_path" "$checksums_path"; do
           if [ ! -f "$required" ]; then
             echo "Expected conda-ship output was not created: ${required}" >&2
             exit 1
@@ -395,6 +399,7 @@ runs:
         echo "info_path=${info_path}" >> "$GITHUB_OUTPUT"
         echo "lock_path=${lock_path}" >> "$GITHUB_OUTPUT"
         echo "package_list_path=${package_list_path}" >> "$GITHUB_OUTPUT"
+        echo "sbom_path=${sbom_path}" >> "$GITHUB_OUTPUT"
         echo "checksums_path=${checksums_path}" >> "$GITHUB_OUTPUT"
         bundle_path="${stem_path}.bundle.tar.zst"
         if [ -f "$bundle_path" ]; then

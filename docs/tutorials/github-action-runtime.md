@@ -118,8 +118,8 @@ downloaded `cs` binary.
 
 The workflow also attests the generated runtime output directory before
 uploading it. That downstream attestation covers the runtime binary,
-`.runtime.lock`, `.packages.txt`, `.info.json`, `.sha256`, and any external
-bundle produced by that job.
+`.runtime.lock`, `.packages.txt`, `.cdx.json`, `.info.json`, `.sha256`, and any
+external bundle produced by that job.
 
 ## Inspect The Artifact
 
@@ -131,6 +131,7 @@ demo-x86_64-unknown-linux-gnu
 demo-x86_64-unknown-linux-gnu.info.json
 demo-x86_64-unknown-linux-gnu.packages.txt
 demo-x86_64-unknown-linux-gnu.runtime.lock
+demo-x86_64-unknown-linux-gnu.cdx.json
 demo-x86_64-unknown-linux-gnu.sha256
 ```
 

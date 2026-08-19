@@ -13,7 +13,7 @@ The builder CLI covers the core local workflow:
   package
 
 Every staged build writes the runtime plus artifact metadata: the runtime
-lock, a package list, an info JSON file, and SHA256 checksums.
+lock, a package list, a CycloneDX SBOM, an info JSON file, and SHA256 checksums.
 `cs build --dry-run` validates planned artifact work without writing files.
 
 Generic runtime behavior lives in `cs`. This includes automatic bootstrap and

@@ -23,6 +23,7 @@ use super::project::{
     discover_project_input, filter_excluded, find_project_root, is_supported_pyproject_manifest,
     manifest_kind, read_condarc_file,
 };
+use super::sbom::{creation_timestamp, render_cyclonedx_sbom};
 use super::{
     BundleLayout, Cli, Command, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionConfig,
     RuntimeVersionSource, ShipConfig, runtime_data,
@@ -46,6 +47,35 @@ fn make_pkg(name: &str, depends: &[&str]) -> CondaPackageData {
             .parse()
             .unwrap(),
         channel: Some("test".to_string()),
+    })
+}
+
+fn make_sbom_pkg(name: &str, depends: &[&str], hash: u8, license: &str) -> CondaPackageData {
+    let mut record = PackageRecord::new(
+        PackageName::new_unchecked(name),
+        VersionWithSource::from_str("1.0").unwrap(),
+        "h123_0".to_string(),
+    );
+    record.depends = depends
+        .iter()
+        .map(|dependency| dependency.to_string())
+        .collect();
+    record.subdir = "linux-64".to_string();
+    record.sha256 = Some([hash; 32].into());
+    record.md5 = Some([hash; 16].into());
+    record.license = Some(license.to_string());
+    record.size = Some(42);
+    CondaPackageData::from(rattler_conda_types::RepoDataRecord {
+        package_record: record,
+        identifier: rattler_conda_types::package::DistArchiveIdentifier::from(
+            format!("{name}-1.0-h123_0.conda")
+                .parse::<rattler_conda_types::package::CondaArchiveIdentifier>()
+                .unwrap(),
+        ),
+        url: format!("https://conda.anaconda.org/conda-forge/linux-64/{name}-1.0-h123_0.conda")
+            .parse()
+            .unwrap(),
+        channel: Some("https://conda.anaconda.org/conda-forge".to_string()),
     })
 }
 
@@ -806,9 +836,18 @@ fn test_stage_artifacts_external_uses_artifact_name_for_files() {
     assert_eq!(info["runtime_version"], "9.8.7");
     assert!(info["update"].is_null());
     assert_eq!(info["bundle"], "demo-cli-linux-64.bundle.tar.zst");
+    assert_eq!(info["sbom"], "demo-cli-linux-64.cdx.json");
+
+    let sbom: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&output.sbom).unwrap()).unwrap();
+    assert_eq!(sbom["bomFormat"], "CycloneDX");
+    assert_eq!(sbom["specVersion"], "1.7");
+    assert_eq!(sbom["metadata"]["component"]["name"], "demo-cli");
+    assert_eq!(sbom["components"][0]["name"], "conda");
 
     let checksums = std::fs::read_to_string(&output.checksums).unwrap();
     assert!(checksums.contains("demo-cli-linux-64.bundle.tar.zst"));
+    assert!(checksums.contains("demo-cli-linux-64.cdx.json"));
 }
 
 #[test]
@@ -911,6 +950,8 @@ fn test_stage_artifacts_embedded_uses_artifact_name_for_files() {
     assert_eq!(info["layout"], "embedded");
     assert_eq!(info["binary"], expected_binary);
     assert!(info["bundle"].is_null());
+    assert_eq!(info["sbom"], "demoz.cdx.json");
+    assert!(output.sbom.is_file());
     assert_eq!(
         info["update"],
         serde_json::to_value(stamped.header.update).unwrap()
@@ -1371,4 +1412,139 @@ fn test_render_package_list_is_tab_separated() {
         render_package_list(&packages),
         "name\tversion\tbuild\turl\tsha256\npython\t3.12.0\th123_0\thttps://example.com/python.conda\tabc123\n"
     );
+}
+
+#[test]
+fn test_render_cyclonedx_sbom_covers_resolved_conda_graph() {
+    let python = make_sbom_pkg("python", &["openssl >=3"], 0xaa, "Python-2.0");
+    let openssl = make_sbom_pkg("openssl", &[], 0xbb, "Apache-2.0");
+    let packages = vec![&python, &openssl];
+
+    let content = render_cyclonedx_sbom(
+        "demo",
+        "demo-cli",
+        "1.2.3",
+        BundleLayout::Online,
+        Platform::Linux64,
+        "demo-cli",
+        &packages,
+        "2026-08-19T12:00:00Z".to_string(),
+    )
+    .unwrap();
+    let sbom: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    assert_eq!(sbom["bomFormat"], "CycloneDX");
+    assert_eq!(sbom["specVersion"], "1.7");
+    assert_eq!(sbom["metadata"]["timestamp"], "2026-08-19T12:00:00Z");
+    assert_eq!(sbom["metadata"]["component"]["name"], "demo-cli");
+    assert!(sbom["metadata"]["component"]["hashes"].is_null());
+    assert_eq!(sbom["components"].as_array().unwrap().len(), 2);
+    assert_eq!(sbom["components"][0]["name"], "openssl");
+    assert_eq!(sbom["components"][1]["name"], "python");
+    assert_eq!(
+        sbom["components"][1]["licenses"][0]["license"]["name"],
+        "Python-2.0"
+    );
+    assert_eq!(
+        sbom["components"][1]["hashes"][0]["content"],
+        "aa".repeat(32)
+    );
+    assert_eq!(sbom["components"][1]["hashes"][1]["alg"], "MD5");
+    assert_eq!(
+        sbom["components"][1]["hashes"][1]["content"],
+        "aa".repeat(16)
+    );
+    assert!(
+        sbom["components"][1]["purl"]
+            .as_str()
+            .unwrap()
+            .starts_with("pkg:conda/python@1.0?")
+    );
+
+    let python_ref = sbom["components"][1]["bom-ref"].as_str().unwrap();
+    let openssl_ref = sbom["components"][0]["bom-ref"].as_str().unwrap();
+    let dependencies = sbom["dependencies"].as_array().unwrap();
+    let root = dependencies
+        .iter()
+        .find(|dependency| dependency["ref"].as_str().unwrap().starts_with("runtime:"))
+        .unwrap();
+    let python_dependency = dependencies
+        .iter()
+        .find(|dependency| dependency["ref"] == python_ref)
+        .unwrap();
+    let openssl_dependency = dependencies
+        .iter()
+        .find(|dependency| dependency["ref"] == openssl_ref)
+        .unwrap();
+    assert_eq!(root["dependsOn"], serde_json::json!([python_ref]));
+    assert_eq!(
+        python_dependency["dependsOn"],
+        serde_json::json!([openssl_ref])
+    );
+    assert_eq!(openssl_dependency["dependsOn"], serde_json::json!([]));
+    assert_eq!(sbom["compositions"][0]["aggregate"], "incomplete");
+    assert_eq!(
+        sbom["compositions"][0]["assemblies"],
+        serde_json::json!([sbom["metadata"]["component"]["bom-ref"]])
+    );
+}
+
+#[test]
+fn test_render_cyclonedx_sbom_attaches_disconnected_cycles() {
+    let root = make_sbom_pkg("root", &[], 0xaa, "MIT");
+    let cycle_a = make_sbom_pkg("cycle-a", &["cycle-b"], 0xbb, "MIT");
+    let cycle_b = make_sbom_pkg("cycle-b", &["cycle-a"], 0xcc, "MIT");
+    let packages = vec![&root, &cycle_a, &cycle_b];
+
+    let content = render_cyclonedx_sbom(
+        "demo",
+        "demo",
+        "1.0.0",
+        BundleLayout::Online,
+        Platform::Linux64,
+        "demo",
+        &packages,
+        "2026-08-19T12:00:00Z".to_string(),
+    )
+    .unwrap();
+    let sbom: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let components = sbom["components"].as_array().unwrap();
+    let component_ref = |name: &str| {
+        components
+            .iter()
+            .find(|component| component["name"] == name)
+            .unwrap()["bom-ref"]
+            .as_str()
+            .unwrap()
+    };
+    let dependencies = sbom["dependencies"].as_array().unwrap();
+    let root_dependencies = dependencies
+        .iter()
+        .find(|dependency| dependency["ref"].as_str().unwrap().starts_with("runtime:"))
+        .unwrap()["dependsOn"]
+        .as_array()
+        .unwrap();
+
+    assert!(
+        root_dependencies
+            .iter()
+            .any(|reference| reference == component_ref("root"))
+    );
+    assert!(
+        root_dependencies
+            .iter()
+            .any(|reference| reference == component_ref("cycle-a"))
+    );
+    assert!(
+        !root_dependencies
+            .iter()
+            .any(|reference| reference == component_ref("cycle-b"))
+    );
+}
+
+#[test]
+fn test_creation_timestamp_uses_source_date_epoch() {
+    temp_env::with_var("SOURCE_DATE_EPOCH", Some("0"), || {
+        assert_eq!(creation_timestamp().unwrap(), "1970-01-01T00:00:00Z");
+    });
 }
