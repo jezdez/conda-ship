@@ -2372,6 +2372,12 @@ mod tests {
         let Some(ready) = std::env::var_os("CONDA_SHIP_UPDATE_HOLDER_READY") else {
             return;
         };
+        if let Some(sentinel) = std::env::var_os("CONDA_SHIP_UPDATE_HOLDER_SENTINEL") {
+            use windows_sys::Win32::{Foundation::HANDLE, System::Threading::SetEvent};
+
+            let sentinel = sentinel.to_string_lossy().parse::<usize>().unwrap() as HANDLE;
+            unsafe { SetEvent(sentinel) };
+        }
         let release = std::env::var_os("CONDA_SHIP_UPDATE_HOLDER_RELEASE").unwrap();
         std::fs::write(ready, b"ready").unwrap();
         let deadline = Instant::now() + Duration::from_secs(30);
@@ -2387,21 +2393,19 @@ mod tests {
     #[test]
     #[cfg(windows)]
     fn windows_worker_process_does_not_inherit_helper_handles() {
-        use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
-        use windows_sys::Win32::Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation};
+        use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+        use windows_sys::Win32::{
+            Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation, WAIT_TIMEOUT},
+            System::Threading::{CreateEventW, WaitForSingleObject},
+        };
 
         let tmp = tempfile::tempdir().unwrap();
         let ready = tmp.path().join("ready");
         let release = tmp.path().join("release");
         let done = tmp.path().join("done");
-        let sentinel_path = tmp.path().join("captured-output-handle");
-        let sentinel = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .share_mode(0)
-            .open(&sentinel_path)
-            .unwrap();
+        let sentinel = unsafe { CreateEventW(std::ptr::null(), 0, 0, std::ptr::null()) };
+        assert!(!sentinel.is_null(), "failed to create the sentinel event");
+        let sentinel = unsafe { OwnedHandle::from_raw_handle(sentinel) };
         let inherited = unsafe {
             SetHandleInformation(
                 sentinel.as_raw_handle(),
@@ -2436,6 +2440,12 @@ mod tests {
                     "CONDA_SHIP_UPDATE_HOLDER_DONE",
                     done.as_os_str().to_os_string(),
                 ),
+                // Parallel tests may inherit this handle, but only this child
+                // receives its value and can signal it.
+                (
+                    "CONDA_SHIP_UPDATE_HOLDER_SENTINEL",
+                    OsString::from((sentinel.as_raw_handle() as usize).to_string()),
+                ),
             ],
             &[],
         )
@@ -2448,9 +2458,7 @@ mod tests {
         }
         assert!(ready.exists(), "child process did not start");
 
-        drop(sentinel);
-        std::fs::remove_file(&sentinel_path)
-            .expect("child process inherited an unrelated helper handle");
+        let inherited = unsafe { WaitForSingleObject(sentinel.as_raw_handle(), 0) };
         std::fs::write(&release, b"release").unwrap();
 
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -2458,6 +2466,10 @@ mod tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         assert!(done.exists(), "child process did not exit");
+        assert_eq!(
+            inherited, WAIT_TIMEOUT,
+            "child process inherited an unrelated helper handle"
+        );
     }
 
     #[test]
