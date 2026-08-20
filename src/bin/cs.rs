@@ -21,6 +21,8 @@ mod bundle;
 mod diagnostic;
 #[path = "cs/project.rs"]
 mod project;
+#[path = "cs/sbom.rs"]
+mod sbom;
 #[cfg(test)]
 #[path = "cs/tests.rs"]
 mod tests;
@@ -416,6 +418,7 @@ fn run(cli: Cli) -> miette::Result<()> {
             eprintln!("checksums {}", output.checksums.display());
             eprintln!("lock {}", output.lock.display());
             eprintln!("packages {}", output.package_list.display());
+            eprintln!("sbom {}", output.sbom.display());
             if let Some(bundle) = output.bundle {
                 eprintln!("bundle {}", bundle.display());
             }

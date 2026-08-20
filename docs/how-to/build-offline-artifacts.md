@@ -40,6 +40,7 @@ For an `external` build, distribute these files together:
 - `demo.runtime.lock`
 - `demo.info.json`
 - `demo.packages.txt`
+- `demo.cdx.json`
 - `demo.sha256`
 
 Point the runtime at an extracted bundle directory on its first invocation:

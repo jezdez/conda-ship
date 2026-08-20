@@ -118,6 +118,15 @@ jobs:
             --target-label "$TARGET" \
             --template "$template"
 
+      - name: Validate CycloneDX SBOM
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: >-
+          pixi run --locked -e sbom cyclonedx-cli validate
+          --input-file "dist/demo-${TARGET}.cdx.json"
+          --input-format json
+          --input-version v1_7
+          --fail-on-errors
+
       - name: Smoke test built runtime
         shell: bash
         run: |

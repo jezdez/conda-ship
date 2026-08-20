@@ -148,6 +148,9 @@ source by full commit SHA and pass the matching conda-ship release through the
 `package-list-path`
 : Absolute path to the staged package list.
 
+`sbom-path`
+: Absolute path to the CycloneDX 1.7 SBOM.
+
 `checksums-path`
 : Absolute path to the SHA256 checksum file.
 

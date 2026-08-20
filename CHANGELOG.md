@@ -2,6 +2,13 @@
 
 All notable changes to `conda-ship` are documented here.
 
+## Unreleased
+
+### Added
+
+- Added a CycloneDX 1.7 SBOM sidecar for every staged runtime, containing the
+  resolved conda package graph.
+
 ## 0.7.0 - 2026-07-24
 
 ### Added

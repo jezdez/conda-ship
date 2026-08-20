@@ -13,6 +13,7 @@ use super::project::{
     DerivedRuntimeLock, derive_runtime_lock, package_record, project_root,
     write_generated_runtime_lock,
 };
+use super::sbom::{creation_timestamp, render_cyclonedx_sbom};
 use super::{
     BUNDLE_ARCHIVE_FILE, BundleLayout, RUNTIME_LOCK_FILE, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig,
     RuntimeVersionSource, SHIP_STATE_DIR, ShipConfig, runtime_data,
@@ -26,6 +27,7 @@ pub(crate) struct BuildOutput {
     pub(crate) checksums: PathBuf,
     pub(crate) lock: PathBuf,
     pub(crate) package_list: PathBuf,
+    pub(crate) sbom: PathBuf,
 }
 
 #[derive(Debug)]
@@ -37,6 +39,7 @@ struct PlannedArtifactPaths {
     checksums: PathBuf,
     lock: PathBuf,
     package_list: PathBuf,
+    sbom: PathBuf,
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -60,6 +63,8 @@ pub(crate) struct ArtifactInfo {
     pub(crate) bundle: Option<String>,
     pub(crate) lock: String,
     pub(crate) package_list: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) sbom: Option<String>,
     pub(crate) package_count: usize,
     pub(crate) checksums: Vec<ArtifactChecksum>,
 }
@@ -639,6 +644,7 @@ fn print_build_dry_run(
             "  packages: {}",
             display_path(root, &paths.package_list)
         )?;
+        writeln!(writer, "  sbom: {}", display_path(root, &paths.sbom))?;
         writeln!(
             writer,
             "  checksums: {}",
@@ -811,6 +817,7 @@ pub(crate) fn stage_artifacts(
     if let Some(bundle) = &bundle {
         eprintln!("staged {}", bundle.display());
     }
+    eprintln!("wrote {}", metadata.sbom.display());
     eprintln!("wrote {}", metadata.info.display());
     eprintln!("wrote {}", metadata.checksums.display());
 
@@ -821,6 +828,7 @@ pub(crate) fn stage_artifacts(
         checksums: metadata.checksums,
         lock: metadata.lock,
         package_list: metadata.package_list,
+        sbom: metadata.sbom,
     })
 }
 
@@ -840,6 +848,7 @@ fn planned_artifact_paths(
         checksums: out_dir.join(format!("{stem}.sha256")),
         lock: out_dir.join(format!("{stem}.runtime.lock")),
         package_list: out_dir.join(format!("{stem}.packages.txt")),
+        sbom: out_dir.join(format!("{stem}.cdx.json")),
         stem,
         binary,
         bundle,
@@ -852,6 +861,7 @@ struct ArtifactMetadataPaths {
     checksums: PathBuf,
     lock: PathBuf,
     package_list: PathBuf,
+    sbom: PathBuf,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -882,10 +892,32 @@ fn write_artifact_metadata(
         .into_diagnostic()
         .with_context(|| format!("failed to write {}", package_list.display()))?;
 
+    let runtime_version = derived
+        .runtime_config
+        .runtime_version
+        .clone()
+        .ok_or_else(|| missing_runtime_version(derived.runtime_config.project_dynamic_version))?;
+    let binary_checksum = checksum_for_path(binary)?;
+    let sbom = out_dir.join(format!("{stem}.cdx.json"));
+    let sbom_content = render_cyclonedx_sbom(
+        runtime,
+        artifact_name,
+        &runtime_version,
+        layout,
+        platform,
+        &file_name(binary)?,
+        &packages,
+        creation_timestamp()?,
+    )?;
+    std::fs::write(&sbom, sbom_content)
+        .into_diagnostic()
+        .with_context(|| format!("failed to write {}", sbom.display()))?;
+
     let mut checksums = vec![
-        checksum_for_path(binary)?,
+        binary_checksum,
         checksum_for_path(&lock)?,
         checksum_for_path(&package_list)?,
+        checksum_for_path(&sbom)?,
     ];
     if let Some(bundle) = bundle {
         checksums.push(checksum_for_path(bundle)?);
@@ -897,13 +929,7 @@ fn write_artifact_metadata(
         name: stem.to_string(),
         artifact_name: artifact_name.to_string(),
         runtime_name: runtime.to_string(),
-        runtime_version: derived
-            .runtime_config
-            .runtime_version
-            .clone()
-            .ok_or_else(|| {
-                missing_runtime_version(derived.runtime_config.project_dynamic_version)
-            })?,
+        runtime_version,
         layout: layout.as_str().to_string(),
         platform: platform.to_string(),
         update: derived.runtime_config.update.clone(),
@@ -911,6 +937,7 @@ fn write_artifact_metadata(
         bundle: bundle.map(file_name).transpose()?,
         lock: file_name(&lock)?,
         package_list: file_name(&package_list)?,
+        sbom: Some(file_name(&sbom)?),
         package_count: package_infos.len(),
         checksums,
     };
@@ -933,6 +960,7 @@ fn write_artifact_metadata(
         checksums,
         lock,
         package_list,
+        sbom,
     })
 }
 

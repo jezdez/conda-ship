@@ -77,9 +77,16 @@ Every staged build writes checksums and metadata:
 - `.info.json`
 - `.runtime.lock`
 - `.packages.txt`
+- `.cdx.json`
 
 These files describe and verify what conda-ship produced. They are not a
 replacement for signing.
+
+The CycloneDX file inventories the resolved conda package graph. It is marked
+incomplete because package records cannot reveal every operating-system,
+vendored, or statically linked component. Downstream projects remain
+responsible for evaluating the full product scope and for their CRA technical
+documentation, access, publication, and retention policy.
 
 ## Downstream Signing And Attestation
 
@@ -87,8 +94,8 @@ Sign or attest after conda-ship has staged the files. For executable updates,
 sign the runtime before running `cs package-update --binary`. That ensures the
 package contains and reports the finalized bytes. The GitHub Action exposes
 `dist-path` so downstream workflows can attest the complete output set:
-the runtime binary, `.runtime.lock`, `.packages.txt`, `.info.json`, `.sha256`,
-and optional external bundle.
+the runtime binary, `.runtime.lock`, `.packages.txt`, `.cdx.json`, `.info.json`,
+`.sha256`, and optional external bundle.
 
 Good places for downstream release controls include:
 

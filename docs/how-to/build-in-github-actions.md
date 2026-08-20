@@ -125,7 +125,7 @@ Each job emits an asset name qualified with the runner target triple.
 
 Use `dist-path` as the source of truth for artifact uploads. It contains the
 runtime, optional external bundle, `.info.json`, `.runtime.lock`,
-`.packages.txt`, and `.sha256` files for that build.
+`.packages.txt`, `.cdx.json`, and `.sha256` files for that build.
 
 For release workflows, attest the complete `dist-path` before publishing or
 wrapping the files. See {doc}`verify-release-artifacts` for the GitHub Actions

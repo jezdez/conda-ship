@@ -520,6 +520,7 @@ mod tests {
             bundle: None,
             lock: "demo.runtime.lock".to_string(),
             package_list: "demo.packages.txt".to_string(),
+            sbom: None,
             package_count: 1,
             checksums: vec![ArtifactChecksum {
                 path: "demo-linux-64".to_string(),

@@ -32,6 +32,9 @@ Options:
 
 Build and stage a runtime artifact.
 
+Each build also writes a CycloneDX 1.7 SBOM for the resolved conda package
+graph. Its filename uses the artifact stem and ends in `.cdx.json`.
+
 ```bash
 cs build [--runtime-name RUNTIME] [--artifact-name NAME] \
   [--delegate-executable EXECUTABLE] [--artifact-layout LAYOUT] [--target-label LABEL] \

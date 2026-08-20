@@ -63,7 +63,8 @@ install scheme path for `express`, such as `~/.conda/express` with the default
 `artifact-name`
 : Optional staged executable and artifact stem. This is the name used for files
   written to `dist/`, including the staged runtime, `.info.json`,
-  `.runtime.lock`, `.packages.txt`, `.sha256`, and the external bundle stem.
+  `.runtime.lock`, `.packages.txt`, `.cdx.json`, `.sha256`, and the external
+  bundle stem.
   When omitted, it defaults to `runtime-name`.
 
 `install-name`
@@ -123,6 +124,7 @@ dist/demo
 dist/demo.info.json
 dist/demo.runtime.lock
 dist/demo.packages.txt
+dist/demo.cdx.json
 dist/demo.sha256
 ```
 
@@ -142,6 +144,7 @@ dist/cxz
 dist/cxz.info.json
 dist/cxz.runtime.lock
 dist/cxz.packages.txt
+dist/cxz.cdx.json
 dist/cxz.sha256
 ```
 

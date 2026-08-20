@@ -83,6 +83,7 @@ For an `online` build with runtime `demo`, conda-ship stages:
 - `demo` or `demo.exe`
 - `demo.runtime.lock`
 - `demo.packages.txt`
+- `demo.cdx.json`
 - `demo.info.json`
 - `demo.sha256`
 
@@ -100,6 +101,75 @@ These files describe the staged release output. During automatic first-run
 bootstrap, the generated runtime also writes managed-prefix metadata such as
 `conda-meta/history` and `conda-meta/initial-state.explicit.txt` inside the
 install path.
+
+## CycloneDX SBOM
+
+Every staged build writes a CycloneDX 1.7 JSON SBOM named
+`ARTIFACT.cdx.json`. The document identifies the staged runtime as the root
+application and includes every conda package for the target platform in the
+derived runtime lock. Package components include the exact version, build,
+subdir, channel, filename, download URL, SHA256 and MD5 hashes, and license
+value when those fields are available. Direct dependency edges come from the
+solved package records. Dependency sets containing conditional or unparseable
+MatchSpecs are marked `unknown` rather than inventing relationships that the
+runtime lock cannot prove.
+
+Channel and remote download URLs are sanitized before they are written. URL
+credentials, Anaconda `/t/<token>` path segments, queries, and fragments are
+removed. Local paths and `file:` URLs are omitted.
+
+This mapping uses existing conda contracts for
+[package identifiers](https://conda.org/learn/ceps/cep-0026/),
+[MatchSpecs](https://conda.org/learn/ceps/cep-0029/),
+[package metadata](https://conda.org/learn/ceps/cep-0034/), and
+[repodata records](https://conda.org/learn/ceps/cep-0036/). No accepted conda
+CEP currently defines an environment SBOM format or CRA profile.
+
+The derived runtime lock does not currently retain the original requested
+MatchSpecs. The root component therefore points to graph roots inferred from
+the resolved package edges, plus a representative of any otherwise unreachable
+dependency cycle. Every resolved package remains present even when that
+inference cannot reproduce the user's declared top-level set.
+
+When a package record names a dependency that is absent from the target
+platform's resolved package set, the SBOM records the number of omitted edges
+on the root and marks the affected package dependency sets as incomplete. It
+does not invent a component without an exact package record.
+
+For a product that falls within the EU
+[Cyber Resilience Act](https://eur-lex.europa.eu/eli/reg/2024/2847/2024-11-20/eng),
+this file can provide the resolved conda environment portion of its technical
+documentation. The CRA requires a commonly used, machine-readable SBOM that
+covers at least top-level dependencies. It does not mandate CycloneDX 1.7.
+conda-ship chooses the
+[CycloneDX 1.7 JSON schema](https://cyclonedx.org/docs/1.7/json/) and records the
+resolved target-platform package graph to the extent that package records
+permit.
+
+The SBOM composition is deliberately marked `incomplete`. Conda package
+records do not describe every operating-system component or every dependency
+vendored or statically linked into a package. Rust crates linked into
+`cs-template` are also outside the resolved conda graph. The broader package
+metadata gap is discussed in
+[conda/ceps#127](https://github.com/conda/ceps/issues/127). The generated file is
+therefore a CRA-oriented inventory of the resolved conda environment, not proof
+of complete product coverage or legal conformity.
+
+Conda package PURLs follow the current
+[package-url conda type](https://github.com/package-url/purl-spec/blob/main/docs/types/definitions/conda-definition.md).
+They are package-url identifiers, not an accepted conda CEP contract. License
+values are kept as named licenses because historical repodata does not
+guarantee a valid SPDX expression.
+
+conda-ship does not infer an SBOM author or product manufacturer from a channel
+or package record. Compliance profiles that require author, manufacturer, or
+contact metadata are outside the current output contract. Do not edit the
+staged SBOM in place because its checksum is recorded in `.info.json` and
+`.sha256`.
+
+`SOURCE_DATE_EPOCH` controls the SBOM timestamp when set. Otherwise the build
+time is recorded in UTC. Rebuild the SBOM whenever the runtime or package set
+changes.
 
 ## Stamped Runtime Data
 
@@ -158,6 +228,7 @@ The info JSON contains:
 - optional external bundle filename
 - lock filename
 - package list filename
+- SBOM filename
 - package count
 - SHA256 checksums
 
