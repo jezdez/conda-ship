@@ -36,7 +36,8 @@ Then it:
 4. validates the required runtime packages
 5. stamps the derived lock into the generated runtime binary
 6. writes `dist/RUNTIME.runtime.lock`
-7. writes `dist/RUNTIME.cdx.json` from the resolved package graph
+7. writes `dist/RUNTIME.cdx.json` from the target platform's resolved package
+   graph
 
 The runtime lock is the lock the generated runtime uses during bootstrap.
 

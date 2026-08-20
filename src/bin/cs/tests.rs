@@ -1416,7 +1416,12 @@ fn test_render_package_list_is_tab_separated() {
 
 #[test]
 fn test_render_cyclonedx_sbom_covers_resolved_conda_graph() {
-    let python = make_sbom_pkg("python", &["openssl >=3"], 0xaa, "Python-2.0");
+    let python = make_sbom_pkg(
+        "python",
+        &["conda-forge::openssl >=3", "__glibc >=2.17"],
+        0xaa,
+        "Python-2.0",
+    );
     let openssl = make_sbom_pkg("openssl", &[], 0xbb, "Apache-2.0");
     let packages = vec![&python, &openssl];
 
@@ -1487,6 +1492,158 @@ fn test_render_cyclonedx_sbom_covers_resolved_conda_graph() {
         sbom["compositions"][0]["assemblies"],
         serde_json::json!([sbom["metadata"]["component"]["bom-ref"]])
     );
+    let omitted_edges = sbom["metadata"]["component"]["properties"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|property| property["name"] == "conda:environment:dependency-edges-omitted")
+        .unwrap();
+    assert_eq!(omitted_edges["value"], "1");
+    assert_eq!(sbom["compositions"][1]["aggregate"], "incomplete");
+    assert!(sbom["compositions"][1]["assemblies"].is_null());
+    assert_eq!(
+        sbom["compositions"][1]["dependencies"],
+        serde_json::json!([python_ref])
+    );
+}
+
+#[test]
+fn test_render_cyclonedx_sbom_marks_conditional_dependency_sets_unknown() {
+    let parent = make_sbom_pkg("parent", &["optional[when=\"__win\"]"], 0xaa, "MIT");
+    let optional = make_sbom_pkg("optional", &[], 0xbb, "MIT");
+    let packages = vec![&parent, &optional];
+
+    let content = render_cyclonedx_sbom(
+        "demo",
+        "demo",
+        "1.0.0",
+        BundleLayout::Online,
+        Platform::Linux64,
+        "demo",
+        &packages,
+        "2026-08-19T12:00:00Z".to_string(),
+    )
+    .unwrap();
+    let sbom: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let components = sbom["components"].as_array().unwrap();
+    let parent_ref = components
+        .iter()
+        .find(|component| component["name"] == "parent")
+        .unwrap()["bom-ref"]
+        .as_str()
+        .unwrap();
+    let parent_dependency = sbom["dependencies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|dependency| dependency["ref"] == parent_ref)
+        .unwrap();
+
+    assert_eq!(parent_dependency["dependsOn"], serde_json::json!([]));
+    assert_eq!(sbom["compositions"][1]["aggregate"], "unknown");
+    assert_eq!(
+        sbom["compositions"][1]["dependencies"],
+        serde_json::json!([parent_ref])
+    );
+    assert!(
+        sbom["metadata"]["component"]["properties"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|property| property["name"] != "conda:environment:dependency-edges-omitted")
+    );
+}
+
+#[test]
+fn test_render_cyclonedx_sbom_sanitizes_package_sources() {
+    let mut remote = make_sbom_pkg("remote", &[], 0xaa, "MIT")
+        .into_binary()
+        .unwrap();
+    remote.location = "https://location-user:location-password@example.com/t/location-secret/conda-forge/linux-64/remote-1.0-h123_0.conda?location-query=private#location-fragment"
+        .parse()
+        .unwrap();
+    remote.channel = Some(
+        reqwest::Url::parse(
+            "https://channel-user:channel-password@example.com/t/channel-secret/conda-forge?channel-query=private#channel-fragment",
+        )
+        .unwrap()
+        .into(),
+    );
+    let remote = CondaPackageData::from(remote);
+
+    let mut local = make_sbom_pkg("local", &[], 0xbb, "MIT")
+        .into_binary()
+        .unwrap();
+    local.location = "/Users/alice/private-channel/local-1.0-h123_0.conda"
+        .parse()
+        .unwrap();
+    local.channel = Some(
+        reqwest::Url::parse("file:///Users/alice/private-channel/")
+            .unwrap()
+            .into(),
+    );
+    let local = CondaPackageData::from(local);
+    let packages = vec![&remote, &local];
+
+    let content = render_cyclonedx_sbom(
+        "demo",
+        "demo",
+        "1.0.0",
+        BundleLayout::Online,
+        Platform::Linux64,
+        "demo",
+        &packages,
+        "2026-08-19T12:00:00Z".to_string(),
+    )
+    .unwrap();
+    let sbom: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let components = sbom["components"].as_array().unwrap();
+    let remote = components
+        .iter()
+        .find(|component| component["name"] == "remote")
+        .unwrap();
+    let local = components
+        .iter()
+        .find(|component| component["name"] == "local")
+        .unwrap();
+
+    assert_eq!(
+        remote["externalReferences"][0]["url"],
+        "https://example.com/conda-forge/linux-64/remote-1.0-h123_0.conda"
+    );
+    assert_eq!(
+        remote["properties"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|property| property["name"] == "conda:package:channel")
+            .unwrap()["value"],
+        "https://example.com/conda-forge/"
+    );
+    assert!(local["externalReferences"].is_null());
+    assert!(!local["purl"].as_str().unwrap().contains("channel="));
+    assert!(
+        !local["properties"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|property| property["name"] == "conda:package:channel")
+    );
+    for private in [
+        "location-user",
+        "location-password",
+        "location-secret",
+        "location-query",
+        "location-fragment",
+        "channel-user",
+        "channel-password",
+        "channel-secret",
+        "channel-query",
+        "channel-fragment",
+        "/Users/alice/private-channel",
+    ] {
+        assert!(!content.contains(private), "SBOM exposed {private}");
+    }
 }
 
 #[test]

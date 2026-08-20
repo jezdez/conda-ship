@@ -50,6 +50,12 @@ prek = ">=0.4.4"
 [feature.lint.tasks]
 lint = "prek run --all-files"
 
+[feature.sbom]
+platforms = ["linux-aarch64"]
+
+[feature.sbom.dependencies]
+cyclonedx-cli = ">=0.33.1,<0.34"
+
 [feature.docs]
 platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 
@@ -99,6 +105,7 @@ ruff-format-check = "ruff format --check python pyproject.toml"
 [environments]
 docs = ["docs"]
 lint = { features = ["lint"], no-default-feature = true }
+sbom = { features = ["sbom"], no-default-feature = true }
 ship = { features = ["ship"], no-default-feature = true }
 test = ["test"]
 

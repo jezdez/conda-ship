@@ -104,12 +104,19 @@ install path.
 
 ## CycloneDX SBOM
 
-Every build writes a CycloneDX 1.7 JSON SBOM named `ARTIFACT.cdx.json`. The
-document identifies the staged runtime as the root application and includes
-every conda package in the derived runtime lock. Package components include the
-exact version, build, subdir, channel, filename, download URL, SHA256 and MD5
-hashes, and license value when those fields are available. Direct dependency
-edges come from the solved package records.
+Every staged build writes a CycloneDX 1.7 JSON SBOM named
+`ARTIFACT.cdx.json`. The document identifies the staged runtime as the root
+application and includes every conda package for the target platform in the
+derived runtime lock. Package components include the exact version, build,
+subdir, channel, filename, download URL, SHA256 and MD5 hashes, and license
+value when those fields are available. Direct dependency edges come from the
+solved package records. Dependency sets containing conditional or unparseable
+MatchSpecs are marked `unknown` rather than inventing relationships that the
+runtime lock cannot prove.
+
+Channel and remote download URLs are sanitized before they are written. URL
+credentials, Anaconda `/t/<token>` path segments, queries, and fragments are
+removed. Local paths and `file:` URLs are omitted.
 
 This mapping uses existing conda contracts for
 [package identifiers](https://conda.org/learn/ceps/cep-0026/),
@@ -124,6 +131,11 @@ the resolved package edges, plus a representative of any otherwise unreachable
 dependency cycle. Every resolved package remains present even when that
 inference cannot reproduce the user's declared top-level set.
 
+When a package record names a dependency that is absent from the target
+platform's resolved package set, the SBOM records the number of omitted edges
+on the root and marks the affected package dependency sets as incomplete. It
+does not invent a component without an exact package record.
+
 For a product that falls within the EU
 [Cyber Resilience Act](https://eur-lex.europa.eu/eli/reg/2024/2847/2024-11-20/eng),
 this file can provide the resolved conda environment portion of its technical
@@ -131,7 +143,8 @@ documentation. The CRA requires a commonly used, machine-readable SBOM that
 covers at least top-level dependencies. It does not mandate CycloneDX 1.7.
 conda-ship chooses the
 [CycloneDX 1.7 JSON schema](https://cyclonedx.org/docs/1.7/json/) and records the
-complete resolved conda graph available in the runtime lock.
+resolved target-platform package graph to the extent that package records
+permit.
 
 The SBOM composition is deliberately marked `incomplete`. Conda package
 records do not describe every operating-system component or every dependency

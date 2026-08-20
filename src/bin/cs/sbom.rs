@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use jiff::Timestamp;
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{PackageName, PackageUrl, Platform};
+use rattler_conda_types::{
+    MatchSpec, PackageUrl, ParseMatchSpecOptions, Platform, RepodataRevision,
+};
 use rattler_lock::CondaPackageData;
 
 use super::BundleLayout;
@@ -106,7 +108,9 @@ struct Dependency {
 #[derive(serde::Serialize)]
 struct Composition {
     aggregate: &'static str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     assemblies: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     dependencies: Vec<String>,
 }
 
@@ -149,7 +153,7 @@ pub(crate) fn render_cyclonedx_sbom(
     timestamp: String,
 ) -> miette::Result<String> {
     let root_ref = format!("runtime:{artifact_name}@{runtime_version}?platform={platform}");
-    let root = Component {
+    let mut root = Component {
         component_type: "application",
         bom_ref: root_ref.clone(),
         name: artifact_name.to_string(),
@@ -194,20 +198,49 @@ pub(crate) fn render_cyclonedx_sbom(
         .map(|package| (package.name.as_str(), package.component.bom_ref.as_str()))
         .collect();
     let mut depended_on = BTreeSet::new();
+    let mut incomplete_dependency_refs = BTreeSet::new();
+    let mut unknown_dependency_refs = BTreeSet::new();
+    let mut missing_dependency_edges = 0;
     let mut dependencies = Vec::with_capacity(package_components.len() + 1);
     for package in &package_components {
-        let mut depends_on = package
-            .dependencies
-            .iter()
-            .filter_map(|name| references_by_name.get(name.as_str()).copied())
-            .map(str::to_string)
-            .collect::<Vec<_>>();
+        let mut depends_on = Vec::new();
+        for dependency in &package.dependencies {
+            let spec = MatchSpec::from_str(
+                dependency,
+                ParseMatchSpecOptions::lenient().with_repodata_revision(RepodataRevision::V3),
+            );
+            let Ok(spec) = spec else {
+                unknown_dependency_refs.insert(package.component.bom_ref.clone());
+                continue;
+            };
+            if spec.condition.is_some() {
+                unknown_dependency_refs.insert(package.component.bom_ref.clone());
+                continue;
+            }
+            let name = spec
+                .name
+                .into_exact()
+                .expect("MatchSpec parser only accepts exact dependency names");
+            let reference = references_by_name.get(name.as_normalized());
+            if let Some(reference) = reference {
+                depends_on.push((*reference).to_string());
+            } else {
+                missing_dependency_edges += 1;
+                incomplete_dependency_refs.insert(package.component.bom_ref.clone());
+            }
+        }
         depends_on.sort();
         depends_on.dedup();
         depended_on.extend(depends_on.iter().cloned());
         dependencies.push(Dependency {
             reference: package.component.bom_ref.clone(),
             depends_on,
+        });
+    }
+    if missing_dependency_edges > 0 {
+        root.properties.push(Property {
+            name: "conda:environment:dependency-edges-omitted",
+            value: missing_dependency_edges.to_string(),
         });
     }
 
@@ -253,6 +286,27 @@ pub(crate) fn render_cyclonedx_sbom(
     });
     dependencies.sort_by(|a, b| a.reference.cmp(&b.reference));
 
+    let mut compositions = vec![Composition {
+        aggregate: "incomplete",
+        assemblies: vec![root_ref.clone()],
+        dependencies: vec![root_ref],
+    }];
+    if !incomplete_dependency_refs.is_empty() {
+        compositions.push(Composition {
+            aggregate: "incomplete",
+            assemblies: Vec::new(),
+            dependencies: incomplete_dependency_refs.iter().cloned().collect(),
+        });
+    }
+    unknown_dependency_refs.retain(|reference| !incomplete_dependency_refs.contains(reference));
+    if !unknown_dependency_refs.is_empty() {
+        compositions.push(Composition {
+            aggregate: "unknown",
+            assemblies: Vec::new(),
+            dependencies: unknown_dependency_refs.into_iter().collect(),
+        });
+    }
+
     let bom = CycloneDxBom {
         schema: CYCLONEDX_SCHEMA,
         bom_format: "CycloneDX",
@@ -284,11 +338,7 @@ pub(crate) fn render_cyclonedx_sbom(
             .map(|package| package.component)
             .collect(),
         dependencies,
-        compositions: vec![Composition {
-            aggregate: "incomplete",
-            assemblies: vec![root_ref.clone()],
-            dependencies: vec![root_ref],
-        }],
+        compositions,
     };
 
     let mut content = serde_json::to_string_pretty(&bom)
@@ -296,6 +346,22 @@ pub(crate) fn render_cyclonedx_sbom(
         .context("failed to render CycloneDX SBOM")?;
     content.push('\n');
     Ok(content)
+}
+
+fn sanitized_remote_url(url: &reqwest::Url) -> Option<String> {
+    if url.scheme() == "file" {
+        return None;
+    }
+    let mut url = url.clone();
+    url.set_username("").ok()?;
+    url.set_password(None).ok()?;
+    url.set_query(None);
+    url.set_fragment(None);
+    if let Some((prefix, remainder)) = url.path().split_once("/t/") {
+        let suffix = remainder.split_once('/').map_or("", |(_, suffix)| suffix);
+        url.set_path(&format!("{prefix}/{suffix}"));
+    }
+    Some(url.to_string())
 }
 
 fn package_component(
@@ -313,7 +379,7 @@ fn package_component(
     let binary = package.as_binary();
     let channel = binary
         .and_then(|package| package.channel.as_ref())
-        .map(ToString::to_string);
+        .and_then(|channel| sanitized_remote_url(channel.as_ref()));
     let package_filename = binary.map(|package| package.file_name.to_string());
     let package_type = package_filename.as_deref().and_then(|filename| {
         if filename.ends_with(".conda") {
@@ -379,10 +445,11 @@ fn package_component(
     let external_references = package
         .location()
         .as_url()
+        .and_then(sanitized_remote_url)
         .map(|url| {
             vec![ExternalReference {
                 reference_type: "distribution",
-                url: url.to_string(),
+                url,
             }]
         })
         .unwrap_or_default();
@@ -433,14 +500,6 @@ fn package_component(
             external_references,
             properties,
         },
-        dependencies: record
-            .depends
-            .iter()
-            .map(|dependency| {
-                PackageName::from_matchspec_str_unchecked(dependency)
-                    .as_normalized()
-                    .to_string()
-            })
-            .collect(),
+        dependencies: record.depends.clone(),
     })
 }
