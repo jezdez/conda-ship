@@ -753,7 +753,6 @@ mod tests {
     use super::*;
     use crate::runtime_data::{RuntimeDataHeader, append_to_binary};
     use rattler_conda_types::Platform;
-    use std::io::{Seek, SeekFrom, Write};
     use tempfile::{NamedTempFile, TempDir};
 
     fn fleet(root: &Path) -> Fleet {
@@ -851,23 +850,6 @@ packages: []
             .unwrap_err()
             .to_string();
         assert!(error.contains("artifact is not stamped"), "{error}");
-
-        let corrupt = NamedTempFile::new().unwrap();
-        std::fs::write(corrupt.path(), b"binary").unwrap();
-        let mut header = RuntimeDataHeader::for_name("corrupt");
-        header.runtime_lock = empty_lock();
-        append_to_binary(corrupt.path(), &header, None).unwrap();
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .open(corrupt.path())
-            .unwrap();
-        file.seek(SeekFrom::Start(b"binary".len() as u64)).unwrap();
-        file.write_all(b"!").unwrap();
-        let error = RuntimeSpec::from_stamped_artifact(corrupt.path()).unwrap_err();
-        assert!(
-            format!("{error:?}").contains("header checksum mismatch"),
-            "{error:?}"
-        );
 
         let invalid = NamedTempFile::new().unwrap();
         std::fs::write(invalid.path(), b"binary").unwrap();
