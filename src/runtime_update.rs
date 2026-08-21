@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use fs4::fs_std::FileExt;
+use fs4::FileExt;
 use miette::{Context, IntoDiagnostic};
 use rattler_cache::package_cache::{CacheKey, PackageCache};
 use rattler_cache::validation::ValidationMode;
@@ -870,7 +870,7 @@ fn lock_cache_file(path: &Path) -> miette::Result<File> {
                 lock_path.display()
             )
         })?;
-    lock.lock_exclusive().into_diagnostic().with_context(|| {
+    FileExt::lock(&lock).into_diagnostic().with_context(|| {
         format!(
             "failed to acquire runtime update cache lock at {}",
             lock_path.display()

@@ -12,7 +12,7 @@ use std::{
     os::windows::ffi::OsStrExt,
 };
 
-use fs4::fs_std::FileExt as _;
+use fs4::{FileExt, TryLockError};
 use miette::{Context, IntoDiagnostic};
 #[cfg(windows)]
 use windows_sys::Win32::{
@@ -1497,15 +1497,16 @@ pub(crate) fn update_lock_is_held(prefix: &Path, metadata_file: &str) -> miette:
                 policy::path_for_display(&path)
             )
         })?;
-    file.try_lock_exclusive()
-        .into_diagnostic()
-        .with_context(|| {
+    match FileExt::try_lock(&file) {
+        Ok(()) => Ok(false),
+        Err(TryLockError::WouldBlock) => Ok(true),
+        Err(error) => Err(error).into_diagnostic().with_context(|| {
             format!(
                 "failed to inspect runtime update coordination lock at {}",
                 policy::path_for_display(&path)
             )
-        })
-        .map(|acquired| !acquired)
+        }),
+    }
 }
 
 fn candidate_path(target: &Path, digest: &str) -> miette::Result<PathBuf> {
@@ -1834,7 +1835,7 @@ mod tests {
             .write(true)
             .open(update_lock_path(prefix, ".demo.json").unwrap())
             .unwrap();
-        lock.lock_exclusive().unwrap();
+        FileExt::lock(&lock).unwrap();
         lock
     }
 

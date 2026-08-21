@@ -3,7 +3,7 @@
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
-use fs4::fs_std::FileExt;
+use fs4::FileExt;
 use miette::{Context, IntoDiagnostic};
 
 use crate::policy;
@@ -40,7 +40,7 @@ impl BootstrapLock {
                     policy::path_for_display(&path)
                 )
             })?;
-        file.lock_exclusive().into_diagnostic().with_context(|| {
+        FileExt::lock(&file).into_diagnostic().with_context(|| {
             format!(
                 "failed to acquire bootstrap lock at {}",
                 policy::path_for_display(&path)
