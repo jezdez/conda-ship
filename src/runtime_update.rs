@@ -1074,6 +1074,7 @@ mod tests {
             loop {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
                         stream
                             .set_read_timeout(Some(std::time::Duration::from_secs(10)))
                             .unwrap();
