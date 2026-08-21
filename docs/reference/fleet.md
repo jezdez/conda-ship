@@ -51,6 +51,24 @@ The delegate is required and has no `conda` default. `RuntimeSpec::validate()`
 checks the runtime id, delegate name, version, lock content, optional condarc
 mapping, and optional installer type.
 
+For a runtime already selected as a conda-ship stamped artifact, use the
+supported adapter instead of parsing the private stamp format:
+
+```rust
+let spec = RuntimeSpec::from_stamped_artifact("dist/demo")?;
+```
+
+The adapter preserves the stamped runtime identity, version, explicit
+delegate, lock, package specs, exact condarc text, frozen-base policy, and
+installer provenance. The same mapping applies to online, external, and
+embedded artifact layouts.
+
+The adapter verifies the stamped header checksum and validates the resulting
+spec. It does not authenticate the artifact, verify or extract embedded
+bundles, select install options, or choose update policy. Callers remain
+responsible for artifact selection and trust. Fleet bundle input remains an
+explicit `bundle_dir`.
+
 `condarc` contains exact `.condarc` text supplied by the caller. `None` means
 the final Fleet runtime has no `.condarc`. `freeze_base` controls the CEP 22 marker.
 `installer` controls Constructor-compatible `.installer.info` provenance. All
