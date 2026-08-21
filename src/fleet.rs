@@ -40,6 +40,7 @@ impl Fleet {
         spec: RuntimeSpec,
         options: InstallOptions,
     ) -> miette::Result<InstalledRuntime> {
+        crate::tls::install_default_provider();
         spec.validate()?;
         validate_bundle_options(options.bundle_dir.as_deref())?;
         let lock_sha256 = lock_sha256(&spec.lock_content);
