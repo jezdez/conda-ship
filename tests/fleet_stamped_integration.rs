@@ -140,6 +140,7 @@ packages:
     .unwrap();
 }
 
+#[track_caller]
 fn assert_policy(prefix: &Path) {
     assert_eq!(
         std::fs::read_to_string(prefix.join(".condarc")).unwrap(),
