@@ -8,7 +8,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use assert_cmd::cargo::cargo_bin_cmd;
-use fs4::fs_std::FileExt as _;
+use fs4::FileExt;
 use predicates::prelude::*;
 use rattler_conda_types::Platform;
 use rstest::rstest;
@@ -92,7 +92,7 @@ fn hold_runtime_update_lock(prefix: &Path) -> File {
         .truncate(false)
         .open(prefix.join(".demo.update.lock"))
         .unwrap();
-    lock.lock_exclusive().unwrap();
+    FileExt::lock(&lock).unwrap();
     lock
 }
 
