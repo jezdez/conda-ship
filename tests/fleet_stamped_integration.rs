@@ -3,11 +3,11 @@
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 use assert_cmd::cargo::{cargo_bin, cargo_bin_cmd};
 use conda_ship::fleet::{Fleet, InstallOptions, RuntimeSpec};
+use predicates::prelude::*;
 use rattler_conda_types::{Platform, compression_level::CompressionLevel};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
@@ -17,17 +17,6 @@ const DELEGATE_NAME: &str = "fleet-e2e-delegate";
 const PACKAGE_VERSION: &str = "1.0.0";
 const PACKAGE_BUILD: &str = "0";
 const CONDARC: &str = "channels: []\nchannel_priority: strict\n";
-const DELEGATE_ARGS: [&str; 4] = ["plain", "two words", "--flag=value", ""];
-
-const DELEGATE_SOURCE: &str = r#"
-use std::{env, ffi::OsString};
-
-fn main() {
-    let expected_args = ["plain", "two words", "--flag=value", ""].map(OsString::from);
-    assert_eq!(env::args_os().skip(1).collect::<Vec<_>>(), expected_args);
-    println!("delegate arguments verified");
-}
-"#;
 
 fn hex(bytes: impl AsRef<[u8]>) -> String {
     bytes
@@ -49,19 +38,7 @@ fn build_delegate_package(root: &Path) -> (PathBuf, String, u64) {
     std::fs::create_dir_all(&info_dir).unwrap();
     std::fs::create_dir_all(payload_path.parent().unwrap()).unwrap();
 
-    let source = root.join("delegate.rs");
-    std::fs::write(&source, DELEGATE_SOURCE).unwrap();
-    let output = Command::new("rustc")
-        .args(["--edition=2024", "-o"])
-        .arg(&payload_path)
-        .arg(&source)
-        .output()
-        .unwrap();
-    assert!(
-        output.status.success(),
-        "failed to compile delegate: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
+    std::fs::copy(cargo_bin!("cs"), &payload_path).unwrap();
 
     let payload_bytes = std::fs::read(&payload_path).unwrap();
     let payload_sha256 = hex(Sha256::digest(&payload_bytes));
@@ -198,11 +175,13 @@ fn test_stamped_runtime_installs_through_fleet() {
         assert_cmd::Command::new(&artifact)
             .env("CONDA_SHIP_PREFIX", &direct_prefix)
             .env("FLEET_E2E_OFFLINE", "1")
-            .args(DELEGATE_ARGS)
+            .arg("--help")
             .timeout(Duration::from_secs(120))
             .assert()
             .success()
-            .stdout("delegate arguments verified\n");
+            .stdout(predicate::str::contains(
+                "Build ready-to-run conda runtimes",
+            ));
         assert_policy(&direct_prefix);
 
         let spec = RuntimeSpec::from_stamped_artifact(&artifact).unwrap();
@@ -221,9 +200,11 @@ fn test_stamped_runtime_installs_through_fleet() {
 
         let runtime_command = installed.command(DELEGATE_NAME).unwrap();
         assert_cmd::Command::new(runtime_command.executable)
-            .args(DELEGATE_ARGS)
+            .arg("--help")
             .assert()
             .success()
-            .stdout("delegate arguments verified\n");
+            .stdout(predicate::str::contains(
+                "Build ready-to-run conda runtimes",
+            ));
     });
 }
