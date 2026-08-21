@@ -69,7 +69,14 @@ install scheme path for `express`, such as `~/.conda/express` with the default
 
 `install-name`
 : Optional directory name for this runtime's managed base prefix under the
-  selected install scheme. When omitted, it defaults to `runtime-name`.
+  selected install scheme. A string is used literally. The derived form
+  `{ from = "runtime-lock" }` appends the runtime version and a 16-character
+  prefix of the rendered runtime lock SHA-256 to `runtime-name`. Set its
+  optional `base` field to use another base. When omitted, the install name
+  defaults to `runtime-name`. An explicit `--install-name` remains a final-name
+  override.
+  See {doc}`../explanation/install-locations-and-ownership` for lifecycle and
+  security details.
 
 ## Related Fields
 

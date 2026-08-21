@@ -193,7 +193,7 @@ pub(crate) fn derive_runtime_lock(root: &Path) -> miette::Result<DerivedRuntimeL
             project_dynamic_version: input.project_dynamic_version,
             docs_url: input.config.docs_url,
             install_scheme: input.config.install_scheme,
-            install_name: input.config.install_name,
+            install_name: None,
             installer: input.config.installer,
             condarc,
             freeze_base: input.config.freeze_base,

@@ -8,8 +8,8 @@ use rstest::rstest;
 use tempfile::TempDir;
 
 use super::artifact::{
-    PackageInfo, apply_runtime_metadata_overrides, artifact_stem, binary_filename,
-    render_package_list, resolve_artifact_layout, resolve_artifact_name,
+    PackageInfo, apply_install_name_config, apply_runtime_metadata_overrides, artifact_stem,
+    binary_filename, render_package_list, resolve_artifact_layout, resolve_artifact_name,
     resolve_delegate_executable, resolve_runtime_name, runtime_template_filename,
     runtime_template_from_env, source_binary, source_binary_plan, stage_artifacts,
     validate_artifact_name, validate_delegate_executable, validate_docs_url, validate_install_name,
@@ -25,8 +25,9 @@ use super::project::{
 };
 use super::sbom::{creation_timestamp, render_cyclonedx_sbom};
 use super::{
-    BundleLayout, Cli, Command, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionConfig,
-    RuntimeVersionSource, ShipConfig, runtime_data,
+    BundleLayout, Cli, Command, InstallNameConfig, InstallNameSource, InstallNameSourceConfig,
+    RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionConfig, RuntimeVersionSource,
+    ShipConfig, runtime_data,
 };
 
 fn make_pkg(name: &str, depends: &[&str]) -> CondaPackageData {
@@ -386,7 +387,7 @@ fn test_update_config_accepts_supported_layout(#[case] layout: BundleLayout) {
         ..RuntimeStampConfig::default()
     };
 
-    validate_update_config(&config, layout).unwrap();
+    validate_update_config(&config, layout, None).unwrap();
 }
 
 #[rstest]
@@ -436,7 +437,7 @@ fn test_update_config_rejects_invalid_policy(
         ..RuntimeStampConfig::default()
     };
 
-    let error = validate_update_config(&config, layout)
+    let error = validate_update_config(&config, layout, None)
         .unwrap_err()
         .to_string();
 
@@ -461,7 +462,7 @@ package = "demo-runtime"
         ..RuntimeStampConfig::default()
     };
 
-    let error = validate_update_config(&config, BundleLayout::Online)
+    let error = validate_update_config(&config, BundleLayout::Online, None)
         .unwrap_err()
         .to_string();
 
@@ -1105,6 +1106,92 @@ fn test_build_accepts_manifest_runtime_without_cli_runtime() {
 
     assert_eq!(runtime_name, None);
     assert_eq!(artifact_layout, None);
+}
+
+#[test]
+fn test_content_addressed_install_name() {
+    let literal: ShipConfig = toml::from_str("install-name = \"express\"\n").unwrap();
+    let literal = literal.install_name.as_ref().unwrap();
+    let default: ShipConfig =
+        toml::from_str("install-name = { from = \"runtime-lock\" }\n").unwrap();
+    let default = default.install_name.as_ref().unwrap();
+    let explicit: ShipConfig =
+        toml::from_str("install-name = { from = \"runtime-lock\", base = \"express\" }\n").unwrap();
+    let explicit = explicit.install_name.as_ref().unwrap();
+
+    let config = |version: &str| RuntimeStampConfig {
+        runtime_version: Some(version.to_string()),
+        ..RuntimeStampConfig::default()
+    };
+    let apply = |config: &mut RuntimeStampConfig, configured: &InstallNameConfig| {
+        apply_install_name_config(config, Some(configured), None, "cx", "lock\n")
+    };
+
+    let mut literal_config = config("1.2.3");
+    assert_eq!(apply(&mut literal_config, literal).unwrap(), None);
+    assert_eq!(literal_config.install_name.as_deref(), Some("express"));
+
+    let mut default_config = config("1.2.3");
+    let source = apply(&mut default_config, default).unwrap();
+    assert_eq!(source, Some(InstallNameSource::RuntimeLock));
+    assert_eq!(
+        default_config.install_name.as_deref(),
+        Some("cx-1.2.3-d8c9f2728aa278eb")
+    );
+
+    let mut explicit_config = config("1.2.3");
+    apply(&mut explicit_config, explicit).unwrap();
+    assert_eq!(
+        explicit_config.install_name.as_deref(),
+        Some("express-1.2.3-d8c9f2728aa278eb")
+    );
+
+    let allowed_name = InstallNameConfig::Source(InstallNameSourceConfig {
+        from: InstallNameSource::RuntimeLock,
+        base: Some("a".repeat(109)),
+    });
+    let mut allowed = config("1");
+    apply(&mut allowed, &allowed_name).unwrap();
+    assert_eq!(allowed.install_name.unwrap().len(), 128);
+
+    let too_long_name = InstallNameConfig::Source(InstallNameSourceConfig {
+        from: InstallNameSource::RuntimeLock,
+        base: Some("a".repeat(110)),
+    });
+    let mut too_long = config("1");
+    let error = apply(&mut too_long, &too_long_name).unwrap_err();
+    assert!(
+        error.to_string().contains("at most 128 characters"),
+        "{error}"
+    );
+
+    let mut unsafe_version = config("1.2.3+local");
+    let error = apply(&mut unsafe_version, default).unwrap_err();
+    assert!(
+        error.to_string().contains("install name may only contain"),
+        "{error}"
+    );
+
+    let mut update = config("1.2.3");
+    update.update = Some(runtime_data::RuntimeUpdateConfig::new(
+        "https://prefix.dev/demo".to_string(),
+        "demo-runtime".to_string(),
+        0,
+    ));
+    let source = apply(&mut update, default).unwrap();
+    let error = validate_update_config(&update, BundleLayout::Online, source).unwrap_err();
+    assert!(error.to_string().contains("cannot be combined"), "{error}");
+
+    let overridden = apply_install_name_config(
+        &mut update,
+        Some(default),
+        Some("stable-prefix".to_string()),
+        "cx",
+        "lock\n",
+    )
+    .unwrap();
+    assert_eq!(update.install_name.as_deref(), Some("stable-prefix"));
+    validate_update_config(&update, BundleLayout::Online, overridden).unwrap();
 }
 
 #[test]

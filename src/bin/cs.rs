@@ -76,7 +76,7 @@ struct ShipConfig {
     #[serde(default, rename = "install-scheme")]
     install_scheme: Option<runtime_data::InstallScheme>,
     #[serde(default, rename = "install-name")]
-    install_name: Option<String>,
+    install_name: Option<InstallNameConfig>,
     #[serde(default)]
     installer: Option<String>,
     #[serde(default, rename = "condarc-file")]
@@ -104,6 +104,27 @@ struct RuntimeVersionSourceConfig {
 #[serde(rename_all = "kebab-case")]
 enum RuntimeVersionSource {
     ProjectMetadata,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(untagged)]
+enum InstallNameConfig {
+    Value(String),
+    Source(InstallNameSourceConfig),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct InstallNameSourceConfig {
+    from: InstallNameSource,
+    #[serde(default)]
+    base: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+enum InstallNameSource {
+    RuntimeLock,
 }
 
 #[derive(Clone, Default)]

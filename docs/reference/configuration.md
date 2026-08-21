@@ -176,6 +176,23 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   under `~/.conda`. It relies on runtime metadata to avoid overwriting prefixes
   owned by other tools.
 
+  To derive a content-addressed name from immutable runtime inputs, use
+  `install-name = { from = "runtime-lock" }`. Add `base = "express"` inside
+  the table to override the default runtime-name base. The builder resolves it
+  to
+  `BASE-RUNTIME_VERSION-LOCK_HASH`, where `BASE` is the configured `base` or
+  `runtime-name` and `LOCK_HASH` is the first 16 lowercase hexadecimal
+  characters of the SHA-256 of the exact rendered runtime lock bytes.
+  Changing the runtime version or runtime lock selects a new managed prefix.
+  Existing prefixes are retained. The derived name does not itself prevent
+  package changes inside the prefix. Use `freeze-base = true` for the separate
+  CEP 22 mutation guard. Content-addressed runtime versions must use only ASCII
+  letters, digits, dots, dashes, and underscores. The resolved name is limited
+  to 128 characters. The derived form cannot be combined with
+  `[tool.conda-ship.update]`. An explicit `cs build --install-name` or GitHub
+  Action `install-name` input remains a final-name override and disables
+  derivation for that build.
+
 `installer`
 : Optional package manager or installer hint stamped into the generated runtime.
   Release workflows can override this with `cs build --installer INSTALLER` or
@@ -268,7 +285,8 @@ set.
 - runtime name: `RUNTIME_NAME`
 - delegate executable: the configured `delegate-executable`
 - install scheme: `conda-home`, or the configured `install-scheme`
-- install name: `RUNTIME_NAME`, or the configured `install-name`
+- install name: `RUNTIME_NAME`, the literal `install-name`, or the resolved
+  content-addressed name from the derived `install-name` form
 - installer: the configured `installer`, when present
 - condarc contents: the exact text from `condarc-file`, when configured
 - frozen base policy: the configured `freeze-base` value, defaulting to `false`
