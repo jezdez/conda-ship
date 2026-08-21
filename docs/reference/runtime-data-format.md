@@ -7,7 +7,9 @@ general-purpose file format for other tools to write.
 ```{important}
 Treat the stamped runtime data as private executable metadata. Release tooling
 should read `.info.json`, `.runtime.lock`, `.packages.txt`, `.cdx.json`, and
-`.sha256` instead of parsing or writing bytes inside the runtime binary.
+`.sha256` instead of parsing or writing bytes inside the runtime binary. Fleet
+callers adapting a selected stamped artifact should use
+`RuntimeSpec::from_stamped_artifact`.
 ```
 
 ## Location

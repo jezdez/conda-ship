@@ -296,6 +296,46 @@ pub struct RuntimeSpec {
 }
 
 impl RuntimeSpec {
+    /// Construct a runtime spec from a conda-ship stamped artifact.
+    ///
+    /// This verifies the stamped metadata and validates the resulting spec.
+    /// Artifact selection and trust remain the caller's responsibility.
+    pub fn from_stamped_artifact(path: impl AsRef<Path>) -> miette::Result<Self> {
+        let path = path.as_ref();
+        let data = crate::runtime_data::read_from_path(path)
+            .into_diagnostic()
+            .with_context(|| {
+                format!(
+                    "failed to read stamped runtime artifact {}",
+                    policy::path_for_display(path)
+                )
+            })?
+            .ok_or_else(|| {
+                miette::miette!(
+                    "artifact is not stamped with conda-ship runtime data: {}",
+                    policy::path_for_display(path)
+                )
+            })?;
+        let header = data.header;
+        let spec = Self {
+            id: header.runtime_name,
+            version: header.runtime_version,
+            delegate_executable: header.delegate_executable,
+            lock_content: header.runtime_lock,
+            requested_specs: header.runtime_config.packages,
+            condarc: header.runtime_config.condarc,
+            freeze_base: header.runtime_config.freeze_base,
+            installer: header.installer,
+        };
+        spec.validate().with_context(|| {
+            format!(
+                "invalid runtime spec in stamped artifact {}",
+                policy::path_for_display(path)
+            )
+        })?;
+        Ok(spec)
+    }
+
     /// Validate runtime identity and command names before installation.
     pub fn validate(&self) -> miette::Result<()> {
         validate_runtime_id(&self.id)?;
@@ -711,8 +751,9 @@ To override: pass --override-frozen"
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::runtime_data::{RuntimeDataHeader, append_to_binary};
     use rattler_conda_types::Platform;
-    use tempfile::TempDir;
+    use tempfile::{NamedTempFile, TempDir};
 
     fn fleet(root: &Path) -> Fleet {
         Fleet::new(root)
@@ -749,6 +790,75 @@ packages: []
             freeze_base: false,
             installer: None,
         }
+    }
+
+    #[test]
+    fn test_runtime_spec_from_stamped_artifact() {
+        for layout in ["online", "external", "embedded"] {
+            let artifact = NamedTempFile::new().unwrap();
+            std::fs::write(artifact.path(), b"binary").unwrap();
+            let bundle = if layout == "embedded" {
+                let bundle = NamedTempFile::new().unwrap();
+                std::fs::write(bundle.path(), b"bundle").unwrap();
+                Some(bundle)
+            } else {
+                None
+            };
+
+            let lock_content = empty_lock();
+            let mut header = RuntimeDataHeader::for_name("artifact-name");
+            header.runtime_name = "runtime-name".to_string();
+            header.runtime_version = "2026.8.0".to_string();
+            header.artifact_layout = layout.to_string();
+            header.install_name = "stamped-install-name".to_string();
+            header.delegate_executable = "python3.12".to_string();
+            header.runtime_lock = lock_content.clone();
+            header.runtime_config.channels = vec!["ignored-channel".to_string()];
+            header.runtime_config.packages = vec!["python".to_string(), "certifi".to_string()];
+            header.runtime_config.condarc = Some("channels:\n  - runtime-channel\n".to_string());
+            header.runtime_config.freeze_base = true;
+            header.installer = Some("homebrew".to_string());
+            append_to_binary(
+                artifact.path(),
+                &header,
+                bundle.as_ref().map(NamedTempFile::path),
+            )
+            .unwrap();
+
+            assert_eq!(
+                RuntimeSpec::from_stamped_artifact(artifact.path()).unwrap(),
+                RuntimeSpec {
+                    id: "runtime-name".to_string(),
+                    version: "2026.8.0".to_string(),
+                    delegate_executable: "python3.12".to_string(),
+                    lock_content,
+                    requested_specs: vec!["python".to_string(), "certifi".to_string()],
+                    condarc: Some("channels:\n  - runtime-channel\n".to_string()),
+                    freeze_base: true,
+                    installer: Some("homebrew".to_string()),
+                },
+                "layout {layout}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_runtime_spec_from_stamped_artifact_rejects_invalid_artifacts() {
+        let unstamped = NamedTempFile::new().unwrap();
+        std::fs::write(unstamped.path(), b"binary").unwrap();
+        let error = RuntimeSpec::from_stamped_artifact(unstamped.path())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("artifact is not stamped"), "{error}");
+
+        let invalid = NamedTempFile::new().unwrap();
+        std::fs::write(invalid.path(), b"binary").unwrap();
+        let header = RuntimeDataHeader::for_name("invalid");
+        append_to_binary(invalid.path(), &header, None).unwrap();
+        let error = RuntimeSpec::from_stamped_artifact(invalid.path())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("invalid runtime spec"), "{error}");
     }
 
     fn write_delegate(prefix: &Path, delegate: &str) -> PathBuf {

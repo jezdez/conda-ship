@@ -6,6 +6,8 @@ All notable changes to `conda-ship` are documented here.
 
 ### Added
 
+- Added a Fleet adapter for deriving a validated `RuntimeSpec` from a selected
+  conda-ship stamped runtime artifact.
 - Added a CycloneDX 1.7 SBOM sidecar for every staged runtime, containing the
   resolved conda package graph.
 
