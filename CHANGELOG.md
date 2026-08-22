@@ -20,6 +20,8 @@ All notable changes to `conda-ship` are documented here.
 - Initialized the default TLS provider before Fleet installs packages through
   the Rust API.
 - Updated `h2` to 0.4.16, addressing RUSTSEC-2026-0258.
+- Fixed release rehearsals to pair the released action with matching released
+  builder assets.
 
 ## 0.7.0 - 2026-07-24
 
