@@ -134,5 +134,6 @@ conda-ship does not:
 - replace review of committed source lockfiles
 - hide the need for package-manager or platform signing
 
-It provides reproducible build output, narrow runtime verification, and metadata
-that downstream release systems can sign.
+It provides lock-based package selection, narrow runtime verification, and
+metadata that downstream release systems can sign. Set `SOURCE_DATE_EPOCH` when
+reproducible SBOM timestamps are required.

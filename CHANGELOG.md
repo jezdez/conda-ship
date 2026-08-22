@@ -2,21 +2,24 @@
 
 All notable changes to `conda-ship` are documented here.
 
-## Unreleased
+## 0.8.0 - 2026-08-22
 
 ### Added
 
-- Added opt-in content-addressed install names derived from the runtime version
-  and the rendered runtime lock SHA-256.
-- Added a Fleet adapter for deriving a validated `RuntimeSpec` from a selected
-  conda-ship stamped runtime artifact.
-- Added a CycloneDX 1.7 SBOM sidecar for every staged runtime, containing the
-  resolved conda package graph.
+- Added opt-in derived install names with
+  `install-name = { from = "runtime-lock" }`, allowing different runtime
+  versions or locked package sets to use separate managed prefixes.
+- Added a CycloneDX 1.7 `.cdx.json` SBOM for every staged runtime. It is
+  recorded in `.info.json` and `.sha256`, and exposed through the GitHub Action
+  `sbom-path` output.
+- Added `RuntimeSpec::from_stamped_artifact` to the optional Fleet Rust API for
+  deriving validated Fleet input from a selected conda-ship artifact.
 
 ### Fixed
 
-- Initialized the default TLS provider when Fleet installs a runtime through
-  the Rust library API.
+- Initialized the default TLS provider before Fleet installs packages through
+  the Rust API.
+- Updated `h2` to 0.4.16, addressing RUSTSEC-2026-0258.
 
 ## 0.7.0 - 2026-07-24
 
