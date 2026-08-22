@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::Platform;
 use rattler_lock::{CondaPackageData, LockFile};
+use sha2::{Digest, Sha256};
 
 use super::bundle::gen_bundle_from_lock;
 use super::diagnostic::{DiagnosticKind, ship_error};
@@ -15,8 +16,9 @@ use super::project::{
 };
 use super::sbom::{creation_timestamp, render_cyclonedx_sbom};
 use super::{
-    BUNDLE_ARCHIVE_FILE, BundleLayout, RUNTIME_LOCK_FILE, RUNTIME_TEMPLATE_ENV, RuntimeStampConfig,
-    RuntimeVersionSource, SHIP_STATE_DIR, ShipConfig, runtime_data,
+    BUNDLE_ARCHIVE_FILE, BundleLayout, InstallNameConfig, InstallNameSource, RUNTIME_LOCK_FILE,
+    RUNTIME_TEMPLATE_ENV, RuntimeStampConfig, RuntimeVersionSource, SHIP_STATE_DIR, ShipConfig,
+    runtime_data,
 };
 
 #[derive(Debug)]
@@ -169,9 +171,16 @@ pub(crate) fn dry_run_build_artifact(
         docs_url,
         installer,
     )?;
-    apply_install_location_overrides(&mut derived.runtime_config, install_scheme, install_name)?;
-    validate_install_location_config(&derived.runtime_config, &runtime)?;
-    validate_update_config(&derived.runtime_config, layout)?;
+    let install_name_source = apply_install_name_config(
+        &mut derived.runtime_config,
+        derived.input.config.install_name.as_ref(),
+        install_name,
+        &runtime,
+        &derived.content,
+    )?;
+    validate_update_config(&derived.runtime_config, layout, install_name_source)?;
+    derived.runtime_config.install_scheme =
+        install_scheme.or(derived.runtime_config.install_scheme);
 
     let runtime_lock_path = generated_runtime_lock_path(&root);
     let packages = packages_for_platform(&derived.lock_file, &runtime_lock_path, platform)?;
@@ -247,9 +256,16 @@ pub(crate) fn build_artifact(
         docs_url,
         installer,
     )?;
-    apply_install_location_overrides(&mut derived.runtime_config, install_scheme, install_name)?;
-    validate_install_location_config(&derived.runtime_config, &runtime)?;
-    validate_update_config(&derived.runtime_config, layout)?;
+    let install_name_source = apply_install_name_config(
+        &mut derived.runtime_config,
+        derived.input.config.install_name.as_ref(),
+        install_name,
+        &runtime,
+        &derived.content,
+    )?;
+    validate_update_config(&derived.runtime_config, layout, install_name_source)?;
+    derived.runtime_config.install_scheme =
+        install_scheme.or(derived.runtime_config.install_scheme);
     let runtime_lock_path = generated_runtime_lock_path(&root);
     write_generated_runtime_lock(&runtime_lock_path, &derived.content)?;
 
@@ -1022,20 +1038,38 @@ pub(crate) fn validate_target_triple(target: &str) -> miette::Result<()> {
     validate_artifact_component("target triple", target)
 }
 
-fn apply_install_location_overrides(
-    config: &mut RuntimeStampConfig,
-    install_scheme: Option<runtime_data::InstallScheme>,
-    install_name: Option<String>,
-) -> miette::Result<()> {
-    if let Some(install_scheme) = install_scheme {
-        config.install_scheme = Some(install_scheme);
-    }
+const MAX_CONTENT_ADDRESSED_INSTALL_NAME_LEN: usize = 128;
 
-    if let Some(install_name) = install_name {
-        validate_install_name(&install_name)?;
-        config.install_name = Some(install_name);
-    }
-    Ok(())
+pub(crate) fn apply_install_name_config(
+    config: &mut RuntimeStampConfig,
+    configured: Option<&InstallNameConfig>,
+    install_name_override: Option<String>,
+    runtime: &str,
+    lock_content: &str,
+) -> miette::Result<Option<InstallNameSource>> {
+    let (install_name, source) = match (install_name_override, configured) {
+        (Some(install_name), _) => (install_name, None),
+        (None, Some(InstallNameConfig::Value(install_name))) => (install_name.clone(), None),
+        (None, None) => (runtime.to_string(), None),
+        (None, Some(InstallNameConfig::Source(source))) => {
+            let version = config
+                .runtime_version
+                .as_deref()
+                .ok_or_else(|| missing_runtime_version(config.project_dynamic_version))?;
+            let base = source.base.as_deref().unwrap_or(runtime);
+            let digest = Sha256::digest(lock_content.as_bytes());
+            let install_name = format!("{base}-{version}-{}", crate::hash::hex(&digest[..8]));
+            if install_name.len() > MAX_CONTENT_ADDRESSED_INSTALL_NAME_LEN {
+                return Err(miette::miette!(
+                    "content-addressed install name must be at most {MAX_CONTENT_ADDRESSED_INSTALL_NAME_LEN} characters. Shorten install-name base or runtime-version"
+                ));
+            }
+            (install_name, Some(source.from))
+        }
+    };
+    validate_install_name(&install_name)?;
+    config.install_name = Some(install_name);
+    Ok(source)
 }
 
 pub(crate) fn apply_runtime_metadata_overrides(
@@ -1106,20 +1140,19 @@ fn missing_runtime_version(project_dynamic_version: bool) -> miette::Report {
     }
 }
 
-fn validate_install_location_config(
-    config: &RuntimeStampConfig,
-    runtime: &str,
-) -> miette::Result<()> {
-    validate_install_name(config.install_name.as_deref().unwrap_or(runtime))
-}
-
 pub(crate) fn validate_update_config(
     config: &RuntimeStampConfig,
     layout: BundleLayout,
+    install_name_source: Option<InstallNameSource>,
 ) -> miette::Result<()> {
     let Some(update) = config.update.as_ref() else {
         return Ok(());
     };
+    if install_name_source.is_some() {
+        return Err(miette::miette!(
+            "install-name = {{ from = \"runtime-lock\" }} cannot be combined with [tool.conda-ship.update] because runtime updates require a stable install name"
+        ));
+    }
     if layout == BundleLayout::External {
         return Err(miette::miette!(
             "[tool.conda-ship.update] is supported only for online and embedded artifacts"

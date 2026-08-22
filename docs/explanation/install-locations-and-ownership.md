@@ -34,6 +34,48 @@ install-name = "express"
 
 With the `conda-home` scheme, that runtime installs below `~/.conda/express`.
 
+## Content-addressed Install Names
+
+Use the derived `install-name` form to give each runtime version and rendered
+runtime lock its own managed prefix:
+
+```toml
+[tool.conda-ship]
+runtime-name = "cx"
+runtime-version = "1.2.3"
+install-name = { from = "runtime-lock", base = "express" }
+```
+
+The builder stamps a flat install name in the form
+`BASE-RUNTIME_VERSION-LOCK_HASH`. `BASE` is the configured `base` or the runtime
+name when `base` is omitted. `LOCK_HASH` is the first 16 lowercase hexadecimal
+characters of the SHA-256 of the exact rendered `.runtime.lock` bytes. For
+example, the `conda-home` scheme might resolve to
+`~/.conda/express-1.2.3-d8c9f2728aa278eb`.
+
+Changing the runtime version or lock selects a new prefix. conda-ship does not
+remove older prefixes automatically. The abbreviated digest is a deterministic
+location identifier, not an authorization or integrity boundary. Package
+integrity continues to rely on the hashes in the stamped runtime lock and the
+existing ownership checks.
+
+The derived name identifies the inputs used for the initial installation. It
+does not prevent later package changes inside the prefix. Set
+`freeze-base = true` when a CEP 22-aware delegate should reject ordinary base
+environment mutations.
+
+Content-addressed runtime versions must contain only ASCII letters, digits,
+dots, dashes, and underscores so the complete install name remains one safe
+path component. The resolved name is limited to 128 characters. When active,
+the derived form cannot be combined with `[tool.conda-ship.update]` because
+runtime update candidates must preserve the stamped install name.
+
+An explicit `cs build --install-name` or GitHub Action `install-name` input
+remains a final-name override and disables content-addressed name generation
+for that build.
+`CONDA_SHIP_PREFIX` and the runtime-specific prefix environment variable still
+override the resolved path when the stamped runtime executes.
+
 ## Runtime Prefix Override
 
 `CONDA_SHIP_PREFIX` overrides the resolved install path for every generated
