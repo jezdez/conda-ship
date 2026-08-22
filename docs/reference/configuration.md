@@ -176,6 +176,10 @@ For the naming model behind `runtime-name`, `artifact-name`, `install-name`, and
   under `~/.conda`. It relies on runtime metadata to avoid overwriting prefixes
   owned by other tools.
 
+  ```{versionadded} 0.8.0
+  The derived `install-name = { from = "runtime-lock" }` form.
+  ```
+
   To derive a content-addressed name from immutable runtime inputs, use
   `install-name = { from = "runtime-lock" }`. Add `base = "express"` inside
   the table to override the default runtime-name base. The builder resolves it
