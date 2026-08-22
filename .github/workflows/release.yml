@@ -570,8 +570,27 @@ jobs:
           ref: ${{ needs.validate-release.outputs.ref }}
           persist-credentials: false
 
-      - name: Build with the action
-        id: conda-ship
+      - name: Check out the released action
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate-release.outputs.action-version }}
+          path: released-action
+          persist-credentials: false
+
+      - name: Build with the released action
+        if: github.event_name == 'workflow_dispatch'
+        id: released_action
+        uses: ./released-action
+        with:
+          conda-ship-version: ${{ needs.validate-release.outputs.action-version }}
+          runtime-name: release-smoke
+          delegate-executable: conda
+          root: .
+
+      - name: Build with the tagged action
+        if: github.event_name == 'push'
+        id: tagged_action
         uses: ./
         with:
           conda-ship-version: ${{ needs.validate-release.outputs.action-version }}
@@ -582,7 +601,7 @@ jobs:
       - name: Check builder output
         shell: bash
         env:
-          CS_PATH: ${{ steps.conda-ship.outputs.cs-path }}
+          CS_PATH: ${{ steps.released_action.outputs.cs-path || steps.tagged_action.outputs.cs-path }}
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
@@ -630,6 +649,7 @@ jobs:
           "$cs" "${build_args[@]}" --dry-run
           "$cs" "${build_args[@]}"
           test "$(find "$out_dir" -maxdepth 1 -type f -name '*.info.json' | wc -l | tr -d ' ')" = 1
+          test "$(find "$out_dir" -maxdepth 1 -type f -name '*.cdx.json' | wc -l | tr -d ' ')" = 1
 
   finalize-github-release:
     name: Publish verified GitHub release
